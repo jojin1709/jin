@@ -40,14 +40,16 @@ go build -o jin.exe .
 
 ./jin.exe examples/tour.jin       # run a program
 ./jin.exe examples/control.jin    # run the control-flow demo
+./jin.exe examples/types.jin      # run the type-checked demo
+./jin.exe check examples/tour.jin # type-check without running
 ./jin.exe parse examples/tour.jin # print the syntax tree
 ./jin.exe tokens examples/tour.jin # print the token stream
 ./jin.exe                          # REPL
 go test ./...
 ```
 
-Stage 1 and 2 behaviour (`tokens`, `parse`) is still available, so you can watch
-each layer of the pipeline separately.
+Stages 1, 2 and 4 (`tokens`, `parse`, `check`) are available on their own, so
+you can watch each layer of the pipeline separately.
 
 ## Language tour
 
@@ -73,9 +75,38 @@ print("use {{braces}} for literal braces")
 Built-ins: `print`, `len`, `push`, `str`, `int`, `float`, `type`, `range`,
 `upper`, `lower`, `trim`, `split`, `join`, `contains`, `abs`, `min`, `max`.
 
+## Types are optional, but checked
+
+Annotations are never required. When you write them, Jin enforces them before
+the program runs, so mistakes are caught up front instead of halfway through a
+loop:
+
+```jin
+fn area(w: int, h: int) -> int {
+    return w * h
+}
+
+let width: int = 3
+let height = "4"
+
+print(area(width, height))   # error: argument 2: cannot use str where int is expected
+print(area(width))           # error: area() expects 2 argument(s), got 1
+print(1 + "x")               # error: cannot add int and str
+if width { }                 # error: condition must be a bool, got int
+```
+
+Run `jin check file.jin` to see the problems without executing anything. Running
+a file checks it first, so a program with type errors never starts.
+
+Whatever you leave unannotated is treated as `any` and left alone, so plain
+scripts keep working exactly as before. The checker also covers `let` and
+assignment, function arguments and returns, loop bodies, indexing, built-in
+calls, misplaced `break` / `continue` / `return`, and the expressions inside
+`{interpolation}`.
+
 ## How it works
 
-A language is built as a pipeline. Jin is through stage 3:
+A language is built as a pipeline. Jin is through stage 4:
 
 ```
 source text
@@ -85,6 +116,9 @@ tokens
    |  parser.go       -> syntax tree
    v
 syntax tree            (ast.go)
+   |  typechecker.go  -> type errors, or a clean bill of health
+   v
+syntax tree
    |  interpreter.go  -> result
    v
 values                 (object.go, environment.go, builtins.go)
@@ -97,6 +131,8 @@ values                 (object.go, environment.go, builtins.go)
 | `ast.go` | Syntax tree node definitions |
 | `parser.go` | Tokens to syntax tree (Pratt parser) |
 | `dump.go` | Renders a syntax tree as indented text |
+| `typechecker.go` | Static types, and every check that runs before the program does |
+| `template.go` | Splits `{interpolation}` inside strings, shared by the checker and interpreter |
 | `object.go` | Runtime values |
 | `environment.go` | Variable scopes |
 | `builtins.go` | Built-in functions |
@@ -108,7 +144,7 @@ values                 (object.go, environment.go, builtins.go)
 - [x] Stage 1: lexer
 - [x] Stage 2: parser
 - [x] Stage 3: interpreter
-- [ ] Stage 4: type checker
+- [x] Stage 4: type checker
 - [ ] Stage 5: bytecode compiler + VM
 - [ ] Stage 6: standard library
 - [ ] Stage 7: package manager + CLI

@@ -26,6 +26,17 @@ func NewLexer(input string) *Lexer {
 	return l
 }
 
+// NewLexerAt starts lexing as if the input began at the given 1-based line.
+// It is used for expressions pulled out of a string, so that errors inside
+// {interpolation} point at the real line in the file rather than line 1.
+func NewLexerAt(input string, line int) *Lexer {
+	l := NewLexer(input)
+	if line > 0 {
+		l.line = line
+	}
+	return l
+}
+
 // readChar advances to the next rune, keeping line/lineStart in sync.
 func (l *Lexer) readChar() {
 	// If we are leaving a newline, the next rune starts a new line.

@@ -1,0 +1,311 @@
+package main
+
+import (
+	"strings"
+	"testing"
+)
+
+// ---------------------------------------------------------------- helpers
+
+func parseOf(t *testing.T, src string) *Program {
+	t.Helper()
+	p := NewParser(NewLexer(src))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors for %q: %s", src, strings.Join(p.Errors(), "; "))
+	}
+	return program
+}
+
+func checkOf(t *testing.T, src string) []string {
+	t.Helper()
+	return Check(parseOf(t, src))
+}
+
+func expectClean(t *testing.T, src string) {
+	t.Helper()
+	if errs := checkOf(t, src); len(errs) > 0 {
+		t.Errorf("expected no type errors for:\n%s\ngot: %s", src, strings.Join(errs, "; "))
+	}
+}
+
+func expectTypeError(t *testing.T, src, wantSub string) {
+	t.Helper()
+	errs := checkOf(t, src)
+	if len(errs) == 0 {
+		t.Errorf("expected a type error containing %q for:\n%s\ngot none", wantSub, src)
+		return
+	}
+	joined := strings.Join(errs, "; ")
+	if !strings.Contains(joined, wantSub) {
+		t.Errorf("for:\n%s\nwant an error containing %q\ngot: %s", src, wantSub, joined)
+	}
+}
+
+// ---------------------------------------------------------------- tests
+
+func TestValidProgramsPassTheChecker(t *testing.T) {
+	programs := []string{
+		`let x: int = 5`,
+		`let name: str = "Jin"
+let greeting = "Hello, {name}!"`,
+		`fn add(a: int, b: int) -> int { return a + b }
+add(1, 2)`,
+		`fn fib(n) {
+    if n < 2 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+fib(10)`,
+		`let xs = [1, 2, 3]
+let total = 0
+for x in xs { total = total + x }
+total`,
+		`let n = 0
+while n < 5 {
+    n = n + 1
+    if n == 3 { continue }
+    if n == 6 { break }
+}
+n`,
+		`let f = fn(v: int) -> int { v * 2 }
+f(21)`,
+		`let s = ""
+for ch in "abc" { s = s + ch }
+s`,
+		`print("fib: {len([1, 2, 3])}")`,
+		`let a = [1, 2]
+a[0] = 99
+a[1]`,
+		`fn outer() {
+    fn inner(x: int) -> int { return x + 1 }
+    return inner(1)
+}
+outer()`,
+		// A closure may assign to a local of the enclosing function.
+		`fn counter() {
+    let n = 0
+    let inc = fn() { n = n + 1; return n }
+    return inc
+}
+let next = counter()
+next()`,
+		// A bare "array" annotation is allowed.
+		`let xs: array = []
+xs = push(xs, 1)
+for x in xs { print(x) }`,
+		// Recursion against an annotated signature.
+		`fn fact(n: int) -> int {
+    if n <= 1 { return 1 }
+    return n * fact(n - 1)
+}
+fact(5)`,
+		// push keeps the element type it knows about.
+		`let xs = [1, 2]
+let ys = push(xs, 3)
+for y in ys { print(y + 1) }`,
+		`let grid = [1, 2, 3]
+grid[1] = grid[0] + grid[2]
+grid`,
+	}
+	for _, src := range programs {
+		expectClean(t, src)
+	}
+}
+
+func TestBasicTypeMismatches(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{`let x: int = "hello"`, "cannot assign str to int"},
+		{`let x: int = 5` + "\n" + `x = "s"`, "cannot assign str to int"},
+		{`1 + "x"`, "cannot add int and str"},
+		{`"a" - "b"`, "cannot use '-' on str and str"},
+		{`1 + 1.5`, "convert one explicitly"},
+		{`let n = 1` + "\n" + `n * 2.5`, "convert one explicitly"},
+		{`!5`, "'!' expects a bool"},
+		{`-"text"`, "'-' expects a number"},
+		{`true && 1`, "'&&' expects bool operands"},
+		{`1 < "a"`, "cannot compare"},
+		{`if 1 { print("x") }`, "condition must be a bool"},
+		{`while "yes" { }`, "condition must be a bool"},
+		{`let x: int = 5` + "\n" + `x + true`, "cannot add int and bool"},
+	}
+	for _, c := range cases {
+		expectTypeError(t, c.src, c.want)
+	}
+}
+
+func TestUnknownTypeName(t *testing.T) {
+	expectTypeError(t, `let x: integer = 5`, `unknown type "integer"`)
+	expectTypeError(t, `fn f(a: string) { }`, `unknown type "string"`)
+}
+
+func TestFunctionCallsAreChecked(t *testing.T) {
+	expectTypeError(t, "fn f(a: int) { }\nf(1, 2)", "f() expects 1 argument(s), got 2")
+	expectTypeError(t, "fn f(a: int) { }\nf()", "f() expects 1 argument(s), got 0")
+	expectTypeError(t, `fn f(a: int) { }`+"\n"+`f("x")`, "argument 1: cannot use str where int is expected")
+	expectTypeError(t, `let x = 5`+"\n"+`x(1)`, "is not callable")
+	expectTypeError(t, `fn f(a: str, b: bool) { }`+"\n"+`f("ok", 1)`, "argument 2")
+}
+
+func TestReturnTypesAreChecked(t *testing.T) {
+	expectTypeError(t, `fn f() -> int { return "text" }`, "cannot return str")
+	expectTypeError(t, `fn f() -> str { return 42 }`, "cannot return int")
+	// Implicit return of the last expression must match too.
+	expectTypeError(t, `fn f() -> int { "just a string" }`, "declared to return int")
+	// Explicitly returning the right type is fine.
+	expectClean(t, `fn f() -> int { return 42 }`)
+	expectClean(t, `fn f() -> int { 7 }`)
+}
+
+func TestControlFlowPlacement(t *testing.T) {
+	expectTypeError(t, `break`, "'break' is only allowed inside a loop")
+	expectTypeError(t, `continue`, "'continue' is only allowed inside a loop")
+	expectTypeError(t, `return 1`, "'return' is only allowed inside a function")
+	expectTypeError(t, `while true { fn g() { break } }`, "'break' is only allowed inside a loop")
+	expectClean(t, `while true { break }`)
+	expectClean(t, `fn f() { return 1 }`)
+}
+
+func TestUndefinedVariables(t *testing.T) {
+	expectTypeError(t, `undefinedThing`, `undefined variable "undefinedThing"`)
+	expectTypeError(t, `print(x)`+"\n"+`let x = 5`, `undefined variable "x"`)
+	expectTypeError(t, `typo = 5`, `use 'let' to declare it first`)
+}
+
+// A helper at the top of a file may use a variable declared further down,
+// because the file has to finish loading before anything runs.
+func TestFunctionsCanSeeVariablesDeclaredLater(t *testing.T) {
+	expectClean(t, `fn shout() { print(upper(message)) }
+let message = "hi"
+shout()`)
+
+	expectClean(t, `fn bump() { total = total + 1 }
+let total = 0
+bump()
+bump()
+print(total)`)
+
+	// Top-level code does not get that allowance.
+	expectTypeError(t, `print(message)`+"\n"+`let message = "hi"`, `undefined variable "message"`)
+}
+
+func TestLoopingOverNonIterable(t *testing.T) {
+	expectTypeError(t, `for x in 5 { }`, "cannot loop over int")
+	expectTypeError(t, `for x in true { }`, "cannot loop over bool")
+	expectClean(t, `for x in [1, 2] { }`)
+	expectClean(t, `for ch in "abc" { }`)
+}
+
+func TestIndexingIsChecked(t *testing.T) {
+	expectTypeError(t, `let x = 5`+"\n"+`x[0]`, "cannot index int")
+	expectTypeError(t, `let a = [1, 2]`+"\n"+`a["zero"]`, "index must be an int")
+	expectClean(t, `[1, 2][0]`)
+	expectClean(t, `"abc"[1]`)
+}
+
+func TestBuiltinSignaturesAreChecked(t *testing.T) {
+	expectTypeError(t, `len(5)`, "len() expects str or array")
+	expectTypeError(t, `len("a", "b")`, "len() takes 1 argument")
+	expectTypeError(t, `upper(5)`, "upper() expects str")
+	expectTypeError(t, `push([1], 2, 3)`, "push() takes 2 argument(s)")
+	expectTypeError(t, `join("a,b", "-")`, "join() expects array")
+	expectTypeError(t, `range("ten")`, "range() expects int")
+	expectClean(t, `len("abc")`)
+	expectClean(t, `join(split("a,b", ","), "-")`)
+	expectClean(t, `print(1, "two", true)`)
+	expectClean(t, `min(1, 2, 3)`)
+	expectClean(t, `abs(-1.5)`)
+}
+
+func TestInterpolationIsTypeChecked(t *testing.T) {
+	expectTypeError(t, `"value is {undefinedThing}"`, `undefined variable "undefinedThing"`)
+	expectTypeError(t, `"bad {1 + \"x\"}"`, "cannot add int and str")
+	expectTypeError(t, `"bad {len(5)}"`, "len() expects str or array")
+	expectClean(t, `let n = 5`+"\n"+`"n is {n}, doubled {n * 2}"`)
+	expectClean(t, `"{{literal braces}}"`)
+	expectClean(t, `let xs = [1, 2]`+"\n"+`"count {len(xs)}"`)
+}
+
+func TestArrayElementTypesAreUnified(t *testing.T) {
+	// [1, "two"] unifies to array<any>, so this is allowed.
+	expectClean(t, `let mixed = [1, "two"]`)
+	// Annotated arrays are enforced through push.
+	expectTypeError(t, `let xs: int = [1, 2]`, "cannot assign array<int> to int")
+	expectClean(t, `let xs = [1, 2]`+"\n"+`for x in xs { print(x + 1) }`)
+}
+
+func TestErrorPositionsAreReported(t *testing.T) {
+	errs := checkOf(t, "let a = 1\nlet b: str = 2")
+	if len(errs) == 0 {
+		t.Fatal("expected an error")
+	}
+	if !strings.HasPrefix(errs[0], "2:") {
+		t.Errorf("error should point at line 2, got %q", errs[0])
+	}
+}
+
+func TestInterpolationErrorsPointAtTheRealLine(t *testing.T) {
+	src := "let a = 1\nlet b = 2\nprint(\"total {a + \\\"x\\\"}\")"
+	errs := checkOf(t, src)
+	if len(errs) == 0 {
+		t.Fatalf("expected an interpolation error, got none")
+	}
+	if !strings.HasPrefix(errs[0], "3:") {
+		t.Errorf("interpolation error should point at line 3, got %q", errs[0])
+	}
+}
+
+func TestErrorsAreSortedByPosition(t *testing.T) {
+	src := "let a: int = \"x\"\nlet b: int = \"y\"\nlet c: int = \"z\""
+	errs := checkOf(t, src)
+	if len(errs) != 3 {
+		t.Fatalf("expected 3 errors, got %d: %v", len(errs), errs)
+	}
+	for i, want := range []string{"1:", "2:", "3:"} {
+		if !strings.HasPrefix(errs[i], want) {
+			t.Errorf("error %d should start with %q, got %q", i, want, errs[i])
+		}
+	}
+}
+
+// The REPL checks one line at a time, so the checker has to remember what
+// earlier lines declared.
+func TestCheckerRemembersTypesAcrossCalls(t *testing.T) {
+	c := NewChecker()
+
+	if errs := c.CheckProgram(parseOf(t, `let x: int = 5`)); len(errs) > 0 {
+		t.Fatalf("first chunk should be clean, got %v", errs)
+	}
+
+	if errs := c.CheckProgram(parseOf(t, `let y: str = x`)); len(errs) == 0 {
+		t.Fatal("expected an error: x was declared int on the previous line")
+	}
+
+	if errs := c.CheckProgram(parseOf(t, `fn twice(n: int) -> int { return n * 2 }`)); len(errs) > 0 {
+		t.Fatalf("defining a function should be clean, got %v", errs)
+	}
+
+	if errs := c.CheckProgram(parseOf(t, `twice("no")`)); len(errs) == 0 {
+		t.Fatal("expected an argument error for twice(\"no\")")
+	}
+
+	if errs := c.CheckProgram(parseOf(t, `twice(21)`)); len(errs) > 0 {
+		t.Fatalf("twice(21) should be clean, got %v", errs)
+	}
+}
+
+// A failed REPL line must not leave its declarations behind.
+func TestScopeRollbackUndoesFailedLine(t *testing.T) {
+	c := NewChecker()
+
+	before := c.GlobalScope()
+	if errs := c.CheckProgram(parseOf(t, `let y: str = 1`)); len(errs) == 0 {
+		t.Fatal("expected a type error")
+	}
+	c.SetGlobalScope(before)
+
+	// y was rolled back, so using it is now an undefined variable again.
+	errs := c.CheckProgram(parseOf(t, `y`))
+	if len(errs) == 0 || !strings.Contains(errs[0], "undefined variable") {
+		t.Fatalf("expected y to be undefined after rollback, got %v", errs)
+	}
+}

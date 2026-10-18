@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const version = "0.3.0 (stage 3: interpreter)"
+const version = "0.4.0 (stage 4: type checker)"
 
 func main() {
 	args := os.Args[1:]
@@ -32,6 +32,10 @@ func main() {
 		requireFile(args, "parse")
 		printAST(args[1])
 		return
+	case "check":
+		requireFile(args, "check")
+		checkFile(args[1])
+		return
 	case "run":
 		requireFile(args, "run")
 		runFile(args[1])
@@ -46,6 +50,7 @@ func usage() {
 
 Usage:
   jin <file.jin>       run a program
+  jin check <file>     type-check a program without running it
   jin parse <file>     print the syntax tree instead of running
   jin tokens <file>    print the raw token stream
   jin                  start the REPL
@@ -82,9 +87,35 @@ func parseProgram(path string) *Program {
 	return program
 }
 
+// reportTypeErrors prints type errors, if any, and reports whether there were
+// any. Errors are printed all at once rather than one per run.
+func reportTypeErrors(errs []string, label string) bool {
+	if len(errs) == 0 {
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "jin: %s has type errors:\n", label)
+	for _, e := range errs {
+		fmt.Fprintf(os.Stderr, "  %s\n", e)
+	}
+	return true
+}
+
+// checkFile type-checks a program and reports the result without running it.
+func checkFile(path string) {
+	program := parseProgram(path)
+	if reportTypeErrors(Check(program), path) {
+		os.Exit(1)
+	}
+	fmt.Printf("%s: no type errors\n", path)
+}
+
 // runFile executes a program.
 func runFile(path string) {
 	program := parseProgram(path)
+
+	if reportTypeErrors(Check(program), path) {
+		os.Exit(1)
+	}
 
 	interp := NewInterpreter(os.Stdout)
 	if _, err := interp.Run(program, NewEnvironment()); err != nil {
@@ -119,6 +150,7 @@ func repl() {
 
 	interp := NewInterpreter(os.Stdout)
 	env := NewEnvironment()
+	checker := NewChecker()
 	sc := bufio.NewScanner(os.Stdin)
 	var pending []string
 
@@ -155,6 +187,20 @@ func repl() {
 		if len(p.Errors()) > 0 {
 			// Hold the text back: it may just be an unfinished block.
 			pending = append(pending, line)
+			continue
+		}
+
+		// In the REPL, a type error is shown but the prompt continues, so one
+		// bad line does not end the session. Types declared by the failing line
+		// are rolled back so they cannot affect later lines.
+		before := checker.GlobalScope()
+		if errs := checker.CheckProgram(program); len(errs) > 0 {
+			fmt.Println("  type errors:")
+			for _, e := range errs {
+				fmt.Printf("    %s\n", e)
+			}
+			checker.SetGlobalScope(before)
+			pending = nil
 			continue
 		}
 

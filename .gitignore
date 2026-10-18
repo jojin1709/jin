@@ -1,0 +1,8 @@
+# Build output
+/jin.exe
+/jin
+*.exe
+
+# Go test and coverage output
+*.test
+*.out

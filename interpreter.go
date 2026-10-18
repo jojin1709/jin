@@ -650,48 +650,26 @@ func (i *Interpreter) evalString(node *StringLiteral, env *Environment) (Object,
 // interpolate replaces every {expression} with its value. Use {{ and }} for
 // literal braces. A '#' before a brace is just a normal character, so
 // "friend #{n}" reads naturally.
+//
+// Splitting the string is shared with the type checker (see splitInterpolation)
+// so both always find the same embedded expressions.
 func (i *Interpreter) interpolate(raw string, env *Environment, tok Token) (string, error) {
+	segs, err := splitInterpolation(raw)
+	if err != nil {
+		return "", fmt.Errorf("%d:%d: %s", tok.Line, tok.Column, err)
+	}
+
 	var sb strings.Builder
-	runes := []rune(raw)
-
-	for idx := 0; idx < len(runes); idx++ {
-		ch := runes[idx]
-
-		if ch == '{' {
-			if idx+1 < len(runes) && runes[idx+1] == '{' {
-				sb.WriteRune('{')
-				idx++
-				continue
-			}
-
-			end := -1
-			for j := idx + 1; j < len(runes); j++ {
-				if runes[j] == '}' {
-					end = j
-					break
-				}
-			}
-			if end == -1 {
-				return "", fmt.Errorf("%d:%d: missing '}' in string", tok.Line, tok.Column)
-			}
-
-			src := string(runes[idx+1 : end])
-			value, err := i.evalInline(src, env, tok)
-			if err != nil {
-				return "", err
-			}
-			sb.WriteString(value.Inspect())
-			idx = end
+	for _, seg := range segs {
+		if seg.Expr == "" {
+			sb.WriteString(seg.Literal)
 			continue
 		}
-
-		if ch == '}' && idx+1 < len(runes) && runes[idx+1] == '}' {
-			sb.WriteRune('}')
-			idx++
-			continue
+		value, err := i.evalInline(seg.Expr, env, tok)
+		if err != nil {
+			return "", err
 		}
-
-		sb.WriteRune(ch)
+		sb.WriteString(value.Inspect())
 	}
 
 	return sb.String(), nil
@@ -700,7 +678,7 @@ func (i *Interpreter) interpolate(raw string, env *Environment, tok Token) (stri
 // evalInline parses and evaluates a single expression from source text. This
 // is what makes {n + 1} inside a string work.
 func (i *Interpreter) evalInline(src string, env *Environment, tok Token) (Object, error) {
-	p := NewParser(NewLexer(src))
+	p := NewParser(NewLexerAt(src, tok.Line))
 	program := p.ParseProgram()
 	if len(p.Errors()) > 0 {
 		return nil, fmt.Errorf("%d:%d: bad interpolation {%s}: %s",

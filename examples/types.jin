@@ -1,0 +1,50 @@
+# Types in Jin are optional but checked.
+#
+# Run "jin check examples/types.jin" to see the checks without running,
+# or "jin examples/types.jin" to run it. Running checks first, so nothing
+# here can fail halfway through.
+
+fn area(w: int, h: int) -> int {
+    return w * h
+}
+
+# The return type is enforced too: this would be an error.
+# fn broken() -> str { return 42 }
+
+fn describe(label: str, value: int) -> str {
+    return "{label}: {value}"
+}
+
+let width: int = 4
+let height: int = 3
+
+print(describe("area", area(width, height)))
+
+# Annotated variables cannot be reassigned to another type.
+let count: int = 0
+count = count + 1
+print(describe("count", count))
+
+# Arrays remember what they hold.
+let primes = [2, 3, 5, 7, 11]
+let sum = 0
+for p in primes {
+    sum = sum + p
+}
+print(describe("sum of primes", sum))
+
+# Unannotated code is left alone: these are all "any".
+fn double(value) {
+    return value * 2
+}
+print(describe("double", double(21)))
+
+# Errors you would get if you uncommented any of these:
+#
+#   print(area(width))              argument count
+#   print(area(width, "three"))     argument 2: cannot use str where int is expected
+#   print(1 + "x")                  cannot add int and str
+#   if width { print("hi") }        condition must be a bool
+#   for n in 42 { print(n) }        cannot loop over int
+#   print("oops {area(1)}")         reported on this line, not line 1
+#   let bad: int = "text"           cannot assign str to int variable "bad"
