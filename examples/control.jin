@@ -30,3 +30,5 @@ fn main() {
     let doubler = fn(x) { return x * 2 }
     print(doubler(21))
 }
+
+main()

@@ -1,0 +1,29 @@
+fn add(a, b) { return a + b }
+fn square(x) { return x * x }
+
+let numbers = [1, 2, 3, 4, 5]
+
+for n in numbers {
+    print("{n} squared is {square(n)}")
+}
+
+print("2 + 3 = {add(2, 3)}")
+
+let words = split("the quick brown fox", " ")
+let upperWords = []
+for w in words {
+    upperWords = push(upperWords, upper(w))
+}
+print(join(upperWords, " "))
+
+# fibonacci
+fn fib(n) {
+    if n < 2 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+let fibs = []
+for i in range(10) {
+    fibs = push(fibs, fib(i))
+}
+print("fib: {join(fibs, \", \")}")

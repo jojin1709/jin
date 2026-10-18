@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.0 (stage 2: parser)"
+const version = "0.3.0 (stage 3: interpreter)"
 
 func main() {
 	args := os.Args[1:]
@@ -21,63 +21,86 @@ func main() {
 	case "-v", "--version", "version":
 		fmt.Printf("Jin %s\n", version)
 		return
-	case "tokens":
-		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "jin: 'tokens' needs a file")
-			os.Exit(1)
-		}
-		printTokens(args[1])
-		return
 	case "-h", "--help", "help":
 		usage()
 		return
+	case "tokens":
+		requireFile(args, "tokens")
+		printTokens(args[1])
+		return
+	case "parse":
+		requireFile(args, "parse")
+		printAST(args[1])
+		return
+	case "run":
+		requireFile(args, "run")
+		runFile(args[1])
+		return
 	}
 
-	printAST(args[0])
+	runFile(args[0])
 }
 
 func usage() {
 	fmt.Println(`Jin - a small fast language
 
 Usage:
-  jin <file.jin>       parse a file and print its syntax tree
-  jin tokens <file>    print the raw token stream (stage 1 view)
+  jin <file.jin>       run a program
+  jin parse <file>     print the syntax tree instead of running
+  jin tokens <file>    print the raw token stream
   jin                  start the REPL
   jin --version        print the version`)
 }
 
-// parseFile reads and parses a file, reporting errors to stderr.
-func parseFile(path string) (*Program, []string) {
+func requireFile(args []string, cmd string) {
+	if len(args) < 2 {
+		fmt.Fprintf(os.Stderr, "jin: '%s' needs a file, e.g. jin %s program.jin\n", cmd, cmd)
+		os.Exit(1)
+	}
+}
+
+func readSource(path string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "jin: cannot read %s: %v\n", path, err)
 		os.Exit(1)
 	}
-	p := NewParser(NewLexer(string(data)))
-	program := p.ParseProgram()
-	return program, p.Errors()
+	return string(data)
 }
 
-func printAST(path string) {
-	program, errs := parseFile(path)
-	if len(errs) > 0 {
-		fmt.Fprintln(os.Stderr, "parse errors:")
-		for _, e := range errs {
+// parseProgram reads and parses a file, exiting with a report on syntax errors.
+func parseProgram(path string) *Program {
+	p := NewParser(NewLexer(readSource(path)))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		fmt.Fprintf(os.Stderr, "jin: %s has syntax errors:\n", path)
+		for _, e := range p.Errors() {
 			fmt.Fprintf(os.Stderr, "  %s\n", e)
 		}
 		os.Exit(1)
 	}
-	fmt.Print(DumpProgram(program))
+	return program
 }
 
-func printTokens(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "jin: cannot read %s: %v\n", path, err)
+// runFile executes a program.
+func runFile(path string) {
+	program := parseProgram(path)
+
+	interp := NewInterpreter(os.Stdout)
+	if _, err := interp.Run(program, NewEnvironment()); err != nil {
+		fmt.Fprintf(os.Stderr, "jin: %v\n", err)
 		os.Exit(1)
 	}
+}
 
-	lex := NewLexer(string(data))
+// printAST shows the syntax tree without running anything.
+func printAST(path string) {
+	fmt.Print(DumpProgram(parseProgram(path)))
+}
+
+// printTokens shows the raw token stream.
+func printTokens(path string) {
+	lex := NewLexer(readSource(path))
 	for {
 		tok := lex.NextToken()
 		fmt.Printf("%d:%d\t%-8s %s\n", tok.Line, tok.Column, tok.Type, describe(tok))
@@ -87,35 +110,66 @@ func printTokens(path string) {
 	}
 }
 
+// repl is an interactive session. State persists between lines, and an
+// incomplete line is buffered until it parses, so multi-line functions work.
 func repl() {
 	fmt.Printf("Jin %s\n", version)
-	fmt.Println("Type Jin code, then press Enter. 'exit' or Ctrl+D quits.")
-	fmt.Println("(Stages 1 and 2 only: this parses code and prints the tree.)")
+	fmt.Println("Type Jin code and press Enter. 'exit' or Ctrl+D quits.")
+	fmt.Println("'clear' discards a half-typed block.")
 
+	interp := NewInterpreter(os.Stdout)
+	env := NewEnvironment()
 	sc := bufio.NewScanner(os.Stdin)
-	fmt.Print("jin> ")
+	var pending []string
 
-	for sc.Scan() {
-		line := sc.Text()
-		if strings.TrimSpace(line) == "exit" {
+	for {
+		if len(pending) == 0 {
+			fmt.Print("jin> ")
+		} else {
+			fmt.Print("  .. ")
+		}
+
+		if !sc.Scan() {
 			break
 		}
-		if strings.TrimSpace(line) == "" {
-			fmt.Print("jin> ")
+		line := sc.Text()
+		trimmed := strings.TrimSpace(line)
+
+		if len(pending) == 0 {
+			if trimmed == "exit" {
+				break
+			}
+			if trimmed == "" {
+				continue
+			}
+			if trimmed == "clear" {
+				fmt.Println("(nothing pending)")
+				continue
+			}
+		}
+
+		source := strings.Join(append(append([]string{}, pending...), line), "\n")
+		p := NewParser(NewLexer(source))
+		program := p.ParseProgram()
+
+		if len(p.Errors()) > 0 {
+			// Hold the text back: it may just be an unfinished block.
+			pending = append(pending, line)
 			continue
 		}
 
-		p := NewParser(NewLexer(line))
-		program := p.ParseProgram()
-		if len(p.Errors()) > 0 {
-			for _, e := range p.Errors() {
-				fmt.Printf("  error: %s\n", e)
-			}
-		} else {
-			fmt.Print(DumpProgram(program))
-		}
+		result, err := interp.Run(program, env)
+		pending = nil
 
-		fmt.Print("jin> ")
+		if err != nil {
+			fmt.Printf("  error: %v\n", err)
+			continue
+		}
+		if _, isNil := result.(*Nil); !isNil {
+			if _, isFn := result.(*Function); !isFn {
+				fmt.Println(result.Inspect())
+			}
+		}
 	}
 
 	fmt.Println()
