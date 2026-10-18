@@ -1,0 +1,110 @@
+# A soak program: exercises most of the language at once.
+
+fn fib(n) {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn makeCounter(start) {
+    let n = start
+    return fn() {
+        n = n + 1
+        return n
+    }
+}
+
+fn apply(f, v) {
+    return f(v)
+}
+
+fn sumList(items) {
+    let total = 0
+    for item in items {
+        total = total + item
+    }
+    return total
+}
+
+fn describe(n) {
+    if n % 15 == 0 {
+        return "fizzbuzz"
+    }
+    if n % 3 == 0 {
+        return "fizz"
+    }
+    if n % 5 == 0 {
+        return "buzz"
+    }
+    return str(n)
+}
+
+# recursion
+let fibs = []
+for i in range(12) {
+    fibs = push(fibs, fib(i))
+}
+print("fibs:", fibs)
+
+# closures over an inner local
+let next = makeCounter(10)
+print("count:", next(), next(), next())
+
+# functions as values
+let double = fn(x) { return x * 2 }
+print("apply:", apply(double, 21))
+
+# loops, break, continue
+let odds = []
+for n in range(20) {
+    if n % 2 == 0 {
+        continue
+    }
+    if n > 15 {
+        break
+    }
+    odds = push(odds, n)
+}
+print("odds:", odds)
+
+let countdown = 3
+let ticks = []
+while countdown > 0 {
+    ticks = push(ticks, countdown)
+    countdown = countdown - 1
+}
+print("ticks:", ticks)
+
+# arrays and index assignment
+let grid = [1, 2, 3, 4, 5]
+grid[0] = 100
+grid[4] = grid[0] + grid[1]
+print("grid:", grid, sumList(grid))
+
+# strings
+let word = "Jin"
+print("word:", upper(word), lower(word), len(word), word[0])
+
+let parts = split("a,b,c", ",")
+print("parts:", parts, join(parts, "-"), contains("hello", "ell"))
+
+# nested interpolation
+let who = "world"
+print("hello {who}, {len(who)} letters, list {fibs}")
+
+# nested loops
+let pairs = []
+for a in range(3) {
+    for b in range(3) {
+        pairs = push(pairs, a * 10 + b)
+    }
+}
+print("pairs:", pairs)
+
+# fizzbuzz
+let said = []
+for i in range(1, 16) {
+    said = push(said, describe(i))
+}
+print("fizzbuzz:", join(said, " "))

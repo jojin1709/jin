@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const version = "0.4.0 (stage 4: type checker)"
+const version = "0.5.0 (stage 5: bytecode VM)"
 
 func main() {
 	args := os.Args[1:]
@@ -36,6 +36,14 @@ func main() {
 		requireFile(args, "check")
 		checkFile(args[1])
 		return
+	case "compile":
+		requireFile(args, "compile")
+		compileFile(args[1])
+		return
+	case "interpret":
+		requireFile(args, "interpret")
+		interpretFile(args[1])
+		return
 	case "run":
 		requireFile(args, "run")
 		runFile(args[1])
@@ -51,6 +59,8 @@ func usage() {
 Usage:
   jin <file.jin>       run a program
   jin check <file>     type-check a program without running it
+  jin compile <file>   print the bytecode instead of running
+  jin interpret <file> run with the tree-walking interpreter
   jin parse <file>     print the syntax tree instead of running
   jin tokens <file>    print the raw token stream
   jin                  start the REPL
@@ -109,8 +119,30 @@ func checkFile(path string) {
 	fmt.Printf("%s: no type errors\n", path)
 }
 
-// runFile executes a program.
+// runFile executes a program on the bytecode VM.
 func runFile(path string) {
+	program := parseProgram(path)
+
+	if reportTypeErrors(Check(program), path) {
+		os.Exit(1)
+	}
+
+	vm := NewVM(os.Stdout)
+	bc, err := compileProgram(program)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "jin: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err := vm.Run(bc); err != nil {
+		fmt.Fprintf(os.Stderr, "jin: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// interpretFile executes a program with the tree-walking interpreter, which is
+// slower but useful for checking the two back ends agree.
+func interpretFile(path string) {
 	program := parseProgram(path)
 
 	if reportTypeErrors(Check(program), path) {
@@ -122,6 +154,33 @@ func runFile(path string) {
 		fmt.Fprintf(os.Stderr, "jin: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// compileProgram compiles a program with a fresh global table.
+func compileProgram(program *Program) (*Bytecode, error) {
+	return NewCompiler(NewSymbolTable(true)).Compile(program)
+}
+
+// compileFile prints the bytecode a program compiles to.
+func compileFile(path string) {
+	program := parseProgram(path)
+
+	if reportTypeErrors(Check(program), path) {
+		os.Exit(1)
+	}
+
+	bc, err := compileProgram(program)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "jin: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("== constants ==")
+	for i, c := range bc.Constants {
+		fmt.Printf("%04d %s\n", i, c.Inspect())
+	}
+	fmt.Printf("== <script> (locals: %d) ==\n", bc.NumLocals)
+	fmt.Print(bc.Instructions)
 }
 
 // printAST shows the syntax tree without running anything.
@@ -148,8 +207,8 @@ func repl() {
 	fmt.Println("Type Jin code and press Enter. 'exit' or Ctrl+D quits.")
 	fmt.Println("'clear' discards a half-typed block.")
 
-	interp := NewInterpreter(os.Stdout)
-	env := NewEnvironment()
+	vm := NewVM(os.Stdout)
+	compiler := NewCompiler(NewSymbolTable(true))
 	checker := NewChecker()
 	sc := bufio.NewScanner(os.Stdin)
 	var pending []string
@@ -204,7 +263,14 @@ func repl() {
 			continue
 		}
 
-		result, err := interp.Run(program, env)
+		bc, err := compiler.Compile(program)
+		if err != nil {
+			fmt.Printf("  error: %v\n", err)
+			pending = nil
+			continue
+		}
+
+		result, err := vm.Run(bc)
 		pending = nil
 
 		if err != nil {
@@ -212,7 +278,7 @@ func repl() {
 			continue
 		}
 		if _, isNil := result.(*Nil); !isNil {
-			if _, isFn := result.(*Function); !isFn {
+			if _, isFn := result.(*Closure); !isFn {
 				fmt.Println(result.Inspect())
 			}
 		}

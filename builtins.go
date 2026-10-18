@@ -2,14 +2,24 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
 
-// newBuiltins returns the functions Jin provides out of the box.
-func newBuiltins(i *Interpreter) map[string]*Builtin {
+// builtinNames lists the built-ins in the order that OpGetBuiltin indexes
+// them. The compiler and the VM both read this, so they cannot disagree.
+var builtinNames = []string{
+	"print", "len", "push", "str", "int", "float", "type", "range",
+	"upper", "lower", "trim", "split", "join", "contains", "abs", "min", "max",
+}
+
+// newBuiltins returns the functions Jin provides out of the box. They are
+// shared by the tree-walking interpreter and the bytecode VM, so they only
+// depend on where output goes.
+func newBuiltins(out io.Writer) map[string]*Builtin {
 	b := map[string]*Builtin{}
 
 	b["print"] = &Builtin{Name: "print", Fn: func(args []Object) (Object, error) {
@@ -17,7 +27,7 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 		for _, a := range args {
 			parts = append(parts, a.Inspect())
 		}
-		fmt.Fprintln(i.out, strings.Join(parts, " "))
+		fmt.Fprintln(out, strings.Join(parts, " "))
 		return &Nil{}, nil
 	}}
 
@@ -27,9 +37,9 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 		}
 		switch v := args[0].(type) {
 		case *String:
-			return &Integer{Value: int64(utf8.RuneCountInString(v.Value))}, nil
+			return newInteger(int64(utf8.RuneCountInString(v.Value))), nil
 		case *Array:
-			return &Integer{Value: int64(len(v.Elements))}, nil
+			return newInteger(int64(len(v.Elements))), nil
 		}
 		return nil, typeError("len", args[0], "str or array")
 	}}
@@ -63,18 +73,18 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 		case *Integer:
 			return v, nil
 		case *Float:
-			return &Integer{Value: int64(v.Value)}, nil
+			return newInteger(int64(v.Value)), nil
 		case *Boolean:
 			if v.Value {
-				return &Integer{Value: 1}, nil
+				return newInteger(1), nil
 			}
-			return &Integer{Value: 0}, nil
+			return newInteger(0), nil
 		case *String:
 			n, err := strconv.ParseInt(strings.TrimSpace(v.Value), 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("int(): cannot convert %q to an int", v.Value)
 			}
-			return &Integer{Value: n}, nil
+			return newInteger(n), nil
 		}
 		return nil, typeError("int", args[0], "int, float, bool or str")
 	}}
@@ -87,13 +97,13 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 		case *Float:
 			return v, nil
 		case *Integer:
-			return &Float{Value: float64(v.Value)}, nil
+			return newFloat(float64(v.Value)), nil
 		case *String:
 			f, err := strconv.ParseFloat(strings.TrimSpace(v.Value), 64)
 			if err != nil {
 				return nil, fmt.Errorf("float(): cannot convert %q to a float", v.Value)
 			}
-			return &Float{Value: f}, nil
+			return newFloat(f), nil
 		}
 		return nil, typeError("float", args[0], "int, float or str")
 	}}
@@ -129,7 +139,7 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 		}
 		elems := []Object{}
 		for n := start; n < end; n++ {
-			elems = append(elems, &Integer{Value: n})
+			elems = append(elems, newInteger(n))
 		}
 		return &Array{Elements: elems}, nil
 	}}
@@ -216,14 +226,14 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 			if !ok {
 				return nil, typeError("contains", args[1], "str")
 			}
-			return &Boolean{Value: strings.Contains(c.Value, sub.Value)}, nil
+			return newBoolean(strings.Contains(c.Value, sub.Value)), nil
 		case *Array:
 			for _, el := range c.Elements {
 				if objectsEqual(el, args[1]) {
-					return &Boolean{Value: true}, nil
+					return newBoolean(true), nil
 				}
 			}
-			return &Boolean{Value: false}, nil
+			return newBoolean(false), nil
 		}
 		return nil, typeError("contains", args[0], "str or array")
 	}}
@@ -235,11 +245,11 @@ func newBuiltins(i *Interpreter) map[string]*Builtin {
 		switch v := args[0].(type) {
 		case *Integer:
 			if v.Value < 0 {
-				return &Integer{Value: -v.Value}, nil
+				return newInteger(-v.Value), nil
 			}
 			return v, nil
 		case *Float:
-			return &Float{Value: math.Abs(v.Value)}, nil
+			return newFloat(math.Abs(v.Value)), nil
 		}
 		return nil, typeError("abs", args[0], "int or float")
 	}}
@@ -296,7 +306,7 @@ func minMax(name string, args []Object, wantMin bool) (Object, error) {
 				best = v
 			}
 		}
-		return &Integer{Value: best}, nil
+		return newInteger(best), nil
 	}
 
 	best := 0.0
@@ -314,5 +324,5 @@ func minMax(name string, args []Object, wantMin bool) (Object, error) {
 			best = v
 		}
 	}
-	return &Float{Value: best}, nil
+	return newFloat(best), nil
 }

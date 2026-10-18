@@ -16,7 +16,7 @@ type Interpreter struct {
 // NewInterpreter creates an interpreter that writes program output to out.
 func NewInterpreter(out io.Writer) *Interpreter {
 	i := &Interpreter{out: out}
-	i.builtins = newBuiltins(i)
+	i.builtins = newBuiltins(out)
 	return i
 }
 
@@ -225,13 +225,13 @@ func (i *Interpreter) evalExpression(expr Expression, env *Environment) (Object,
 	switch node := expr.(type) {
 
 	case *IntegerLiteral:
-		return &Integer{Value: node.Value}, nil
+		return newInteger(node.Value), nil
 
 	case *FloatLiteral:
-		return &Float{Value: node.Value}, nil
+		return newFloat(node.Value), nil
 
 	case *BooleanLiteral:
-		return &Boolean{Value: node.Value}, nil
+		return newBoolean(node.Value), nil
 
 	case *NilLiteral:
 		return &Nil{}, nil
@@ -301,13 +301,13 @@ func (i *Interpreter) evalPrefix(node *PrefixExpression, env *Environment) (Obje
 		if !ok {
 			return nil, fmt.Errorf("%d:%d: '!' expects a bool, got %s", node.Token.Line, node.Token.Column, right.Type())
 		}
-		return &Boolean{Value: !b.Value}, nil
+		return newBoolean(!b.Value), nil
 	case "-":
 		switch v := right.(type) {
 		case *Integer:
-			return &Integer{Value: -v.Value}, nil
+			return newInteger(-v.Value), nil
 		case *Float:
-			return &Float{Value: -v.Value}, nil
+			return newFloat(-v.Value), nil
 		}
 		return nil, fmt.Errorf("%d:%d: '-' expects a number, got %s", node.Token.Line, node.Token.Column, right.Type())
 	}
@@ -329,10 +329,10 @@ func (i *Interpreter) evalInfix(node *InfixExpression, env *Environment) (Object
 			return nil, err
 		}
 		if op == "&&" && !lb {
-			return &Boolean{Value: false}, nil
+			return newBoolean(false), nil
 		}
 		if op == "||" && lb {
-			return &Boolean{Value: true}, nil
+			return newBoolean(true), nil
 		}
 		right, err := i.evalExpression(node.Right, env)
 		if err != nil {
@@ -342,7 +342,7 @@ func (i *Interpreter) evalInfix(node *InfixExpression, env *Environment) (Object
 		if err != nil {
 			return nil, err
 		}
-		return &Boolean{Value: rb}, nil
+		return newBoolean(rb), nil
 	}
 
 	left, err := i.evalExpression(node.Left, env)
@@ -366,7 +366,7 @@ func (i *Interpreter) evalInfix(node *InfixExpression, env *Environment) (Object
 		if op == "!=" {
 			equal = !equal
 		}
-		return &Boolean{Value: equal}, nil
+		return newBoolean(equal), nil
 	}
 
 	return nil, fmt.Errorf("%d:%d: unknown operator %s %s %s",
@@ -377,11 +377,11 @@ func addValues(left, right Object, tok Token) (Object, error) {
 	switch l := left.(type) {
 	case *Integer:
 		if r, ok := right.(*Integer); ok {
-			return &Integer{Value: l.Value + r.Value}, nil
+			return newInteger(l.Value + r.Value), nil
 		}
 	case *Float:
 		if r, ok := right.(*Float); ok {
-			return &Float{Value: l.Value + r.Value}, nil
+			return newFloat(l.Value + r.Value), nil
 		}
 	case *String:
 		if r, ok := right.(*String); ok {
@@ -410,38 +410,38 @@ func arithValues(op string, left, right Object, tok Token) (Object, error) {
 		if r, ok := right.(*Integer); ok {
 			switch op {
 			case "-":
-				return &Integer{Value: l.Value - r.Value}, nil
+				return newInteger(l.Value - r.Value), nil
 			case "*":
-				return &Integer{Value: l.Value * r.Value}, nil
+				return newInteger(l.Value * r.Value), nil
 			case "/":
 				if r.Value == 0 {
 					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
 				}
-				return &Integer{Value: l.Value / r.Value}, nil
+				return newInteger(l.Value / r.Value), nil
 			case "%":
 				if r.Value == 0 {
 					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
 				}
-				return &Integer{Value: l.Value % r.Value}, nil
+				return newInteger(l.Value % r.Value), nil
 			}
 		}
 	case *Float:
 		if r, ok := right.(*Float); ok {
 			switch op {
 			case "-":
-				return &Float{Value: l.Value - r.Value}, nil
+				return newFloat(l.Value - r.Value), nil
 			case "*":
-				return &Float{Value: l.Value * r.Value}, nil
+				return newFloat(l.Value * r.Value), nil
 			case "/":
 				if r.Value == 0 {
 					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
 				}
-				return &Float{Value: l.Value / r.Value}, nil
+				return newFloat(l.Value / r.Value), nil
 			case "%":
 				if r.Value == 0 {
 					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
 				}
-				return &Float{Value: math.Mod(l.Value, r.Value)}, nil
+				return newFloat(math.Mod(l.Value, r.Value)), nil
 			}
 		}
 	}
@@ -457,15 +457,15 @@ func compareValues(op string, left, right Object, tok Token) (Object, error) {
 	switch l := left.(type) {
 	case *Integer:
 		if r, ok := right.(*Integer); ok {
-			return &Boolean{Value: compareOrder(op, float64(l.Value), float64(r.Value))}, nil
+			return newBoolean(compareOrder(op, float64(l.Value), float64(r.Value))), nil
 		}
 	case *Float:
 		if r, ok := right.(*Float); ok {
-			return &Boolean{Value: compareOrder(op, l.Value, r.Value)}, nil
+			return newBoolean(compareOrder(op, l.Value, r.Value)), nil
 		}
 	case *String:
 		if r, ok := right.(*String); ok {
-			return &Boolean{Value: compareStrings(op, l.Value, r.Value)}, nil
+			return newBoolean(compareStrings(op, l.Value, r.Value)), nil
 		}
 	}
 	return nil, fmt.Errorf("%d:%d: cannot compare %s and %s", tok.Line, tok.Column, left.Type(), right.Type())
@@ -522,15 +522,15 @@ func (i *Interpreter) evalAssign(node *AssignExpression, env *Environment) (Obje
 		}
 		arr, ok := container.(*Array)
 		if !ok {
-			return nil, fmt.Errorf("%d:%d: cannot assign into %s", node.Token.Line, node.Token.Column, container.Type())
+			return nil, fmt.Errorf("%d:%d: cannot assign into %s", target.Token.Line, target.Token.Column, container.Type())
 		}
-		idx, err := i.indexValue(target.Index, env)
+		idx, err := i.indexValue(target.Index, env, target.Token)
 		if err != nil {
 			return nil, err
 		}
 		if idx < 0 || idx >= int64(len(arr.Elements)) {
 			return nil, fmt.Errorf("%d:%d: index %d out of range (length %d)",
-				node.Token.Line, node.Token.Column, idx, len(arr.Elements))
+				target.Token.Line, target.Token.Column, idx, len(arr.Elements))
 		}
 		arr.Elements[idx] = value
 		return value, nil
@@ -544,7 +544,7 @@ func (i *Interpreter) evalIndex(node *IndexExpression, env *Environment) (Object
 	if err != nil {
 		return nil, err
 	}
-	idx, err := i.indexValue(node.Index, env)
+	idx, err := i.indexValue(node.Index, env, node.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -568,15 +568,16 @@ func (i *Interpreter) evalIndex(node *IndexExpression, env *Environment) (Object
 	return nil, fmt.Errorf("%d:%d: cannot index %s", node.Token.Line, node.Token.Column, container.Type())
 }
 
-// indexValue evaluates an index expression and requires it to be an int.
-func (i *Interpreter) indexValue(expr Expression, env *Environment) (int64, error) {
+// indexValue evaluates an index expression and requires it to be an int. The
+// token is only used to point at the right place when it is not.
+func (i *Interpreter) indexValue(expr Expression, env *Environment, tok Token) (int64, error) {
 	obj, err := i.evalExpression(expr, env)
 	if err != nil {
 		return 0, err
 	}
 	n, ok := obj.(*Integer)
 	if !ok {
-		return 0, fmt.Errorf("index must be an int, got %s", obj.Type())
+		return 0, fmt.Errorf("%d:%d: index must be an int, got %s", tok.Line, tok.Column, obj.Type())
 	}
 	return n.Value, nil
 }

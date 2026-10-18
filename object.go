@@ -28,6 +28,52 @@ type Object interface {
 	Inspect() string
 }
 
+// Small values are shared instead of allocated. Arithmetic produces a value on
+// every step, so allocating each one is the single biggest cost in a loop.
+
+var (
+	nilObject   = &Nil{}
+	trueObject  = &Boolean{Value: true}
+	falseObject = &Boolean{Value: false}
+)
+
+const (
+	smallIntMin = -1024
+	smallIntMax = 8192
+)
+
+var smallInts [smallIntMax - smallIntMin + 1]Integer
+
+func init() {
+	for i := range smallInts {
+		smallInts[i].Value = int64(i + smallIntMin)
+	}
+}
+
+// newInteger returns a shared value for small numbers, and a fresh one for the
+// rest. Integers never change, so sharing them is safe.
+func newInteger(v int64) *Integer {
+	if v >= smallIntMin && v <= smallIntMax {
+		return &smallInts[v-smallIntMin]
+	}
+	return &Integer{Value: v}
+}
+
+// newFloat returns a new float value. Floats are not pooled: most programs
+// produce more distinct values than any pool would cover.
+func newFloat(v float64) *Float { return &Float{Value: v} }
+
+// newBoolean returns the shared true or false.
+func newBoolean(b bool) *Boolean {
+	if b {
+		return trueObject
+	}
+	return falseObject
+}
+
+// newNil returns the shared nil.
+func newNil() *Nil { return nilObject }
+
 // Integer is a whole number.
 type Integer struct{ Value int64 }
 
@@ -94,6 +140,36 @@ type Builtin struct {
 
 func (o *Builtin) Type() ObjectType { return BUILTIN_OBJ }
 func (o *Builtin) Inspect() string  { return "<builtin " + o.Name + ">" }
+
+// ---- compiled code
+
+// CompiledFunction is a function compiled to bytecode. It holds no captured
+// state of its own, so one CompiledFunction can back many closures.
+type CompiledFunction struct {
+	Name         string
+	Instructions Instructions
+	Positions    []Position // where each byte came from, for error messages
+	NumLocals    int        // slots the frame needs, parameters included
+	NumParams    int
+}
+
+func (o *CompiledFunction) Type() ObjectType { return FUNCTION_OBJ }
+func (o *CompiledFunction) Inspect() string {
+	if o.Name == "" {
+		return "<fn>"
+	}
+	return "<fn " + o.Name + ">"
+}
+
+// Closure pairs a compiled function with the variables it captured, so a
+// function can keep using values from the scope where it was written.
+type Closure struct {
+	Fn   *CompiledFunction
+	Free []Object
+}
+
+func (o *Closure) Type() ObjectType { return FUNCTION_OBJ }
+func (o *Closure) Inspect() string  { return o.Fn.Inspect() }
 
 // ---- control-flow signals. These travel up the tree as ordinary values so
 // that return/break/continue are not confused with real errors.
