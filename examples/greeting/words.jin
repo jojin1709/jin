@@ -1,0 +1,8 @@
+# A file's names are reached as words.<name>, so nothing here can clash with
+# a name in the file that imports it.
+
+let greeting = "Hello"
+
+fn greet(name: str) -> str {
+    return "{greeting}, {name}!"
+}

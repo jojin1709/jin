@@ -43,6 +43,9 @@ func dumpNode(sb *strings.Builder, n Node, indent int) {
 		}
 		dumpNode(sb, node.Body, indent+1)
 
+	case *ImportStatement:
+		dumpLine(sb, indent, "Import %q as %s", node.Path, node.Alias.Value)
+
 	case *ReturnStatement:
 		dumpLine(sb, indent, "Return")
 		if node.Value != nil {

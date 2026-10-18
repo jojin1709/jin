@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 // TokenType identifies the kind of a token.
 type TokenType string
 
@@ -48,6 +50,8 @@ const (
 	RBRACKET TokenType = "]"
 
 	// Keywords
+	IMPORT   TokenType = "import"
+	AS       TokenType = "as"
 	FUNCTION TokenType = "fn"
 	LET      TokenType = "let"
 	IF       TokenType = "if"
@@ -63,15 +67,29 @@ const (
 	NIL      TokenType = "nil"
 )
 
-// Token is a single lexical unit with its source position.
+// Token is a single lexical unit with its source position. File is empty for
+// the file that was run and holds the import path for everything else, so an
+// error only has to name a file when it did not come from the one you ran.
 type Token struct {
 	Type    TokenType
 	Literal string
+	File    string
 	Line    int
 	Column  int
 }
 
+// Position is a token's place in the source, in the short form errors use:
+// "line:col", or "file:line:col" for an imported file.
+func (t Token) Position() string {
+	if t.File != "" {
+		return fmt.Sprintf("%s:%d:%d", t.File, t.Line, t.Column)
+	}
+	return fmt.Sprintf("%d:%d", t.Line, t.Column)
+}
+
 var keywords = map[string]TokenType{
+	"import":   IMPORT,
+	"as":       AS,
 	"fn":       FUNCTION,
 	"let":      LET,
 	"if":       IF,

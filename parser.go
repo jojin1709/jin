@@ -139,7 +139,7 @@ func (p *Parser) curPrecedence() int {
 
 func (p *Parser) errorf(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	p.errors = append(p.errors, fmt.Sprintf("%d:%d: %s", p.curToken.Line, p.curToken.Column, msg))
+	p.errors = append(p.errors, fmt.Sprintf("%s: %s", p.curToken.Position(), msg))
 }
 
 // ---------------------------------------------------------------- program
@@ -168,6 +168,8 @@ func (p *Parser) ParseProgram() *Program {
 
 func (p *Parser) parseStatement() Statement {
 	switch p.curToken.Type {
+	case IMPORT:
+		return p.parseImportStatement()
 	case LET:
 		return p.parseLetStatement()
 	case FUNCTION:
@@ -187,6 +189,27 @@ func (p *Parser) parseStatement() Statement {
 	default:
 		return p.parseExpressionStatement()
 	}
+}
+
+// parseImportStatement reads `import "path" as alias`. The path is a file's
+// name without the .jin ending, and the alias is required: a file's names are
+// always reached through it, so a name from another file is never a surprise.
+func (p *Parser) parseImportStatement() *ImportStatement {
+	stmt := &ImportStatement{Token: p.curToken}
+
+	if !p.expectPeek(STRING) {
+		return nil
+	}
+	stmt.Path = p.curToken.Literal
+
+	if !p.expectPeek(AS) {
+		return nil
+	}
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	stmt.Alias = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	return stmt
 }
 
 func (p *Parser) parseLetStatement() *LetStatement {
@@ -399,6 +422,13 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 		// Statements that end in a brace do not eat their own ';', so one
 		// left over from them is a separator and gets skipped here.
 		if p.curTokenIs(SEMICOLON) {
+			p.nextToken()
+			continue
+		}
+		// An import belongs to a file, not to a block inside one.
+		if p.curTokenIs(IMPORT) {
+			p.errorf("'import' is only allowed at the top level of a file")
+			p.parseImportStatement()
 			p.nextToken()
 			continue
 		}

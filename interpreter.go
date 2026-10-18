@@ -11,18 +11,74 @@ import (
 type Interpreter struct {
 	out      io.Writer
 	builtins map[string]*Builtin
+
+	// The top-level scope of each imported file, and which files have already
+	// run. A REPL keeps one interpreter, so a file imported on one line stays
+	// usable on the next without running it again.
+	moduleEnvs map[*Module]*Environment
+	ran        map[*Module]bool
 }
 
 // NewInterpreter creates an interpreter that writes program output to out.
 func NewInterpreter(out io.Writer) *Interpreter {
-	i := &Interpreter{out: out}
-	i.builtins = newBuiltins(out)
+	return NewInterpreterWithArgs(out, nil)
+}
+
+// NewInterpreterWithArgs creates an interpreter that also knows the arguments
+// the program was run with, which is what args() reports.
+func NewInterpreterWithArgs(out io.Writer, programArgs []string) *Interpreter {
+	i := &Interpreter{
+		out:        out,
+		moduleEnvs: map[*Module]*Environment{},
+		ran:        map[*Module]bool{},
+	}
+	i.builtins = newBuiltins(out, programArgs)
 	return i
 }
 
 // Run executes every statement in a program. The last statement's value is
 // returned so the REPL can show it.
 func (i *Interpreter) Run(program *Program, env *Environment) (Object, error) {
+	return i.RunModules(&Module{Program: program}, env)
+}
+
+// RunModules runs a file and everything it imports. Every imported file runs
+// once, before the file that imported it, matching the bytecode back end.
+func (i *Interpreter) RunModules(entry *Module, env *Environment) (Object, error) {
+	for _, dep := range entry.Deps {
+		if err := i.runModule(dep); err != nil {
+			return nil, err
+		}
+	}
+
+	for alias, mod := range entry.Aliases() {
+		env.modules[alias] = i.moduleEnvs[mod]
+	}
+
+	return i.runProgram(entry.Program, env)
+}
+
+// runModule evaluates one imported file's top-level statements in a scope of
+// its own, once, and keeps that scope so other files can reach its names.
+func (i *Interpreter) runModule(m *Module) error {
+	if i.ran[m] {
+		return nil
+	}
+	i.ran[m] = true
+
+	modEnv := NewEnvironment()
+	for alias, dep := range m.Aliases() {
+		modEnv.modules[alias] = i.moduleEnvs[dep]
+	}
+	i.moduleEnvs[m] = modEnv
+
+	_, err := i.runProgram(m.Program, modEnv)
+	return err
+}
+
+// runProgram executes every statement of one file, stopping if control flow
+// escapes to the top level.
+func (i *Interpreter) runProgram(program *Program, env *Environment) (Object, error) {
 	var result Object = &Nil{}
 
 	for _, stmt := range program.Statements {
@@ -43,6 +99,11 @@ func (i *Interpreter) Run(program *Program, env *Environment) (Object, error) {
 
 func (i *Interpreter) evalStatement(stmt Statement, env *Environment) (Object, error) {
 	switch node := stmt.(type) {
+
+	case *ImportStatement:
+		// The file it names has already run; the alias was installed before
+		// this file's statements started.
+		return &Nil{}, nil
 
 	case *ExpressionStatement:
 		return i.evalExpression(node.Expression, env)
@@ -208,7 +269,7 @@ func (i *Interpreter) evalWhile(node *WhileStatement, env *Environment) (Object,
 func (i *Interpreter) iterate(obj Object, tok Token) ([]Object, error) {
 	seq, err := iterateValues(obj)
 	if err != nil {
-		return nil, fmt.Errorf("%d:%d: %s", tok.Line, tok.Column, err)
+		return nil, at(tok, "%s", err)
 	}
 	// iterateValues hands back an array for every collection, and for an array
 	// it hands back the array itself, so a loop sees the live elements.
@@ -276,19 +337,36 @@ func (i *Interpreter) evalExpression(expr Expression, env *Environment) (Object,
 				return nil, err
 			}
 			if err := m.Set(key, value); err != nil {
-				return nil, fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
+				return nil, at(node.Token, "%s", err)
 			}
 		}
 		return m, nil
 
 	case *FunctionLiteral:
 		return &Function{Parameters: node.Parameters, Body: node.Body, Env: env}, nil
+
 	case *MemberExpression:
-		return nil, fmt.Errorf("%d:%d: property access (.%s) is not supported yet",
-			node.Token.Line, node.Token.Column, node.Property.Value)
+		return i.evalMember(node, env)
 	}
 
 	return nil, fmt.Errorf("cannot evaluate %T", expr)
+}
+
+// evalMember reads a name from an imported file: u.name. Only a file's
+// top-level names are reachable, and only through the alias the import gave it.
+func (i *Interpreter) evalMember(node *MemberExpression, env *Environment) (Object, error) {
+	if id, ok := node.Object.(*Identifier); ok {
+		if _, shadowed := env.Get(id.Value); !shadowed {
+			if modEnv, isModule := env.modules[id.Value]; isModule {
+				val, ok := modEnv.Get(node.Property.Value)
+				if !ok {
+					return nil, at(node.Token, "%s has no name %q", id.Value, node.Property.Value)
+				}
+				return val, nil
+			}
+		}
+	}
+	return nil, at(node.Token, "property access (.%s) is not supported yet", node.Property.Value)
 }
 
 func (i *Interpreter) evalIdentifier(node *Identifier, env *Environment) (Object, error) {
@@ -298,7 +376,11 @@ func (i *Interpreter) evalIdentifier(node *Identifier, env *Environment) (Object
 	if b, ok := i.builtins[node.Value]; ok {
 		return b, nil
 	}
-	return nil, fmt.Errorf("%d:%d: undefined variable %q", node.Token.Line, node.Token.Column, node.Value)
+	if _, isModule := env.modules[node.Value]; isModule {
+		return nil, at(node.Token, "%q is a module; write %s.<name> to use a name from it",
+			node.Value, node.Value)
+	}
+	return nil, at(node.Token, "undefined variable %q", node.Value)
 }
 
 func (i *Interpreter) evalPrefix(node *PrefixExpression, env *Environment) (Object, error) {
@@ -311,7 +393,7 @@ func (i *Interpreter) evalPrefix(node *PrefixExpression, env *Environment) (Obje
 	case "!":
 		b, ok := right.(*Boolean)
 		if !ok {
-			return nil, fmt.Errorf("%d:%d: '!' expects a bool, got %s", node.Token.Line, node.Token.Column, right.Type())
+			return nil, at(node.Token, "'!' expects a bool, got %s", right.Type())
 		}
 		return newBoolean(!b.Value), nil
 	case "-":
@@ -321,10 +403,10 @@ func (i *Interpreter) evalPrefix(node *PrefixExpression, env *Environment) (Obje
 		case *Float:
 			return newFloat(-v.Value), nil
 		}
-		return nil, fmt.Errorf("%d:%d: '-' expects a number, got %s", node.Token.Line, node.Token.Column, right.Type())
+		return nil, at(node.Token, "'-' expects a number, got %s", right.Type())
 	}
 
-	return nil, fmt.Errorf("%d:%d: unknown operator %s%s", node.Token.Line, node.Token.Column, node.Operator, right.Type())
+	return nil, at(node.Token, "unknown operator %s%s", node.Operator, right.Type())
 }
 
 func (i *Interpreter) evalInfix(node *InfixExpression, env *Environment) (Object, error) {
@@ -381,8 +463,7 @@ func (i *Interpreter) evalInfix(node *InfixExpression, env *Environment) (Object
 		return newBoolean(equal), nil
 	}
 
-	return nil, fmt.Errorf("%d:%d: unknown operator %s %s %s",
-		node.Token.Line, node.Token.Column, left.Type(), op, right.Type())
+	return nil, at(node.Token, "unknown operator %s %s %s", left.Type(), op, right.Type())
 }
 
 func addValues(left, right Object, tok Token) (Object, error) {
@@ -410,10 +491,9 @@ func addValues(left, right Object, tok Token) (Object, error) {
 
 	// Mixed numeric types are rejected on purpose: no silent promotion.
 	if isNumber(left) && isNumber(right) && left.Type() != right.Type() {
-		return nil, fmt.Errorf("%d:%d: cannot add %s and %s; convert one explicitly with int() or float()",
-			tok.Line, tok.Column, left.Type(), right.Type())
+		return nil, at(tok, "cannot add %s and %s; convert one explicitly with int() or float()", left.Type(), right.Type())
 	}
-	return nil, fmt.Errorf("%d:%d: cannot add %s and %s", tok.Line, tok.Column, left.Type(), right.Type())
+	return nil, at(tok, "cannot add %s and %s", left.Type(), right.Type())
 }
 
 func arithValues(op string, left, right Object, tok Token) (Object, error) {
@@ -427,12 +507,12 @@ func arithValues(op string, left, right Object, tok Token) (Object, error) {
 				return newInteger(l.Value * r.Value), nil
 			case "/":
 				if r.Value == 0 {
-					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
+					return nil, at(tok, "division by zero")
 				}
 				return newInteger(l.Value / r.Value), nil
 			case "%":
 				if r.Value == 0 {
-					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
+					return nil, at(tok, "division by zero")
 				}
 				return newInteger(l.Value % r.Value), nil
 			}
@@ -446,12 +526,12 @@ func arithValues(op string, left, right Object, tok Token) (Object, error) {
 				return newFloat(l.Value * r.Value), nil
 			case "/":
 				if r.Value == 0 {
-					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
+					return nil, at(tok, "division by zero")
 				}
 				return newFloat(l.Value / r.Value), nil
 			case "%":
 				if r.Value == 0 {
-					return nil, fmt.Errorf("%d:%d: division by zero", tok.Line, tok.Column)
+					return nil, at(tok, "division by zero")
 				}
 				return newFloat(math.Mod(l.Value, r.Value)), nil
 			}
@@ -459,10 +539,9 @@ func arithValues(op string, left, right Object, tok Token) (Object, error) {
 	}
 
 	if isNumber(left) && isNumber(right) && left.Type() != right.Type() {
-		return nil, fmt.Errorf("%d:%d: cannot use %s on %s and %s; convert one explicitly with int() or float()",
-			tok.Line, tok.Column, op, left.Type(), right.Type())
+		return nil, at(tok, "cannot use %s on %s and %s; convert one explicitly with int() or float()", op, left.Type(), right.Type())
 	}
-	return nil, fmt.Errorf("%d:%d: cannot use %s on %s and %s", tok.Line, tok.Column, op, left.Type(), right.Type())
+	return nil, at(tok, "cannot use %s on %s and %s", op, left.Type(), right.Type())
 }
 
 func compareValues(op string, left, right Object, tok Token) (Object, error) {
@@ -480,7 +559,7 @@ func compareValues(op string, left, right Object, tok Token) (Object, error) {
 			return newBoolean(compareStrings(op, l.Value, r.Value)), nil
 		}
 	}
-	return nil, fmt.Errorf("%d:%d: cannot compare %s and %s", tok.Line, tok.Column, left.Type(), right.Type())
+	return nil, at(tok, "cannot compare %s and %s", left.Type(), right.Type())
 }
 
 // compareOrder applies an ordering operator to two numbers.
@@ -522,8 +601,7 @@ func (i *Interpreter) evalAssign(node *AssignExpression, env *Environment) (Obje
 	switch target := node.Target.(type) {
 	case *Identifier:
 		if !env.Assign(target.Value, value) {
-			return nil, fmt.Errorf("%d:%d: undefined variable %q; use 'let' to declare it first",
-				node.Token.Line, node.Token.Column, target.Value)
+			return nil, at(node.Token, "undefined variable %q; use 'let' to declare it first", target.Value)
 		}
 		return value, nil
 
@@ -537,12 +615,22 @@ func (i *Interpreter) evalAssign(node *AssignExpression, env *Environment) (Obje
 			return nil, err
 		}
 		if err := setInto(container, index, value); err != nil {
-			return nil, fmt.Errorf("%d:%d: %s", target.Token.Line, target.Token.Column, err)
+			return nil, at(target.Token, "%s", err)
 		}
 		return value, nil
+
+	case *MemberExpression:
+		if id, ok := target.Object.(*Identifier); ok {
+			if _, shadowed := env.Get(id.Value); !shadowed {
+				if _, isModule := env.modules[id.Value]; isModule {
+					return nil, at(target.Token, "cannot assign to %s.%s; another file's names are read-only",
+						id.Value, target.Property.Value)
+				}
+			}
+		}
 	}
 
-	return nil, fmt.Errorf("%d:%d: cannot assign to this expression", node.Token.Line, node.Token.Column)
+	return nil, at(node.Token, "cannot assign to this expression")
 }
 
 func (i *Interpreter) evalIndex(node *IndexExpression, env *Environment) (Object, error) {
@@ -557,7 +645,7 @@ func (i *Interpreter) evalIndex(node *IndexExpression, env *Environment) (Object
 
 	value, err := indexInto(container, index)
 	if err != nil {
-		return nil, fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
+		return nil, at(node.Token, "%s", err)
 	}
 	return value, nil
 }
@@ -583,12 +671,12 @@ func (i *Interpreter) evalCall(node *CallExpression, env *Environment) (Object, 
 	case *Builtin:
 		result, err := fn.Fn(args)
 		if err != nil {
-			return nil, fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
+			return nil, at(node.Token, "%s", err)
 		}
 		return result, nil
 	}
 
-	return nil, fmt.Errorf("%d:%d: %s is not callable", node.Token.Line, node.Token.Column, callee.Type())
+	return nil, at(node.Token, "%s is not callable", callee.Type())
 }
 
 func (i *Interpreter) applyFunction(fn *Function, args []Object, tok Token) (Object, error) {
@@ -597,8 +685,7 @@ func (i *Interpreter) applyFunction(fn *Function, args []Object, tok Token) (Obj
 		if name == "" {
 			name = "fn"
 		}
-		return nil, fmt.Errorf("%d:%d: %s() expects %d argument(s), got %d",
-			tok.Line, tok.Column, name, len(fn.Parameters), len(args))
+		return nil, at(tok, "%s() expects %d argument(s), got %d", name, len(fn.Parameters), len(args))
 	}
 
 	callEnv := NewEnclosedEnvironment(fn.Env)
@@ -641,7 +728,7 @@ func (i *Interpreter) evalString(node *StringLiteral, env *Environment) (Object,
 func (i *Interpreter) interpolate(raw string, env *Environment, tok Token) (string, error) {
 	segs, err := splitInterpolation(raw)
 	if err != nil {
-		return "", fmt.Errorf("%d:%d: %s", tok.Line, tok.Column, err)
+		return "", at(tok, "%s", err)
 	}
 
 	var sb strings.Builder
@@ -663,23 +750,29 @@ func (i *Interpreter) interpolate(raw string, env *Environment, tok Token) (stri
 // evalInline parses and evaluates a single expression from source text. This
 // is what makes {n + 1} inside a string work.
 func (i *Interpreter) evalInline(src string, env *Environment, tok Token) (Object, error) {
-	p := NewParser(NewLexerAt(src, tok.Line))
+	p := NewParser(NewLexerAt(src, tok.Line, tok.File))
 	program := p.ParseProgram()
 	if len(p.Errors()) > 0 {
-		return nil, fmt.Errorf("%d:%d: bad interpolation {%s}: %s",
-			tok.Line, tok.Column, src, strings.Join(p.Errors(), "; "))
+		return nil, at(tok, "bad interpolation {%s}: %s", src, strings.Join(p.Errors(), "; "))
 	}
 	if len(program.Statements) != 1 {
-		return nil, fmt.Errorf("%d:%d: interpolation {%s} must be one expression", tok.Line, tok.Column, src)
+		return nil, at(tok, "interpolation {%s} must be one expression", src)
 	}
 	stmt, ok := program.Statements[0].(*ExpressionStatement)
 	if !ok {
-		return nil, fmt.Errorf("%d:%d: interpolation {%s} must be an expression", tok.Line, tok.Column, src)
+		return nil, at(tok, "interpolation {%s} must be an expression", src)
 	}
 	return i.evalExpression(stmt.Expression, env)
 }
 
 // ---------------------------------------------------------------- helpers
+
+// at builds a runtime error that points at a piece of source. An imported
+// file's name is included; the file that was run is left out, because there is
+// only one of it and the message stays shorter without it.
+func at(tok Token, format string, args ...any) error {
+	return fmt.Errorf("%s: %s", tok.Position(), fmt.Sprintf(format, args...))
+}
 
 func isNumber(o Object) bool {
 	switch o.(type) {
@@ -692,7 +785,7 @@ func isNumber(o Object) bool {
 func asBoolAt(o Object, tok Token) (bool, error) {
 	b, ok := o.(*Boolean)
 	if !ok {
-		return false, fmt.Errorf("%d:%d: expected a bool, got %s", tok.Line, tok.Column, o.Type())
+		return false, at(tok, "expected a bool, got %s", o.Type())
 	}
 	return b.Value, nil
 }

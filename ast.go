@@ -123,6 +123,20 @@ func (s *FunctionStatement) String() string {
 	return sb.String()
 }
 
+// ImportStatement brings another file's names in behind an alias:
+// import "utils" as u
+type ImportStatement struct {
+	Token Token
+	Path  string
+	Alias *Identifier
+}
+
+func (s *ImportStatement) statementNode()       {}
+func (s *ImportStatement) TokenLiteral() string { return s.Token.Literal }
+func (s *ImportStatement) String() string {
+	return "import \"" + s.Path + "\" as " + s.Alias.String()
+}
+
 // ReturnStatement returns a value from a function.
 type ReturnStatement struct {
 	Token Token

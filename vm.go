@@ -38,6 +38,12 @@ type VM struct {
 
 // NewVM prepares a virtual machine that writes program output to out.
 func NewVM(out io.Writer) *VM {
+	return NewVMWithArgs(out, nil)
+}
+
+// NewVMWithArgs prepares a virtual machine that also knows the arguments the
+// program was run with, which is what args() reports.
+func NewVMWithArgs(out io.Writer, programArgs []string) *VM {
 	vm := &VM{
 		stack:   make([]Object, stackSize),
 		frames:  make([]*Frame, maxFrames),
@@ -48,13 +54,13 @@ func NewVM(out io.Writer) *VM {
 	for i := range vm.frames {
 		vm.frames[i] = &Frame{}
 	}
-	vm.builtins = orderedBuiltins(out)
+	vm.builtins = orderedBuiltins(out, programArgs)
 	return vm
 }
 
 // orderedBuiltins returns the built-ins in the order OpGetBuiltin expects.
-func orderedBuiltins(out io.Writer) []*Builtin {
-	byName := newBuiltins(out)
+func orderedBuiltins(out io.Writer, programArgs []string) []*Builtin {
+	byName := newBuiltins(out, programArgs)
 	list := make([]*Builtin, len(builtinNames))
 	for i, name := range builtinNames {
 		list[i] = byName[name]
@@ -561,6 +567,9 @@ func (vm *VM) errorf(format string, args ...interface{}) error {
 	if at >= 0 && at < len(frame.cl.Fn.Positions) {
 		pos := frame.cl.Fn.Positions[at]
 		if pos.Line > 0 {
+			if pos.File != "" {
+				return fmt.Errorf("%s:%d:%d: %s", pos.File, pos.Line, pos.Col, msg)
+			}
 			return fmt.Errorf("%d:%d: %s", pos.Line, pos.Col, msg)
 		}
 	}
@@ -706,7 +715,7 @@ func (vm *VM) tokenHere() Token {
 	at := frame.ip - 1
 	if at >= 0 && at < len(frame.cl.Fn.Positions) {
 		pos := frame.cl.Fn.Positions[at]
-		return Token{Line: pos.Line, Column: pos.Col}
+		return Token{Line: pos.Line, Column: pos.Col, File: pos.File}
 	}
 	return Token{}
 }

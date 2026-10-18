@@ -23,13 +23,27 @@ var builtinNames = []string{
 	"replace", "find", "starts_with", "ends_with", "repeat", "chars", "lines",
 	"floor", "ceil", "round", "sqrt", "pow", "random", "error",
 	"read_file", "write_file", "append_file", "file_exists", "delete_file",
+	"args",
 }
 
 // newBuiltins returns the functions Jin provides out of the box. They are
 // shared by the tree-walking interpreter and the bytecode VM, so they only
-// depend on where output goes.
-func newBuiltins(out io.Writer) map[string]*Builtin {
+// depend on where output goes and on the arguments the program was run with.
+func newBuiltins(out io.Writer, programArgs []string) map[string]*Builtin {
 	b := map[string]*Builtin{}
+
+	// args() is the arguments the program was run with, so a Jin program can
+	// be used as a command.
+	b["args"] = &Builtin{Name: "args", Fn: func(args []Object) (Object, error) {
+		if err := arity("args", args, 0); err != nil {
+			return nil, err
+		}
+		elems := make([]Object, 0, len(programArgs))
+		for _, arg := range programArgs {
+			elems = append(elems, &String{Value: arg})
+		}
+		return &Array{Elements: elems}, nil
+	}}
 
 	b["print"] = &Builtin{Name: "print", Fn: func(args []Object) (Object, error) {
 		parts := make([]string, 0, len(args))

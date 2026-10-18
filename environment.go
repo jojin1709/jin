@@ -5,16 +5,21 @@ package main
 type Environment struct {
 	store map[string]Object
 	outer *Environment
+
+	// modules maps the aliases this scope can reach imported files by to those
+	// files' own top-level scopes. A scope nested inside this one shares the
+	// same map, so a function can use the import written above it.
+	modules map[string]*Environment
 }
 
 // NewEnvironment creates a fresh top-level scope.
 func NewEnvironment() *Environment {
-	return &Environment{store: map[string]Object{}}
+	return &Environment{store: map[string]Object{}, modules: map[string]*Environment{}}
 }
 
 // NewEnclosedEnvironment creates a scope nested inside outer.
 func NewEnclosedEnvironment(outer *Environment) *Environment {
-	return &Environment{store: map[string]Object{}, outer: outer}
+	return &Environment{store: map[string]Object{}, outer: outer, modules: outer.modules}
 }
 
 // Get looks a name up in this scope and then outwards.

@@ -1,0 +1,15 @@
+# A project made of two files, joined by an import.
+#
+#   jin run examples/greeting
+#   jin run examples/greeting -- Jin Jo
+
+import "words" as words
+
+let who = args()
+if len(who) == 0 {
+    who = ["world"]
+}
+
+for name in who {
+    print(words.greet(name))
+}

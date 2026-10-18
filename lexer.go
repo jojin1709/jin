@@ -12,11 +12,12 @@ const eof = rune(0)
 // Lexer turns Jin source text into a stream of tokens.
 type Lexer struct {
 	input        string
-	position     int  // current position (byte offset of ch)
-	readPosition int  // next position to read
-	ch           rune // current rune under examination
-	line         int  // 1-based line of the current rune
-	lineStart    int  // byte offset where the current line begins
+	file         string // the import path this text came from, empty for the file that was run
+	position     int    // current position (byte offset of ch)
+	readPosition int    // next position to read
+	ch           rune   // current rune under examination
+	line         int    // 1-based line of the current rune
+	lineStart    int    // byte offset where the current line begins
 }
 
 // NewLexer primes a lexer for the given input.
@@ -26,11 +27,19 @@ func NewLexer(input string) *Lexer {
 	return l
 }
 
+// NewLexerFile primes a lexer for text that came from an imported file. Its
+// tokens carry the file's name so errors can point at the right file.
+func NewLexerFile(input, file string) *Lexer {
+	l := NewLexer(input)
+	l.file = file
+	return l
+}
+
 // NewLexerAt starts lexing as if the input began at the given 1-based line.
 // It is used for expressions pulled out of a string, so that errors inside
 // {interpolation} point at the real line in the file rather than line 1.
-func NewLexerAt(input string, line int) *Lexer {
-	l := NewLexer(input)
+func NewLexerAt(input string, line int, file string) *Lexer {
+	l := NewLexerFile(input, file)
 	if line > 0 {
 		l.line = line
 	}
@@ -161,35 +170,40 @@ func (l *Lexer) NextToken() Token {
 	case '"':
 		lit, ok := l.readString()
 		if !ok {
-			return Token{Type: ILLEGAL, Literal: lit, Line: line, Column: col}
+			return l.tok(ILLEGAL, lit, line, col)
 		}
 		l.readChar() // consume the closing quote
-		return Token{Type: STRING, Literal: lit, Line: line, Column: col}
+		return l.tok(STRING, lit, line, col)
 	case eof:
-		return Token{Type: EOF, Literal: "", Line: line, Column: col}
+		return l.tok(EOF, "", line, col)
 	}
 
 	if isLetter(l.ch) {
 		lit := l.readIdentifier()
-		return Token{Type: LookupIdent(lit), Literal: lit, Line: line, Column: col}
+		return l.tok(LookupIdent(lit), lit, line, col)
 	}
 
 	if isDigit(l.ch) {
 		lit, tt := l.readNumber()
-		return Token{Type: tt, Literal: lit, Line: line, Column: col}
+		return l.tok(tt, lit, line, col)
 	}
 
 	// Anything else is an illegal character.
 	ch := l.ch
 	l.readChar()
-	return Token{Type: ILLEGAL, Literal: string(ch), Line: line, Column: col}
+	return l.tok(ILLEGAL, string(ch), line, col)
 }
 
 // simple builds a one-rune token and advances past it.
 func (l *Lexer) simple(tt TokenType, line, col int) Token {
 	lit := string(l.ch)
 	l.readChar()
-	return Token{Type: tt, Literal: lit, Line: line, Column: col}
+	return l.tok(tt, lit, line, col)
+}
+
+// tok builds a token, stamping it with the file it came from.
+func (l *Lexer) tok(tt TokenType, lit string, line, col int) Token {
+	return Token{Type: tt, Literal: lit, File: l.file, Line: line, Column: col}
 }
 
 // twoChar builds a two-rune token (==, !=, <=, >=, &&, ||, ->) and advances
@@ -197,7 +211,7 @@ func (l *Lexer) simple(tt TokenType, line, col int) Token {
 func (l *Lexer) twoChar(tt TokenType, lit string, line, col int) Token {
 	l.readChar() // move onto the second rune
 	l.readChar() // move past the token
-	return Token{Type: tt, Literal: lit, Line: line, Column: col}
+	return l.tok(tt, lit, line, col)
 }
 
 // readIdentifier reads an identifier or keyword.

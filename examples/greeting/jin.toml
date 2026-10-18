@@ -1,0 +1,4 @@
+# Settings for this Jin project.
+name = "greeting"
+version = "1.0.0"
+entry = "main.jin"

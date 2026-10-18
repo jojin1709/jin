@@ -6,10 +6,13 @@ import (
 )
 
 // Position is where a piece of code came from, so run-time errors can point at
-// the right line and column even though the tree is gone.
+// the right line and column even though the tree is gone. File is empty for the
+// file that was run — there is only one of those, and the message is shorter
+// without it — and holds the file's name for anything imported.
 type Position struct {
 	Line int
 	Col  int
+	File string
 }
 
 // Bytecode is a compiled program ready for the VM.
@@ -44,6 +47,7 @@ type loopContext struct {
 type Compiler struct {
 	pool      *constantPool
 	symbols   *SymbolTable
+	root      *SymbolTable // the one table every file's globals live in
 	enclosing *Compiler
 
 	instructions Instructions
@@ -52,6 +56,16 @@ type Compiler struct {
 
 	functionName string
 	loops        []*loopContext
+
+	// The file being compiled, and the names it can reach other files by. A
+	// function inherits both from the file it was written in.
+	modulePrefix string
+	aliases      map[string]*Module
+
+	// Files already put into this chunk, and the namespaces handed out so far.
+	// A REPL reuses one compiler, so an import typed on one line stays usable
+	// on the next.
+	compiled map[*Module]bool
 }
 
 // NewCompiler prepares a compiler that shares a global symbol table. Pass nil
@@ -61,13 +75,24 @@ func NewCompiler(globals *SymbolTable) *Compiler {
 		globals = NewSymbolTable(true)
 	}
 	return &Compiler{
-		pool:    &constantPool{},
-		symbols: globals,
+		pool:     &constantPool{},
+		symbols:  globals,
+		root:     globals,
+		aliases:  map[string]*Module{},
+		compiled: map[*Module]bool{},
 	}
 }
 
 // Compile turns a program into bytecode.
 func (c *Compiler) Compile(program *Program) (*Bytecode, error) {
+	return c.CompileModules(&Module{Program: program})
+}
+
+// CompileModules turns a file and everything it imports into one chunk. The
+// imports are compiled first, in an order where a file always follows the files
+// it imports, so by the time a file's own code runs every name it imported is
+// already there.
+func (c *Compiler) CompileModules(entry *Module) (*Bytecode, error) {
 	// A REPL reuses one compiler, so each chunk starts from a clean slate.
 	c.instructions = nil
 	c.positions = nil
@@ -76,18 +101,22 @@ func (c *Compiler) Compile(program *Program) (*Bytecode, error) {
 	// Local slots do not survive between REPL lines, but globals do.
 	c.symbols.ResetLocals()
 
-	// Every top-level name is declared before anything is compiled, so a
-	// function can use a global that is defined further down the file.
-	for _, stmt := range program.Statements {
-		switch node := stmt.(type) {
-		case *LetStatement:
-			c.symbols.Define(node.Name.Value)
-		case *FunctionStatement:
-			c.symbols.Define(node.Name.Value)
+	for _, dep := range entry.Deps {
+		if err := c.compileModule(dep); err != nil {
+			return nil, err
 		}
 	}
 
-	for _, stmt := range program.Statements {
+	c.modulePrefix = entry.Prefix
+	for alias, mod := range entry.Aliases() {
+		c.aliases[alias] = mod
+	}
+	c.predefineTopLevel(entry)
+
+	for _, stmt := range entry.Program.Statements {
+		if _, ok := stmt.(*ImportStatement); ok {
+			continue // an import is a name to reach a file by, not work to do
+		}
 		if err := c.compileStatement(stmt); err != nil {
 			return nil, err
 		}
@@ -105,6 +134,70 @@ func (c *Compiler) Compile(program *Program) (*Bytecode, error) {
 		Constants:    c.pool.items,
 		NumLocals:    c.symbols.NumLocals(),
 	}, nil
+}
+
+// compileModule puts one imported file's top-level statements into the chunk,
+// once, with its own names and its own view of the files it imports.
+func (c *Compiler) compileModule(m *Module) error {
+	if c.compiled[m] {
+		return nil
+	}
+	c.compiled[m] = true
+
+	savedPrefix, savedAliases := c.modulePrefix, c.aliases
+	c.modulePrefix = m.Prefix
+	c.aliases = m.Aliases()
+	defer func() {
+		c.modulePrefix, c.aliases = savedPrefix, savedAliases
+	}()
+
+	c.predefineTopLevel(m)
+
+	for _, stmt := range m.Program.Statements {
+		if _, ok := stmt.(*ImportStatement); ok {
+			continue
+		}
+		if err := c.compileStatement(stmt); err != nil {
+			return err
+		}
+		c.emit(OpPop)
+	}
+	return nil
+}
+
+// predefineTopLevel declares a file's top-level names before anything in it is
+// compiled, so a function can use a global that is defined further down.
+func (c *Compiler) predefineTopLevel(m *Module) {
+	for _, stmt := range m.Program.Statements {
+		switch node := stmt.(type) {
+		case *LetStatement:
+			c.symbols.Define(c.globalName(node.Name.Value))
+		case *FunctionStatement:
+			c.symbols.Define(c.globalName(node.Name.Value))
+		}
+	}
+}
+
+// globalName prefixes a top-level name from an imported file, because every
+// file's globals live in the one table the VM keeps. The file that was run
+// keeps the plain names, so a single-file program is compiled exactly as it
+// always was, and names inside a function are never touched.
+func (c *Compiler) globalName(name string) string {
+	if c.modulePrefix == "" || !c.symbols.isRoot || c.symbols.depth() != 0 {
+		return name
+	}
+	return c.modulePrefix + name
+}
+
+// fail reports a compile error, naming the file when the code came from an
+// imported one.
+func (c *Compiler) fail(tok Token, format string, args ...any) error {
+	return fmt.Errorf("%s: %s", tok.Position(), fmt.Sprintf(format, args...))
+}
+
+// at says where the instructions about to be emitted came from.
+func (c *Compiler) at(tok Token) {
+	c.position = Position{Line: tok.Line, Col: tok.Column, File: tok.File}
 }
 
 // ---------------------------------------------------------------- emitting
@@ -175,7 +268,7 @@ func (c *Compiler) emitSet(sym *Symbol) {
 // resolve finds a name, creating a captured reference when the variable lives
 // in an enclosing function.
 func (c *Compiler) resolve(name string) (*Symbol, bool) {
-	if sym, ok := c.symbols.Lookup(name); ok {
+	if sym, ok := c.lookupHere(name); ok {
 		return sym, true
 	}
 
@@ -199,6 +292,38 @@ func (c *Compiler) resolve(name string) (*Symbol, bool) {
 		return &Symbol{Name: name, Scope: BuiltinScope, Index: index}, true
 	}
 	return nil, false
+}
+
+// lookupHere looks a name up in this function's own table. At the top level of
+// an imported file the name carries the file's prefix, so one file never sees
+// another file's globals by accident.
+func (c *Compiler) lookupHere(name string) (*Symbol, bool) {
+	if c.modulePrefix != "" && c.symbols.isRoot && c.symbols.depth() == 0 {
+		return c.symbols.Lookup(c.modulePrefix + name)
+	}
+	return c.symbols.Lookup(name)
+}
+
+// namesAVariable reports whether a name is already a parameter, local or
+// global here. It is used to decide whether a module alias is really an alias,
+// and it walks outwards without capturing anything the way resolve does.
+func (c *Compiler) namesAVariable(name string) bool {
+	for cur := c; cur != nil; cur = cur.enclosing {
+		if sym, ok := cur.lookupHere(name); ok && sym.Scope != BuiltinScope {
+			return true
+		}
+	}
+	return false
+}
+
+// moduleName finds a name at the top level of another file. Only top-level
+// names are reachable, which is what makes them a file's exports.
+func (c *Compiler) moduleName(mod *Module, name string) (*Symbol, bool) {
+	sym, ok := c.root.Lookup(mod.Prefix + name)
+	if !ok || sym.Scope != GlobalScope {
+		return nil, false
+	}
+	return sym, true
 }
 
 // ---------------------------------------------------------------- statements
@@ -233,10 +358,15 @@ func statementToken(stmt Statement) Token {
 
 func (c *Compiler) compileStatement(stmt Statement) error {
 	if tok := statementToken(stmt); tok.Line > 0 {
-		c.position = Position{tok.Line, tok.Column}
+		c.at(tok)
 	}
 
 	switch node := stmt.(type) {
+
+	case *ImportStatement:
+		// The file it names was compiled before this one, and the alias lives
+		// in the compiler's alias table, so there is nothing to emit.
+		return nil
 
 	case *ExpressionStatement:
 		return c.compileExpression(node.Expression)
@@ -245,7 +375,7 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 		// A function written straight into a let takes the variable's name and
 		// is declared first, so it can call itself.
 		if lit, ok := node.Value.(*FunctionLiteral); ok {
-			sym := c.symbols.Define(node.Name.Value)
+			sym := c.symbols.Define(c.globalName(node.Name.Value))
 			if err := c.compileFunction(lit.Parameters, lit.Body, node.Name.Value); err != nil {
 				return err
 			}
@@ -257,13 +387,13 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 		if err := c.compileExpression(node.Value); err != nil {
 			return err
 		}
-		sym := c.symbols.Define(node.Name.Value)
+		sym := c.symbols.Define(c.globalName(node.Name.Value))
 		c.emit(OpDup)
 		c.emitSet(sym)
 		return nil
 
 	case *FunctionStatement:
-		sym := c.symbols.Define(node.Name.Value)
+		sym := c.symbols.Define(c.globalName(node.Name.Value))
 		if err := c.compileFunction(node.Parameters, node.Body, node.Name.Value); err != nil {
 			return err
 		}
@@ -296,8 +426,7 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 
 	case *BreakStatement:
 		if len(c.loops) == 0 {
-			return fmt.Errorf("%d:%d: 'break' is only allowed inside a loop",
-				node.Token.Line, node.Token.Column)
+			return c.fail(node.Token, "'break' is only allowed inside a loop")
 		}
 		loop := c.loops[len(c.loops)-1]
 		loop.breaks = append(loop.breaks, c.emit(OpJump, 0))
@@ -305,8 +434,7 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 
 	case *ContinueStatement:
 		if len(c.loops) == 0 {
-			return fmt.Errorf("%d:%d: 'continue' is only allowed inside a loop",
-				node.Token.Line, node.Token.Column)
+			return c.fail(node.Token, "'continue' is only allowed inside a loop")
 		}
 		loop := c.loops[len(c.loops)-1]
 		loop.continueJumps = append(loop.continueJumps, c.emit(OpJump, 0))
@@ -352,7 +480,7 @@ func (c *Compiler) compileBlock(block *BlockStatement, keepLast bool) error {
 }
 
 func (c *Compiler) compileIf(node *IfStatement) error {
-	c.position = Position{node.Token.Line, node.Token.Column}
+	c.at(node.Token)
 	if err := c.compileExpression(node.Condition); err != nil {
 		return err
 	}
@@ -394,7 +522,7 @@ func (c *Compiler) compileWhile(node *WhileStatement) error {
 	loop := &loopContext{}
 	c.loops = append(c.loops, loop)
 
-	c.position = Position{node.Token.Line, node.Token.Column}
+	c.at(node.Token)
 	// Each pass closes the cells the pass before it left open, so a closure
 	// made in one pass keeps that pass's values instead of following the slot
 	// into the next one. Slots below the body belong to code outside the loop
@@ -437,7 +565,7 @@ func (c *Compiler) compileWhile(node *WhileStatement) error {
 }
 
 func (c *Compiler) compileFor(node *ForStatement) error {
-	c.position = Position{node.Token.Line, node.Token.Column}
+	c.at(node.Token)
 
 	if err := c.compileExpression(node.Iterable); err != nil {
 		return err
@@ -538,7 +666,7 @@ func (c *Compiler) compileExpression(expr Expression) error {
 		return c.compileString(node)
 
 	case *Identifier:
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 
 		// A function referring to itself uses the closure that is running,
 		// which is the only way recursion works for a local function.
@@ -551,37 +679,41 @@ func (c *Compiler) compileExpression(expr Expression) error {
 
 		sym, ok := c.resolve(node.Value)
 		if !ok {
-			return fmt.Errorf("%d:%d: undefined variable %q", node.Token.Line, node.Token.Column, node.Value)
+			if _, isModule := c.aliases[node.Value]; isModule {
+				return c.fail(node.Token, "%q is a module; write %s.<name> to use a name from it",
+					node.Value, node.Value)
+			}
+			return c.fail(node.Token, "undefined variable %q", node.Value)
 		}
 		c.emitGet(sym)
 		return nil
 
 	case *PrefixExpression:
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		if err := c.compileExpression(node.Right); err != nil {
 			return err
 		}
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		switch node.Operator {
 		case "!":
 			c.emit(OpBang)
 		case "-":
 			c.emit(OpMinus)
 		default:
-			return fmt.Errorf("%d:%d: unknown operator %s", node.Token.Line, node.Token.Column, node.Operator)
+			return c.fail(node.Token, "unknown operator %s", node.Operator)
 		}
 		return nil
 
 	case *InfixExpression:
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		return c.compileInfix(node)
 
 	case *AssignExpression:
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		return c.compileAssign(node)
 
 	case *CallExpression:
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		if err := c.compileExpression(node.Function); err != nil {
 			return err
 		}
@@ -590,19 +722,19 @@ func (c *Compiler) compileExpression(expr Expression) error {
 				return err
 			}
 		}
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		c.emit(OpCall, len(node.Arguments))
 		return nil
 
 	case *IndexExpression:
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		if err := c.compileExpression(node.Left); err != nil {
 			return err
 		}
 		if err := c.compileExpression(node.Index); err != nil {
 			return err
 		}
-		c.position = Position{node.Token.Line, node.Token.Column}
+		c.at(node.Token)
 		c.emit(OpIndex)
 		return nil
 
@@ -633,8 +765,21 @@ func (c *Compiler) compileExpression(expr Expression) error {
 		return c.compileFunction(node.Parameters, node.Body, "")
 
 	case *MemberExpression:
-		return fmt.Errorf("%d:%d: property access (.%s) is not supported yet",
-			node.Token.Line, node.Token.Column, node.Property.Value)
+		c.at(node.Token)
+		// u.name reaches a top-level name in the file u names. The alias was
+		// checked when the file was loaded, so this can only fail when the
+		// other file has no such name.
+		if id, ok := node.Object.(*Identifier); ok && !c.namesAVariable(id.Value) {
+			if mod, isModule := c.aliases[id.Value]; isModule {
+				sym, ok := c.moduleName(mod, node.Property.Value)
+				if !ok {
+					return c.fail(node.Token, "%s has no name %q", id.Value, node.Property.Value)
+				}
+				c.emitGet(sym)
+				return nil
+			}
+		}
+		return c.fail(node.Token, "property access (.%s) is not supported yet", node.Property.Value)
 	}
 
 	return fmt.Errorf("cannot compile %T", expr)
@@ -669,7 +814,7 @@ func (c *Compiler) compileInfix(node *InfixExpression) error {
 		return err
 	}
 	// Compiling the operands moved the position; point back at the operator.
-	c.position = Position{node.Token.Line, node.Token.Column}
+	c.at(node.Token)
 
 	switch op {
 	case "+":
@@ -695,7 +840,7 @@ func (c *Compiler) compileInfix(node *InfixExpression) error {
 	case "<=":
 		c.emit(OpLessEqual)
 	default:
-		return fmt.Errorf("%d:%d: unknown operator %s", node.Token.Line, node.Token.Column, op)
+		return c.fail(node.Token, "unknown operator %s", op)
 	}
 	return nil
 }
@@ -709,12 +854,10 @@ func (c *Compiler) compileAssign(node *AssignExpression) error {
 		}
 		sym, ok := c.resolve(target.Value)
 		if !ok {
-			return fmt.Errorf("%d:%d: undefined variable %q; use 'let' to declare it first",
-				node.Token.Line, node.Token.Column, target.Value)
+			return c.fail(node.Token, "undefined variable %q; use 'let' to declare it first", target.Value)
 		}
 		if sym.Scope == BuiltinScope {
-			return fmt.Errorf("%d:%d: cannot assign to built-in %q",
-				node.Token.Line, node.Token.Column, target.Value)
+			return c.fail(node.Token, "cannot assign to built-in %q", target.Value)
 		}
 		c.emit(OpDup)
 		c.emitSet(sym)
@@ -730,18 +873,26 @@ func (c *Compiler) compileAssign(node *AssignExpression) error {
 		if err := c.compileExpression(node.Value); err != nil {
 			return err
 		}
-		c.position = Position{target.Token.Line, target.Token.Column}
+		c.at(target.Token)
 		c.emit(OpSetIndex)
 		return nil
+
+	case *MemberExpression:
+		if id, ok := target.Object.(*Identifier); ok && !c.namesAVariable(id.Value) {
+			if _, isModule := c.aliases[id.Value]; isModule {
+				return c.fail(target.Token, "cannot assign to %s.%s; another file's names are read-only",
+					id.Value, target.Property.Value)
+			}
+		}
 	}
 
-	return fmt.Errorf("%d:%d: cannot assign to this expression", node.Token.Line, node.Token.Column)
+	return c.fail(node.Token, "cannot assign to this expression")
 }
 
 // compileString turns interpolation into bytecode: the text pieces become
 // constants and the {expressions} are compiled like any other expression.
 func (c *Compiler) compileString(node *StringLiteral) error {
-	c.position = Position{node.Token.Line, node.Token.Column}
+	c.at(node.Token)
 
 	if !strings.Contains(node.Value, "{") {
 		c.emit(OpConstant, c.addConstant(&String{Value: node.Value}))
@@ -750,7 +901,7 @@ func (c *Compiler) compileString(node *StringLiteral) error {
 
 	segs, err := splitInterpolation(node.Value)
 	if err != nil {
-		return fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
+		return c.fail(node.Token, "%s", err)
 	}
 
 	count := 0
@@ -764,20 +915,17 @@ func (c *Compiler) compileString(node *StringLiteral) error {
 			continue
 		}
 
-		p := NewParser(NewLexerAt(seg.Expr, node.Token.Line))
+		p := NewParser(NewLexerAt(seg.Expr, node.Token.Line, node.Token.File))
 		program := p.ParseProgram()
 		if len(p.Errors()) > 0 {
-			return fmt.Errorf("%d:%d: bad interpolation {%s}: %s",
-				node.Token.Line, node.Token.Column, seg.Expr, strings.Join(p.Errors(), "; "))
+			return c.fail(node.Token, "bad interpolation {%s}: %s", seg.Expr, strings.Join(p.Errors(), "; "))
 		}
 		if len(program.Statements) != 1 {
-			return fmt.Errorf("%d:%d: interpolation {%s} must be one expression",
-				node.Token.Line, node.Token.Column, seg.Expr)
+			return c.fail(node.Token, "interpolation {%s} must be one expression", seg.Expr)
 		}
 		stmt, ok := program.Statements[0].(*ExpressionStatement)
 		if !ok {
-			return fmt.Errorf("%d:%d: interpolation {%s} must be an expression",
-				node.Token.Line, node.Token.Column, seg.Expr)
+			return c.fail(node.Token, "interpolation {%s} must be an expression", seg.Expr)
 		}
 		if err := c.compileExpression(stmt.Expression); err != nil {
 			return err
@@ -800,10 +948,13 @@ func (c *Compiler) compileFunction(params []*Parameter, body *BlockStatement, na
 	child := &Compiler{
 		pool:         c.pool,
 		symbols:      NewSymbolTable(false),
+		root:         c.root,
 		enclosing:    c,
 		functionName: name,
+		modulePrefix: c.modulePrefix,
+		aliases:      c.aliases,
 	}
-	child.position = Position{body.Token.Line, body.Token.Column}
+	child.position = Position{Line: body.Token.Line, Col: body.Token.Column, File: body.Token.File}
 
 	for _, p := range params {
 		child.symbols.Define(p.Name.Value)

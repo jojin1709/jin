@@ -159,6 +159,7 @@ func isNumericKind(k TypeKind) bool { return k == TypeInt || k == TypeFloat }
 
 // checkError is one problem found by the checker, with its position.
 type checkError struct {
+	File string
 	Line int
 	Col  int
 	Msg  string
@@ -169,6 +170,11 @@ type Checker struct {
 	errors   []checkError
 	scopes   []map[string]*Type
 	builtins map[string]*builtinSig
+
+	// The names this file can reach other files by, and the top-level types of
+	// every file checked so far.
+	aliases map[string]*Module
+	modules map[*Module]map[string]*Type
 
 	fnRet     *Type // nil when the function has no declared return type
 	loopDepth int
@@ -186,6 +192,8 @@ func NewChecker() *Checker {
 		errors:   []checkError{},
 		scopes:   []map[string]*Type{{}},
 		builtins: newBuiltinSigs(),
+		aliases:  map[string]*Module{},
+		modules:  map[*Module]map[string]*Type{},
 	}
 }
 
@@ -193,6 +201,40 @@ func NewChecker() *Checker {
 // by position so a file's problems read top to bottom.
 func Check(program *Program) []string {
 	return NewChecker().CheckProgram(program)
+}
+
+// CheckProject type-checks a file and everything it imports, each file on its
+// own but with the files it imports already known. Errors come out grouped by
+// file, in the order the files run.
+func CheckProject(entry *Module) []string {
+	return NewChecker().CheckModules(entry, map[*Module]map[string]*Type{})
+}
+
+// CheckModules checks every imported file that has not been checked yet, then
+// the file itself. Each imported file is checked on its own so its names stay
+// its own, and its top-level types are recorded in checked for the files that
+// import it. A REPL passes the same checked map every line, so a file imported
+// on one line is still known on the next.
+func (c *Checker) CheckModules(entry *Module, checked map[*Module]map[string]*Type) []string {
+	var out []string
+
+	for _, m := range entry.Deps {
+		if _, done := checked[m]; done {
+			continue
+		}
+		sub := NewChecker()
+		sub.aliases = m.Aliases()
+		sub.modules = checked
+		out = append(out, sub.CheckProgram(m.Program)...)
+		checked[m] = sub.GlobalScope()
+	}
+
+	for alias, mod := range entry.Aliases() {
+		c.aliases[alias] = mod
+	}
+	c.modules = checked
+	out = append(out, c.CheckProgram(entry.Program)...)
+	return out
 }
 
 // CheckProgram type-checks a program against this checker's scopes and returns
@@ -232,9 +274,18 @@ func (c *Checker) CheckProgram(program *Program) []string {
 
 	out := make([]string, 0, len(c.errors))
 	for _, e := range c.errors {
-		out = append(out, fmt.Sprintf("%d:%d: %s", e.Line, e.Col, e.Msg))
+		out = append(out, fmt.Sprintf("%s: %s", checkPosition(e), e.Msg))
 	}
 	return out
+}
+
+// checkPosition writes where an error is, naming the file only when the code
+// came from an imported one.
+func checkPosition(e checkError) string {
+	if e.File != "" {
+		return fmt.Sprintf("%s:%d:%d", e.File, e.Line, e.Col)
+	}
+	return fmt.Sprintf("%d:%d", e.Line, e.Col)
 }
 
 // GlobalScope returns a copy of the top-level type scope, so a caller can undo
@@ -254,6 +305,7 @@ func (c *Checker) SetGlobalScope(scope map[string]*Type) {
 
 func (c *Checker) errorf(tok Token, format string, args ...any) {
 	c.errors = append(c.errors, checkError{
+		File: tok.File,
 		Line: tok.Line,
 		Col:  tok.Column,
 		Msg:  fmt.Sprintf(format, args...),
@@ -335,6 +387,11 @@ func (c *Checker) fnSignature(params []*Parameter, retAnn *TypeAnnotation) *Type
 
 func (c *Checker) checkStatement(stmt Statement) *Type {
 	switch node := stmt.(type) {
+
+	case *ImportStatement:
+		// The file it names was checked before this one, and its top-level
+		// types are in c.modules, so there is nothing to check here.
+		return nilT
 
 	case *ExpressionStatement:
 		return c.checkExpression(node.Expression)
@@ -551,6 +608,11 @@ func (c *Checker) checkExpression(expr Expression) *Type {
 		if _, ok := c.builtins[node.Value]; ok {
 			return anyT
 		}
+		if _, isModule := c.aliases[node.Value]; isModule {
+			c.errorf(node.Token, "%q is a module; write %s.<name> to use a name from it",
+				node.Value, node.Value)
+			return anyT
+		}
 		c.errorf(node.Token, "undefined variable %q", node.Value)
 		return anyT
 
@@ -593,10 +655,29 @@ func (c *Checker) checkExpression(expr Expression) *Type {
 		return c.checkFunctionBody("", node.Parameters, node.ReturnType, node.Body, node.Token)
 
 	case *MemberExpression:
-		// Property access is not implemented yet; the interpreter reports it.
-		return anyT
+		return c.checkMember(node)
 	}
 
+	return anyT
+}
+
+// checkMember reads a name from an imported file: u.name. The type is the one
+// recorded when that file was checked, so calling u.helper() is checked against
+// helper's real parameters.
+func (c *Checker) checkMember(node *MemberExpression) *Type {
+	if id, ok := node.Object.(*Identifier); ok {
+		if _, shadowed := c.lookup(id.Value); !shadowed {
+			if mod, isModule := c.aliases[id.Value]; isModule {
+				if t, ok := c.modules[mod][node.Property.Value]; ok {
+					return t
+				}
+				c.errorf(node.Token, "%s has no name %q", id.Value, node.Property.Value)
+				return anyT
+			}
+		}
+	}
+	// Property access on a value is not implemented yet; the run time reports
+	// it when the program gets there.
 	return anyT
 }
 
@@ -616,7 +697,7 @@ func (c *Checker) checkStringLiteral(node *StringLiteral) *Type {
 		if seg.Expr == "" {
 			continue
 		}
-		p := NewParser(NewLexerAt(seg.Expr, node.Token.Line))
+		p := NewParser(NewLexerAt(seg.Expr, node.Token.Line, node.Token.File))
 		program := p.ParseProgram()
 		if len(p.Errors()) > 0 {
 			c.errorf(node.Token, "bad interpolation {%s}: %s", seg.Expr, strings.Join(p.Errors(), "; "))
@@ -779,6 +860,17 @@ func (c *Checker) checkAssign(node *AssignExpression) *Type {
 			c.errorf(node.Token, "cannot assign into %s", containerType)
 		}
 		return valueType
+
+	case *MemberExpression:
+		if id, ok := target.Object.(*Identifier); ok {
+			if _, shadowed := c.lookup(id.Value); !shadowed {
+				if _, isModule := c.aliases[id.Value]; isModule {
+					c.errorf(target.Token, "cannot assign to %s.%s; another file's names are read-only",
+						id.Value, target.Property.Value)
+					return valueType
+				}
+			}
+		}
 	}
 
 	c.errorf(node.Token, "cannot assign to this expression")
@@ -842,6 +934,11 @@ func (c *Checker) checkCall(node *CallExpression) *Type {
 			}
 		}
 	}
+	if member, ok := node.Function.(*MemberExpression); ok {
+		if id, ok := member.Object.(*Identifier); ok {
+			label = id.Value + "." + member.Property.Value + "()"
+		}
+	}
 
 	calleeType := c.checkExpression(node.Function)
 	argTypes := c.checkArgs(node.Arguments)
@@ -899,6 +996,11 @@ func newBuiltinSigs() map[string]*builtinSig {
 
 	sigs["print"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
 		return nilT
+	}}
+
+	sigs["args"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		c.expectArgs("args", args, 0, tok)
+		return arrayOf(strT)
 	}}
 
 	sigs["len"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {

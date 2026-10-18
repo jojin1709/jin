@@ -6,13 +6,13 @@
 
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
-[![Build](https://img.shields.io/badge/build-stage%206%20of%207-blueviolet)](#project-status)
-[![Tests](https://img.shields.io/badge/tests-219%20passing-brightgreen)](#testing)
+[![Build](https://img.shields.io/badge/build-stage%207%20of%207-blueviolet)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-313%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
-checker, bytecode compiler, stack virtual machine and standard library — in pure
-Go, with no third-party dependencies.
+checker, bytecode compiler, stack virtual machine, standard library and package
+manager — in pure Go, with no third-party dependencies.
 
 [Quick Start](#quick-start) · [Language Tour](#language-tour) · [Architecture](#architecture) · [Project Status](#project-status)
 
@@ -38,6 +38,9 @@ Go, with no third-party dependencies.
 - [Files](#files)
 - [Types are optional, but checked](#types-are-optional-but-checked)
 - [Closures](#closures)
+- [Projects and imports](#projects-and-imports)
+  - [Program arguments](#program-arguments)
+  - [How a project is laid out](#how-a-project-is-laid-out)
 - [Architecture](#architecture)
   - [The pipeline](#the-pipeline)
   - [Project layout](#project-layout)
@@ -80,6 +83,8 @@ against the ones around it:
 - **A real front end.** Lexer, Pratt parser and a flow-sensitive type checker.
 - **A real back end.** A bytecode compiler and a stack VM with pooled constants,
   pre-allocated frame slots and shared call frames.
+- **A real toolchain.** A module loader that reads a whole project, resolves
+  imports, refuses cycles, and hands the same program to either engine.
 - **A reference implementation.** The original tree-walking interpreter is kept
   as a second engine, and the test suite runs every program on *both* engines and
   demands byte-identical output. Two independent implementations agreeing is a
@@ -145,6 +150,8 @@ go build -o jin.exe .
 ./jin.exe examples/types.jin        # the type-checked demo
 ./jin.exe examples/files.jin        # reading and writing files
 ./jin.exe examples/closures.jin     # shared captures and mutual recursion
+./jin.exe run examples/greeting     # a project: two files, run by folder
+./jin.exe run examples/greeting Jin # arguments reach the program as args()
 ./jin.exe                           # start the REPL
 go test ./...
 ```
@@ -153,21 +160,29 @@ go test ./...
 
 | Command | What it does |
 |---|---|
-| `jin <file.jin>` | Compile and run on the bytecode VM |
-| `jin run <file.jin>` | The same thing, spelled out |
-| `jin interpret <file.jin>` | Run on the tree-walking reference interpreter |
-| `jin check <file.jin>` | Type-check without running anything |
+| `jin <file.jin> [args]` | Compile and run on the bytecode VM |
+| `jin run [file\|folder] [args]` | The same thing, spelled out; a folder means a project |
+| `jin interpret [file\|folder] [args]` | Run on the tree-walking reference interpreter |
+| `jin check [file\|folder]` | Type-check without running anything |
+| `jin build [folder]` | Check and compile a whole project, with a summary |
+| `jin new <name>` | Start a project in `<name>/` |
 | `jin compile <file.jin>` | Print the bytecode instead of running it |
 | `jin parse <file.jin>` | Print the syntax tree |
 | `jin tokens <file.jin>` | Print the raw token stream |
-| `jin` | Start the REPL |
+| `jin` | Run the project you are in, or start the REPL |
 | `jin --version` / `jin --help` | Print the version, or the usage text |
+
+Anything after the file name is handed to the program, where `args()` returns it.
+A `--` before the arguments is allowed and ignored, so `jin run app.jin -- --help`
+passes `--help` to the program instead of to Jin. A folder is a project when it
+holds a `jin.toml`, and commands work from any folder inside a project, the way a
+build tool does.
 
 Each pipeline stage is available on its own, so you can watch the language being
 translated one layer at a time. `run` and `interpret` must agree on every
 program, and the test suite enforces exactly that — every program in the
-differential corpus, every error message, and every file in `examples/` has to
-produce byte-identical output on both back ends.
+differential corpus, every error message, every file in `examples/` and every
+project under test has to produce byte-identical output on both back ends.
 
 ---
 
@@ -184,6 +199,9 @@ produce byte-identical output on both back ends.
   a missing key that is an error rather than a silent `nil`.
 - **One obvious way to do things.** No decorators, no metaclasses, no dunder
   magic, no implicit truthiness.
+- **Projects, with namespaced files.** A folder with a `jin.toml` is a project;
+  `import "utils" as u` makes another file's top-level names reachable as
+  `u.helper`, so two files on one project can never collide by accident.
 - **Two engines, one meaning.** A bytecode VM and a tree-walking interpreter
   that the test suite forces to agree, byte for byte.
 
@@ -203,6 +221,9 @@ produce byte-identical output on both back ends.
 8. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
    tree-walking interpreter is still there for cross-checking, but it is not
    what `run` uses.
+9. **A file's names belong to that file.** Nothing in another file is in scope
+   until you import it and name it through the alias, and another file's names
+   are read-only from the outside.
 
 ---
 
@@ -242,6 +263,7 @@ for field in person { print(field) }      # maps loop over their keys
 | Lists | `len`, `push`, `reverse`, `sort`, `slice`, `contains`, `range` |
 | Maps | `len`, `has`, `get`, `delete`, `keys`, `values`, `contains` |
 | Files | `read_file`, `write_file`, `append_file`, `file_exists`, `delete_file` |
+| Program | `args` |
 | Control | `error` |
 
 Multi-word built-ins use underscores, so `starts_with` is the shape to expect
@@ -417,11 +439,108 @@ off the stack) when the scope ends or each time a loop starts another pass.
 
 ---
 
+## Projects and imports
+
+A program can be split across files. Any file can import another file beside it,
+and everything in that file is reached through the name the import gave it:
+
+```jin
+# main.jin
+import "utils" as u
+
+print(u.double(21))        # 42
+print(u.name)              # utils
+```
+
+```jin
+# utils.jin
+let name = "utils"
+
+fn double(n: int) -> int {
+    return n * 2
+}
+```
+
+Every top-level `let` and `fn` in `utils.jin` is reachable as `u.<name>`, and
+nothing is. Names inside a function, or inside a block, stay there — a file's
+exports *are* its top-level names, so there is no `export` to write. The alias is
+required, because a bare name from another file is exactly the surprise Jin is
+trying to avoid; `u.helper(x)` says where `helper` came from.
+
+An import runs the file it names, once, before the importing file's own
+statements, and files are run in dependency order — so a file that imports two
+files sees both of them ready. Importing the same file twice runs it once, and a
+cycle is reported as `import cycle: a.jin -> b.jin -> a.jin` rather than hanging.
+An import path is relative to the importing file, uses `/` between folders, and
+cannot leave the folder it is in:
+
+```jin
+import "utils" as u             # utils.jin, beside this file
+import "lib/math" as math       # lib/math.jin
+```
+
+A file's names are read-only from outside it: `u.name = "x"` is an error, and so
+is `print(u)` — a module is a way to reach names, not a value.
+
+Because every file's names are kept apart, an alias may not be a name the
+importing file already declares, and may not shadow a built-in. Both are caught
+before the program runs, at the import that caused the problem.
+
+### Program arguments
+
+`args()` returns the arguments the program was run with, as an `array<str>`, so
+a Jin file can be a command:
+
+```jin
+let who = args()
+if len(who) == 0 {
+    print("no arguments given")
+} else {
+    print("hello, {who[0]}")
+}
+```
+
+```sh
+jin run greet.jin Ada Bo      # hello, Ada
+```
+
+### How a project is laid out
+
+A folder holding a `jin.toml` is a project. The file is deliberately small — a
+name, a version, and the file to start from:
+
+```toml
+# jin.toml
+name = "greeting"
+version = "1.0.0"
+entry = "main.jin"
+```
+
+From anywhere inside the project, `jin run` runs that entry file with its
+imports, `jin check` type-checks every file it reaches, and `jin build` checks
+and compiles the lot:
+
+```sh
+jin new hello           # writes hello/jin.toml, hello/main.jin, hello/greeting.jin
+cd hello
+jin run                 # Hello, world!
+jin run -- Jin          # Hello, Jin!
+jin check               # hello 0.1.0: no type errors in 2 file(s)
+jin build               # files, bytecode size and constants, then "ok"
+```
+
+`examples/greeting` is a project of exactly this shape. Because Jin runs from
+source, `jin build` is a check-and-compile step rather than a step that writes a
+binary: it proves the whole project compiles and reports what came out, and
+there is no separate artefact to keep in step with the source.
+
+---
+
 ## Architecture
 
 ### The pipeline
 
-A language is built as a pipeline. Jin is through stage 6:
+A language is built as a pipeline. Jin is through stage 7:
 
 ```
 source text
@@ -431,6 +550,9 @@ tokens
    |  parser.go       -> syntax tree
    v
 syntax tree            (ast.go)
+   |  module.go       -> the file plus everything it imports
+   v
+syntax tree
    |  typechecker.go  -> type errors, or a clean bill of health
    v
 syntax tree
@@ -454,7 +576,10 @@ That is why `compile` can show you the bytecode, and why `jin check` and
 `jin compile` catch different classes of mistake.
 
 Every instruction carries the line and column it came from, so an error thrown
-by the VM points at the same place the interpreter would.
+by the VM points at the same place the interpreter would. When the code came
+from an imported file, the instruction carries the file too, so the message reads
+`utils.jin:3:5: division by zero` — the file you ran stays plain, because there
+is only one of it.
 
 ### Project layout
 
@@ -467,6 +592,7 @@ by the VM points at the same place the interpreter would.
 | `dump.go` | Renders a syntax tree as indented text |
 | `typechecker.go` | Static types, and every check that runs before the program does |
 | `template.go` | Splits `{interpolation}` inside strings, shared by the checker and compiler |
+| `module.go` | Reads a file and everything it imports: paths, aliases, cycles, `jin.toml`, `jin new` |
 | `code.go` | Opcodes, instruction encoding, and the disassembler behind `jin compile` |
 | `symboltable.go` | Name resolution: globals, frame slots, captured variables, block scopes |
 | `compiler.go` | Syntax tree to bytecode |
@@ -477,7 +603,7 @@ by the VM points at the same place the interpreter would.
 | `builtins.go` | Built-in functions, shared by both back ends |
 | `interpreter.go` | Evaluates the tree, kept as a reference implementation |
 | `main.go` | CLI and REPL |
-| `examples/` | Programs that both engines must run identically |
+| `examples/` | Programs that both engines must run identically, including the `greeting` project |
 
 ### Kept in one place
 
@@ -493,6 +619,13 @@ the environment it was written in; the VM matches it with cells (in `object.go`)
 opened on the stack when a closure is made and closed when the scope ends. Both
 engines run the same differential test corpus, so the two cannot drift apart
 without a test noticing.
+
+The third is what a file's names mean. The compiler keeps every file's globals in
+the one table the VM reads, separated by a prefix the loader hands out; the
+interpreter gives each file its own scope, and a field on the scope carries the
+aliases so a function can use the import written above it. Both are the same rule
+— a file sees its own names plainly and another file's only through an alias —
+reached in the way each engine is built.
 
 ---
 
@@ -527,14 +660,17 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-219 test cases pass, covering the lexer, parser, type checker, compiler,
-interpreter, the VM, the runtime value model and every example program.
+313 test cases pass, covering the lexer, parser, type checker, compiler,
+interpreter, the VM, the runtime value model, modules and projects, and every
+example program.
 
 The centrepiece is the **differential corpus**: each program is run on the
 bytecode VM and on the tree-walking interpreter, and the two results — including
 error text — have to match exactly. Error programs take the same route, which is
 what keeps the two engines honest about their messages rather than merely
-compatible.
+compatible. Projects get the same treatment: the tests write real files into a
+temporary folder and require both back ends to agree on what the whole project
+prints, and on where it fails when a module, an alias or an import path is wrong.
 
 ---
 
@@ -547,18 +683,27 @@ compatible.
 - [x] Stage 5: bytecode compiler + VM
 - [x] Stage 6: standard library
 - [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
-- [ ] Stage 7: package manager + CLI
+- [x] Stage 7: package manager + CLI — imports, projects, `jin new` / `jin build`, `args()`
 
-Current version: `0.6.1 (stage 6: shared captures)` — see `jin --version`.
+Current version: `0.7.0 (stage 7: projects and imports)` — see `jin --version`.
 
 ### What is in, and what is not
 
 In: maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
 `error`, and file reading and writing. `examples/collections.jin` and
-`examples/files.jin` exercise all of it.
+`examples/files.jin` exercise all of it. Multi-file programs are in too:
+`import "utils" as u` puts another file's top-level names behind an alias, a
+folder with a `jin.toml` is a project, and `jin new`, `jin build`, `jin check`
+and `jin run` work on one. `examples/greeting` is a two-file project.
 
 Not in, and honest about it:
 
+- No remote packages. Imports are files beside the one that imports them; there
+  is no registry, no download step, and no lock file, because there is nothing
+  to fetch yet. A project is a folder and nothing else.
+- No compiled output. `jin build` checks and compiles a project and reports what
+  came out, but the result is not written to disk, because Jin runs from source
+  and a stale binary is worse than no binary.
 - No `try` / `catch`, so `error(...)` and a failed `read_file` end the program.
   `file_exists` and `has` are how you check before acting.
 - No user-supplied comparison for `sort`. It orders numbers or strings, and
@@ -566,12 +711,16 @@ Not in, and honest about it:
 - No user-defined types or records. A map is the record type, which is why a
   map's values are allowed to differ in type while an array's are not.
 - No `input` from the terminal yet; the REPL is the only interactive path.
-- No property access (`a.b`) or string literals spanning lines yet.
+- No property access on a *value*: `a.b` reads a name from the file `a` names,
+  and nothing else, so there are no records with dotted fields yet.
+- No string literals spanning lines.
 
 ### Roadmap
 
-- **Stage 7 — package manager + CLI:** `import`, multi-file programs,
-  `jin new` / `jin build`, and command-line arguments.
+- **Stage 8 — remote packages:** a registry and a versioned lock file, so
+  `import "json" as json` can pull a package instead of a folder. The loader in
+  `module.go` is where that lands: it already decides what a path means, what a
+  project is, and how files depend on each other.
 - **Later — a faster VM:** unboxed stack slots and inline caches, to move clearly
   ahead of CPython rather than alongside it.
 
@@ -585,9 +734,9 @@ Not in, and honest about it:
 - Repository: [jojin1709/jin](https://github.com/jojin1709/jin)
 
 Every stage of this project — the lexer, the parser, the type checker, the
-bytecode compiler, the virtual machine, the standard library and the test suite —
-was implemented by hand in Go, without a parser generator or a third-party
-library.
+bytecode compiler, the virtual machine, the standard library, the package
+manager and CLI, and the test suite — was implemented by hand in Go, without a
+parser generator or a third-party library.
 
 ---
 
