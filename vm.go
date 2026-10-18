@@ -28,6 +28,12 @@ type VM struct {
 	builtins   []*Builtin
 	lastPopped Object
 	out        io.Writer
+
+	// openCells holds one cell per local slot that some closure has captured
+	// and whose frame is still running, in increasing slot order. Every closure
+	// that captures the same slot shares the cell, which is what makes sibling
+	// closures see each other's writes.
+	openCells []*cell
 }
 
 // NewVM prepares a virtual machine that writes program output to out.
@@ -64,11 +70,26 @@ func (vm *VM) SetGlobals(globals []Object) { vm.globals = globals }
 
 // Run executes one compiled chunk and returns its value, which is whatever the
 // last top-level statement produced.
-func (vm *VM) Run(bc *Bytecode) (Object, error) {
+func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 	vm.constants = bc.Constants
 	vm.frameTop = 0
 	vm.sp = 0
 	vm.lastPopped = nilObject
+
+	// Every return closes the cells its frame opened, so the list should be
+	// empty already; resetting makes that a guarantee rather than a hope.
+	vm.openCells = vm.openCells[:0]
+
+	// A run that stops early never unwinds its frames, so any cell still open
+	// is closed here. The slots it points at are untouched by the failure:
+	// locals sit below the operand stack, which is the only part that moves.
+	// Without this, a closure that had reached a global would be left pointing
+	// at a stack slot the next run reuses.
+	defer func() {
+		if err != nil {
+			vm.closeCells(0)
+		}
+	}()
 
 	script := &Closure{Fn: &CompiledFunction{
 		Name:         "<script>",
@@ -247,12 +268,12 @@ func (vm *VM) Run(bc *Bytecode) (Object, error) {
 		case OpGetFree:
 			index := int(ReadUint8(ins[frame.ip:]))
 			frame.ip++
-			vm.push(frame.cl.Free[index])
+			vm.push(frame.cl.Free[index].get())
 
 		case OpSetFree:
 			index := int(ReadUint8(ins[frame.ip:]))
 			frame.ip++
-			frame.cl.Free[index] = vm.pop()
+			frame.cl.Free[index].set(vm.pop())
 
 		case OpGetBuiltin:
 			index := int(ReadUint8(ins[frame.ip:]))
@@ -273,14 +294,18 @@ func (vm *VM) Run(bc *Bytecode) (Object, error) {
 				return nil, vm.errorf("closure constant is not a function")
 			}
 
-			free := make([]Object, count)
+			free := make([]*cell, count)
 			for i := 0; i < count; i++ {
 				kind := ins[frame.ip]
 				index := int(ins[frame.ip+1])
 				frame.ip += 2
 				if kind == 0 {
-					free[i] = vm.stack[frame.basePointer+index]
+					// A local of the frame that is running now.
+					free[i] = vm.capture(frame.basePointer + index)
 				} else {
+					// A capture the enclosing closure already holds. Share
+					// the cell itself, so a write from either level is seen
+					// by both.
 					free[i] = frame.cl.Free[index]
 				}
 			}
@@ -348,8 +373,16 @@ func (vm *VM) Run(bc *Bytecode) (Object, error) {
 			frame = vm.frames[vm.frameTop-1]
 			ins = frame.cl.Fn.Instructions
 
+		case OpCloseUpvalues:
+			from := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			vm.closeCells(frame.basePointer + from)
+
 		case OpReturnValue:
 			result := vm.pop()
+			// The frame is about to go, so any variable a closure captured has
+			// to be copied off the stack before its slots are reused.
+			vm.closeCells(frame.basePointer)
 			done := vm.popFrame()
 			if vm.frameTop == 0 {
 				// The script has finished.
@@ -368,6 +401,43 @@ func (vm *VM) Run(bc *Bytecode) (Object, error) {
 	}
 
 	return vm.lastPopped, nil
+}
+
+// ---------------------------------------------------------------- captures
+
+// capture returns the cell for one local slot, making one the first time a
+// closure wants it. A second closure capturing the same slot gets the same
+// cell, so either one sees what the other writes.
+func (vm *VM) capture(slot int) *cell {
+	// The list is short and kept in order, so one backwards scan finds a match
+	// and, failing that, the place to insert.
+	i := len(vm.openCells)
+	for i > 0 && vm.openCells[i-1].index > slot {
+		i--
+	}
+	if i > 0 && vm.openCells[i-1].index == slot {
+		return vm.openCells[i-1]
+	}
+
+	vm.openCells = append(vm.openCells, nil)
+	copy(vm.openCells[i+1:], vm.openCells[i:])
+	vm.openCells[i] = &cell{vm: vm, index: slot}
+	return vm.openCells[i]
+}
+
+// closeCells copies the values of every cell at or above a slot back off the
+// stack and forgets them, so the closures that hold them keep working once the
+// frame or block that owned those slots is gone. Only cells at or above the
+// boundary are touched: anything below belongs to a scope that is still open.
+func (vm *VM) closeCells(from int) {
+	cut := len(vm.openCells)
+	for cut > 0 && vm.openCells[cut-1].index >= from {
+		cut--
+	}
+	for _, c := range vm.openCells[cut:] {
+		c.close()
+	}
+	vm.openCells = vm.openCells[:cut]
 }
 
 // ---------------------------------------------------------------- calling

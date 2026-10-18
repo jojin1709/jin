@@ -149,6 +149,13 @@ func (p *Parser) ParseProgram() *Program {
 	program := &Program{Statements: []Statement{}}
 
 	for !p.curTokenIs(EOF) {
+		// A ';' separating statements is not a statement of its own. It needs
+		// skipping here as well as in a block, because a statement ending in a
+		// brace does not eat its own semicolon.
+		if p.curTokenIs(SEMICOLON) {
+			p.nextToken()
+			continue
+		}
 		stmt := p.parseStatement()
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
@@ -389,6 +396,12 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 
 	p.nextToken()
 	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		// Statements that end in a brace do not eat their own ';', so one
+		// left over from them is a separator and gets skipped here.
+		if p.curTokenIs(SEMICOLON) {
+			p.nextToken()
+			continue
+		}
 		stmt := p.parseStatement()
 		if stmt != nil {
 			block.Statements = append(block.Statements, stmt)

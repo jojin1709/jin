@@ -512,6 +512,15 @@ func (c *Checker) checkBlock(block *BlockStatement) *Type {
 }
 
 func (c *Checker) checkBlockNoScope(block *BlockStatement) *Type {
+	// Functions in a block are declared before any body is checked, so two of
+	// them can call each other in either order. This mirrors the compiler,
+	// which predefines them too.
+	for _, stmt := range block.Statements {
+		if fn, ok := stmt.(*FunctionStatement); ok {
+			c.declare(fn.Name.Value, c.fnSignature(fn.Parameters, fn.ReturnType))
+		}
+	}
+
 	var last *Type = nilT
 	for _, stmt := range block.Statements {
 		last = c.checkStatement(stmt)
@@ -824,10 +833,13 @@ func (c *Checker) checkCall(node *CallExpression) *Type {
 	if id, ok := node.Function.(*Identifier); ok {
 		label = id.Value + "()"
 
-		// Built-ins get precise per-function checks.
-		if sig, found := c.builtins[id.Value]; found {
-			argTypes := c.checkArgs(node.Arguments)
-			return sig.Check(c, argTypes, node.Token)
+		// Built-ins get precise per-function checks, but a local or global with
+		// the same name hides the built-in, just as it does at run time.
+		if _, shadowed := c.lookup(id.Value); !shadowed {
+			if sig, found := c.builtins[id.Value]; found {
+				argTypes := c.checkArgs(node.Arguments)
+				return sig.Check(c, argTypes, node.Token)
+			}
 		}
 	}
 

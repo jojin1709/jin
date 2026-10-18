@@ -316,6 +316,20 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 	return fmt.Errorf("cannot compile %T", stmt)
 }
 
+// predefineFunctions declares the function statements in a block before any of
+// its statements are compiled. Two functions in the same block can then call
+// each other in either order, because each name is already in scope by the time
+// the other body is compiled. Only functions get this treatment: a local
+// declared with 'let' still has to appear above the line that uses it, which is
+// what the type checker enforces too.
+func (c *Compiler) predefineFunctions(block *BlockStatement) {
+	for _, stmt := range block.Statements {
+		if fn, ok := stmt.(*FunctionStatement); ok {
+			c.symbols.Define(fn.Name.Value)
+		}
+	}
+}
+
 // compileBlock compiles statements in order. Every statement leaves one value;
 // all but the last are discarded, and the last is kept when keepLast is set.
 func (c *Compiler) compileBlock(block *BlockStatement, keepLast bool) error {
@@ -323,6 +337,8 @@ func (c *Compiler) compileBlock(block *BlockStatement, keepLast bool) error {
 		c.emit(OpNil)
 		return nil
 	}
+
+	c.predefineFunctions(block)
 
 	for i, stmt := range block.Statements {
 		if err := c.compileStatement(stmt); err != nil {
@@ -379,7 +395,13 @@ func (c *Compiler) compileWhile(node *WhileStatement) error {
 	c.loops = append(c.loops, loop)
 
 	c.position = Position{node.Token.Line, node.Token.Column}
+	// Each pass closes the cells the pass before it left open, so a closure
+	// made in one pass keeps that pass's values instead of following the slot
+	// into the next one. Slots below the body belong to code outside the loop
+	// and stay open.
+	bodyStart := c.symbols.numDefs
 	start := len(c.instructions)
+	c.emit(OpCloseUpvalues, bodyStart)
 
 	if err := c.compileExpression(node.Condition); err != nil {
 		return err
@@ -434,7 +456,12 @@ func (c *Compiler) compileFor(node *ForStatement) error {
 	loop := &loopContext{}
 	c.loops = append(c.loops, loop)
 
+	// Everything the body binds lives above every slot already in use, so
+	// closing from there at the top of each pass hands the body's closures
+	// this pass's values and leaves the loop's own slots alone.
+	bodyStart := c.symbols.numDefs
 	start := len(c.instructions)
+	c.emit(OpCloseUpvalues, bodyStart)
 
 	c.emitGet(indexSym)
 	c.emitGet(iterSym)

@@ -282,6 +282,63 @@ print(total)`)
 	expectTypeError(t, `print(message)`+"\n"+`let message = "hi"`, `undefined variable "message"`)
 }
 
+// Two functions written in the same body can call each other in either order,
+// because the checker declares them all before it checks any of their bodies.
+func TestNestedFunctionsCanCallEachOther(t *testing.T) {
+	expectClean(t, `fn outer() {
+    fn a(n) {
+        if n <= 0 { return "a" }
+        return b(n - 1)
+    }
+    fn b(n) {
+        if n <= 0 { return "b" }
+        return a(n - 1)
+    }
+    return a(5)
+}
+print(outer())`)
+
+	expectClean(t, `fn outer() {
+    fn first() { return second() }
+    fn second() { return "second" }
+    return first()
+}
+print(outer())`)
+
+	// A local declared with 'let' still has to come first, nested or not.
+	expectTypeError(t, `fn outer() {
+    fn a() { return later }
+    let later = 1
+    return a()
+}
+print(outer())`, `undefined variable "later"`)
+
+	// The allowance stops at the block the functions are declared in.
+	expectTypeError(t, `if true {
+    fn hidden() { return 1 }
+}
+hidden()`, `undefined variable "hidden"`)
+}
+
+// A variable with the same name as a built-in hides it, exactly as it does at
+// run time, so built-in names are still usable as ordinary variables.
+func TestLocalsShadowBuiltins(t *testing.T) {
+	expectClean(t, `fn make() {
+    let get = fn(x) { return x * 2 }
+    return get(21)
+}
+print(make())`)
+
+	expectClean(t, `fn width(items) {
+    let len = 3
+    return len + 1
+}
+print(width([]))`)
+
+	// Nothing hides the built-in here, so its own checks still apply.
+	expectTypeError(t, `len(5)`, "len() expects str, array or map")
+}
+
 func TestLoopingOverNonIterable(t *testing.T) {
 	expectTypeError(t, `for x in 5 { }`, "cannot loop over int")
 	expectTypeError(t, `for x in true { }`, "cannot loop over bool")

@@ -11,7 +11,10 @@ Python but with fewer footguns and much better performance.
 4. **Conditions must be `bool`.** `if 1 { }` is rejected instead of quietly being truthy.
 5. **No accidental globals.** Assigning to a name that was never declared is an error.
 6. **A missing key is an error.** `m["nope"]` is not quietly `nil`; ask with `has(m, "nope")`.
-7. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
+7. **A captured variable is shared, not copied.** Two functions written side by
+   side see each other's writes to it, and each pass of a loop gets its own
+   binding rather than the last value the loop reached.
+8. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
    tree-walking interpreter is still there for cross-checking, but it is not
    what `run` uses.
 
@@ -69,6 +72,7 @@ file in `examples/` has to produce byte-identical output on both back ends.
 let x = 5                  # let declares
 let name = "Jin"
 x = x + 1                  # assign to an existing name
+let a = 1; let b = 2       # a ';' separates statements, and is optional
 
 fn add(a, b) { return a + b }        # implicit return also works: fn sq(x) { x * x }
 
@@ -259,6 +263,13 @@ and `iterateValues` decides what a `for` loop walks. The interpreter calls all
 three, which is why an error message about a map key is the same whichever
 engine you run.
 
+The second thing kept in one place is the capture semantics. The interpreter
+already shared a captured variable, because it hands every function a pointer
+to the environment it was written in; the VM now matches it with cells (in
+`object.go`), opened on the stack when a closure is made and closed when the
+scope ends. Both engines run the same differential test corpus, so the two
+cannot drift apart without a test noticing.
+
 ## Closures
 
 Functions capture the variables they use from the scope where they were
@@ -277,28 +288,65 @@ let next = counter()
 print(next(), next(), next())   # 1 2 3
 ```
 
-Two known limits, both of which the test suite documents rather than hides:
+A captured variable is the *variable*, not a snapshot of it, so two functions
+made in the same scope see each other's writes:
 
-- A local variable captured by *two* sibling functions is copied once per
-  function, so writes through one are not seen by the other. Uses where a
-  single closure mutates its own capture, including the counter above, work.
-- Two functions nested inside another function cannot call each other, because
-  each is compiled before the other's slot is filled. Functions declared at the
-  top level have no such problem, so mutual recursion belongs there.
+```jin
+fn running_total() {
+    let total = 0
+    let add = fn(n) { total = total + n }
+    let show = fn() { return total }
+    return [add, show]
+}
+
+let pair = running_total()
+pair[0](10)
+pair[0](5)
+print(pair[1]())                # 15
+```
+
+A loop's variable is a fresh binding on every pass, so each function made in the
+body keeps its own value instead of following the loop:
+
+```jin
+let printers = []
+for word in ["one", "two", "three"] {
+    printers = push(printers, fn() { return word })
+}
+for p in printers { print(p()) }   # one, two, three
+```
+
+Functions written in the same body may call each other in either order, because
+both names are known before either body is compiled:
+
+```jin
+fn classify(n) {
+    fn even(n) { if n == 0 { return true }  return odd(n - 1) }
+    fn odd(n)  { if n == 0 { return false } return even(n - 1) }
+    if even(n) { return "even" }
+    return "odd"
+}
+```
+
+`examples/closures.jin` exercises all of this. Under the hood each captured
+local gets a *cell*: while the frame that owns the variable is still running the
+cell points straight at the frame's stack slot, so an ordinary local read or
+write is seen by every closure holding it; the cell is closed (the value copied
+off the stack) when the scope ends or each time a loop starts another pass.
 
 ## Speed
 
 Naive `fib(30)`, wall clock including start-up, compile and type-check, on the
-same machine (Windows, Go 1.26, CPython 3.13):
+same machine (Windows, Go 1.26, CPython 3.14):
 
 | Engine | Time |
 |---|---|
-| `jin run` (bytecode VM) | ~0.42 s |
-| `jin interpret` (tree walker) | ~2.2 s |
-| CPython 3.13, same program | ~0.34 s |
+| `jin run` (bytecode VM) | ~0.40 s |
+| `jin interpret` (tree walker) | ~2.4 s |
+| CPython 3.14, same program | ~0.34 s |
 
-So the VM is a little over five times faster than Jin's own tree-walking back
-end, and in the same ballpark as CPython on a call-heavy benchmark. Getting
+So the VM is roughly six times faster than Jin's own tree-walking back end, and
+in the same ballpark as CPython on a call-heavy benchmark. Getting
 clearly past CPython would need unboxed stack slots and inline caches, which
 are a later stage's work.
 
@@ -316,6 +364,7 @@ that get thrown away.
 - [x] Stage 4: type checker
 - [x] Stage 5: bytecode compiler + VM
 - [x] Stage 6: standard library
+- [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
 - [ ] Stage 7: package manager + CLI
 
 ### Stage 6: what is in, and what is not

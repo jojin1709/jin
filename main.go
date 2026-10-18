@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const version = "0.6.0 (stage 6: standard library)"
+const version = "0.6.1 (stage 6: shared captures)"
 
 func main() {
 	args := os.Args[1:]

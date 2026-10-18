@@ -226,6 +226,45 @@ func TestParseErrorsAreReported(t *testing.T) {
 	}
 }
 
+// A ';' separates statements wherever it appears, including after a statement
+// that ends in a brace, which is what lets a whole nested definition sit on one
+// line.
+func TestSemicolonsSeparateStatements(t *testing.T) {
+	program := parse(t, `fn outer() {
+    fn a(n) { if n <= 0 { return "a" }; return b(n - 1) }
+    fn b(n) { if n <= 0 { return "b" }; return a(n - 1) }; return a(5)
+}`)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("want 1 top-level statement, got %d", len(program.Statements))
+	}
+	outer, ok := program.Statements[0].(*FunctionStatement)
+	if !ok {
+		t.Fatalf("want FunctionStatement, got %T", program.Statements[0])
+	}
+	// The body holds the two nested functions and the final return.
+	if got := len(outer.Body.Statements); got != 3 {
+		t.Fatalf("outer body: want 3 statements, got %d", got)
+	}
+	a, ok := outer.Body.Statements[0].(*FunctionStatement)
+	if !ok {
+		t.Fatalf("want FunctionStatement, got %T", outer.Body.Statements[0])
+	}
+	// The ';' inside a's body separates its if from its return.
+	if got := len(a.Body.Statements); got != 2 {
+		t.Errorf("a body: want 2 statements, got %d", got)
+	}
+	if _, ok := outer.Body.Statements[2].(*ReturnStatement); !ok {
+		t.Errorf("want ReturnStatement last, got %T", outer.Body.Statements[2])
+	}
+
+	// A semicolon on its own is a separator, not a statement.
+	loose := parse(t, "let a = 1;;\n;if true { print(a) };")
+	if len(loose.Statements) != 2 {
+		t.Errorf("want 2 statements, got %d", len(loose.Statements))
+	}
+}
+
 func TestParseEmptyProgram(t *testing.T) {
 	program := parse(t, "")
 	if len(program.Statements) != 0 {

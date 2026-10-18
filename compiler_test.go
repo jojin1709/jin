@@ -18,6 +18,7 @@ func TestInstructionRoundTrip(t *testing.T) {
 		{OpGetLocal, []int{7}},
 		{OpCall, []int{3}},
 		{OpBuildString, []int{2}},
+		{OpCloseUpvalues, []int{65535}},
 		{OpPop, nil},
 		{OpReturnValue, nil},
 	}
@@ -303,6 +304,46 @@ print(outer())`)
 
 	if found != 1 {
 		t.Errorf("captured %d variables, want 1", found)
+	}
+}
+
+// A for loop closes the cells its body opened from the slot where the body
+// begins. The loop's own two hidden slots sit below that, so the loop's
+// bookkeeping is never mistaken for a capture, and a variable declared outside
+// the loop keeps its cell open across every pass.
+func TestForLoopClosesFromTheBodysFirstSlot(t *testing.T) {
+	bc := compileSource(t, `let total = 0
+for i in range(2) {
+    total = total + i
+}
+print(total)`)
+
+	closes := []int{}
+	for i := 0; i < len(bc.Instructions); {
+		def, err := Lookup(bc.Instructions[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		operands, read := ReadOperands(def, bc.Instructions[i+1:])
+		if Opcode(bc.Instructions[i]) == OpCloseUpvalues {
+			closes = append(closes, operands[0])
+		}
+		i += 1 + read
+	}
+
+	if len(closes) != 1 {
+		t.Fatalf("found %d closes, want 1", len(closes))
+	}
+	// The sequence and the position take slots 0 and 1, so the body starts at 2.
+	if closes[0] != 2 {
+		t.Errorf("loop closed from slot %d, want 2, the body's first slot", closes[0])
+	}
+
+	// Code with no loop has nothing open, so it closes nothing.
+	plain := compileSource(t, `let x = 1
+print(x)`)
+	if strings.Contains(plain.Instructions.String(), "OpCloseUpvalues") {
+		t.Error("code with no loop should not close any cells")
 	}
 }
 

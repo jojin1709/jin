@@ -273,11 +273,55 @@ func (o *CompiledFunction) Inspect() string {
 // function can keep using values from the scope where it was written.
 type Closure struct {
 	Fn   *CompiledFunction
-	Free []Object
+	Free []*cell
 }
 
 func (o *Closure) Type() ObjectType { return FUNCTION_OBJ }
 func (o *Closure) Inspect() string  { return o.Fn.Inspect() }
+
+// cell is one captured variable, kept where every closure that captured it can
+// reach the same copy. While the frame that owns the variable is still on the
+// stack the cell points straight at that frame's slot, so an ordinary read or
+// write of the local is seen by every closure. When the scope ends the value is
+// copied out of the slot, which is what lets a closure outlive its frame.
+//
+// This is what makes two closures made in one scope share a variable, and lets
+// a closure capture a variable that has not been assigned yet.
+type cell struct {
+	// The machine holding the slot. The slot is reached through it rather than
+	// cached, because the stack slice is replaced whenever the stack grows.
+	vm *VM
+
+	index  int    // where in that stack the variable lives
+	value  Object // the value, once the slot is gone
+	closed bool
+}
+
+func (c *cell) get() Object {
+	if c.closed {
+		return c.value
+	}
+	return c.vm.stack[c.index]
+}
+
+func (c *cell) set(value Object) {
+	if c.closed {
+		c.value = value
+		return
+	}
+	c.vm.stack[c.index] = value
+}
+
+// close copies the value out of the slot, so the cell keeps working after the
+// frame that owned the variable has gone.
+func (c *cell) close() {
+	if c.closed {
+		return
+	}
+	c.value = c.vm.stack[c.index]
+	c.vm = nil
+	c.closed = true
+}
 
 // ---- control-flow signals. These travel up the tree as ordinary values so
 // that return/break/continue are not confused with real errors.

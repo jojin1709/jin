@@ -1,0 +1,85 @@
+# Functions are values, and they remember the variables they were written next
+# to. Two functions made in the same place share those variables, so writing
+# through one is visible from the other.
+
+# ---------------------------------------------------------------- a counter
+
+# 'n' lives in the frame of counter, but the function handed back keeps it
+# alive. The frame is gone; the variable is not.
+fn counter() {
+    let n = 0
+    return fn() {
+        n = n + 1
+        return n
+    }
+}
+
+let next = counter()
+print(next(), next(), next())
+
+# Each call makes a separate variable, so two counters do not interfere.
+let other = counter()
+print(next(), other())
+
+# ------------------------------------------------- a pair over one variable
+
+# 'inc' and 'show' are made in the same scope, so they see the same 'total'.
+fn running_total() {
+    let total = 0
+    let add = fn(n) { total = total + n }
+    let show = fn() { return total }
+    return [add, show]
+}
+
+let pair = running_total()
+pair[0](10)
+pair[0](5)
+print("total: {pair[1]()}")
+
+# ------------------------------------------------------------ loop captures
+
+# The loop variable is a fresh binding each pass, so each function made in the
+# body remembers its own value rather than the last one the loop reached.
+let printers = []
+for word in ["one", "two", "three"] {
+    printers = push(printers, fn() { return word })
+}
+for p in printers { print(p()) }
+
+# A variable declared outside the loop is one binding, so every function made
+# inside the loop shares it.
+fn count_up_to(times) {
+    let seen = 0
+    let bump = fn() { seen = seen + 1 }
+    for i in range(times) { bump() }
+    return seen
+}
+print("counted: {count_up_to(4)}")
+
+# --------------------------------------------------------- mutual recursion
+
+# Functions written in the same body can call each other in either order,
+# because both names are known before either body is compiled.
+fn classify(n) {
+    fn even(n) {
+        if n == 0 { return true }
+        return odd(n - 1)
+    }
+    fn odd(n) {
+        if n == 0 { return false }
+        return even(n - 1)
+    }
+    if even(n) { return "even" }
+    return "odd"
+}
+
+print(classify(10), classify(7))
+
+# --------------------------------------------------------------- currying
+
+fn adder(a) {
+    return fn(b) {
+        return fn(c) { return a + b + c }
+    }
+}
+print(adder(1)(2)(3))

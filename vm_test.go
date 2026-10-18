@@ -599,6 +599,324 @@ print(deep(3))`,
 print("done")`,
 		want: "done\n",
 	},
+	{
+		name: "sibling closures share one variable",
+		source: `fn make() {
+    let n = 0
+    let inc = fn() { n = n + 1 }
+    let show = fn() { return n }
+    inc()
+    inc()
+    return show()
+}
+print(make())`,
+		want: "2\n",
+	},
+	{
+		name: "two sibling closures write and read the same variable",
+		source: `fn pair() {
+    let n = 0
+    let up = fn() {
+        n = n + 1
+        return n
+    }
+    let down = fn() {
+        n = n - 1
+        return n
+    }
+    return [up, down]
+}
+let p = pair()
+print(p[0](), p[0](), p[1](), p[0]())`,
+		want: "1 2 1 2\n",
+	},
+	{
+		name: "a closure and its caller share the variable",
+		source: `fn make() {
+    let total = 0
+    let add = fn(n) { total = total + n }
+    let show = fn() { return total }
+    add(3)
+    add(4)
+    return show()
+}
+print(make())`,
+		want: "7\n",
+	},
+	{
+		name: "a captured local still works in a loop",
+		source: `fn make() {
+    let n = 0
+    let add = fn() { n = n + 1 }
+    let show = fn() { return n }
+    for i in range(3) { add() }
+    return show()
+}
+print(make())`,
+		want: "3\n",
+	},
+	{
+		name: "closures in a loop share a variable from outside it",
+		source: `fn make() {
+    let n = 0
+    let fns = []
+    for i in range(3) {
+        fns = push(fns, fn() { n = n + 1; return n })
+    }
+    for f in fns { f() }
+    return n
+}
+print(make())`,
+		want: "3\n",
+	},
+	{
+		name: "two closures made together share their variable",
+		source: `fn make() {
+    let n = 5
+    let pair = [fn() { n = n + 1; return n }, fn() { return n }]
+    return pair[0]() + pair[1]()
+}
+print(make())`,
+		want: "12\n",
+	},
+	{
+		name: "a closure in a while body keeps each pass's value",
+		source: `let fns = []
+let i = 0
+while i < 3 {
+    let captured = i
+    fns = push(fns, fn() { return captured })
+    i = i + 1
+}
+let out = []
+for f in fns { out = push(out, f()) }
+print(out)`,
+		want: "[0, 1, 2]\n",
+	},
+	{
+		name: "loop variables captured by two nested loops",
+		source: `let fns = []
+for i in range(2) {
+    for j in range(2) {
+        fns = push(fns, fn() { return [i, j] })
+    }
+}
+let out = []
+for f in fns { out = push(out, f()) }
+print(out)`,
+		want: "[[0, 0], [0, 1], [1, 0], [1, 1]]\n",
+	},
+	{
+		name: "a closure in a loop body keeps its own copy of the loop variable",
+		source: `let fns = []
+for i in range(3) {
+    let box = fn() { return i * 10 }
+    fns = push(fns, box)
+}
+let out = []
+for f in fns { out = push(out, f()) }
+print(out)`,
+		want: "[0, 10, 20]\n",
+	},
+	{
+		name: "mutual recursion between two functions in the same body",
+		source: `fn outer() {
+    fn a(n) {
+        if n <= 0 { return "a" }
+        return b(n - 1)
+    }
+    fn b(n) {
+        if n <= 0 { return "b" }
+        return a(n - 1)
+    }
+    return a(5)
+}
+print(outer())`,
+		want: "b\n",
+	},
+	{
+		name: "a nested function can call one defined below it",
+		source: `fn outer() {
+    fn first() { return second() }
+    fn second() { return "second" }
+    return first()
+}
+print(outer())`,
+		want: "second\n",
+	},
+	{
+		name: "mutually recursive nested functions keep every call",
+		source: `fn outer() {
+    fn even(n) {
+        if n == 0 { return true }
+        return odd(n - 1)
+    }
+    fn odd(n) {
+        if n == 0 { return false }
+        return even(n - 1)
+    }
+    return [even(10), odd(10)]
+}
+print(outer())`,
+		want: "[true, false]\n",
+	},
+	{
+		name: "a capture shared two levels down",
+		source: `fn outer() {
+    let n = 0
+    let mid = fn() {
+        let bump = fn() { n = n + 1 }
+        let show = fn() { return n }
+        bump()
+        bump()
+        return show()
+    }
+    return mid()
+}
+print(outer())`,
+		want: "2\n",
+	},
+	{
+		name: "a returned pair keeps writing to one shared variable",
+		source: `fn counter() {
+    let n = 0
+    let inc = fn() { n = n + 1 }
+    let show = fn() { return n }
+    return [inc, show]
+}
+let c = counter()
+c[0]()
+c[0]()
+c[0]()
+print(c[1]())`,
+		want: "3\n",
+	},
+	{
+		name: "sibling closures still share a global",
+		source: `let hits = 0
+let a = fn() { hits = hits + 1 }
+let b = fn() { return hits }
+a()
+a()
+print(b())`,
+		want: "2\n",
+	},
+	{
+		name: "a local can shadow a built-in name",
+		source: `fn make() {
+    let get = fn(x) { return x * 2 }
+    return get(21)
+}
+print(make(), len([1, 2]))`,
+		want: "42 2\n",
+	},
+	{
+		name: "a closure made in an if branch keeps its value",
+		source: `fn pick(flag) {
+    let f = fn() { return "none" }
+    if flag {
+        let inner = "yes"
+        f = fn() { return inner }
+    } else {
+        let other = "no"
+        f = fn() { return other }
+    }
+    return f()
+}
+print(pick(true), pick(false))`,
+		want: "yes no\n",
+	},
+	{
+		name: "semicolons separate statements anywhere",
+		source: `fn classify(n) {
+    if n < 0 { return "neg" }; return "non-neg"
+}
+print(classify(-1), classify(1));
+let total = 0;
+for i in range(3) { total = total + i };;
+print(total)`,
+		want: "neg non-neg\n3\n",
+	},
+	{
+		name: "each call to a factory gets its own cells",
+		source: `fn counter() {
+    let n = 0
+    return fn() {
+        n = n + 1
+        return n
+    }
+}
+let a = counter()
+let b = counter()
+print(a(), a(), b(), a(), b())`,
+		want: "1 2 1 3 2\n",
+	},
+	{
+		name: "a captured loop value survives the loop that made it",
+		source: `fn make() {
+    let kept = []
+    for i in range(3) {
+        kept = push(kept, fn() { return i })
+    }
+    let out = []
+    for f in kept { out = push(out, f()) }
+    return out
+}
+print(make(), make())`,
+		want: "[0, 1, 2] [0, 1, 2]\n",
+	},
+	{
+		name: "deeper recursion keeps every capture apart",
+		source: `fn chain(n) {
+    if n == 0 { return fn() { return 0 } }
+    let depth = n
+    let below = chain(n - 1)
+    return fn() {
+        let here = depth
+        return here + below()
+    }
+}
+print(chain(4)())`,
+		want: "10\n",
+	},
+	{
+		name: "break and continue leave the loop's cells alone",
+		source: `let fns = []
+for i in range(4) {
+    if i % 2 == 1 { continue }
+    let seen = i
+    fns = push(fns, fn() { return seen })
+}
+let out = []
+for f in fns { out = push(out, f()) }
+print(out)
+
+fn last_before_break() {
+    let kept = fn() { return -1 }
+    for i in range(5) {
+        if i == 3 { break }
+        kept = fn() { return i }
+    }
+    return kept()
+}
+print(last_before_break())
+
+fn while_version() {
+    let i = 0
+    let fns = []
+    while i < 4 {
+        if i == 2 { i = i + 1; continue }
+        let held = i * 10
+        fns = push(fns, fn() { return held })
+        i = i + 1
+    }
+    let out = []
+    for f in fns { out = push(out, f()) }
+    return out
+}
+print(while_version())`,
+		want: "[0, 2]\n2\n[0, 10, 30]\n",
+	},
 }
 
 func TestProgramsAgreeAcrossEngines(t *testing.T) {
@@ -958,6 +1276,49 @@ func TestGlobalsSurviveBetweenRuns(t *testing.T) {
 	run(`print(double(total))`)
 
 	if got, want := out.String(), "20\n"; got != want {
+		t.Errorf("output = %q, want %q", got, want)
+	}
+}
+
+// TestAStoppedLineDoesNotStrandACapturedValue checks the REPL case where a
+// line captures a variable, then fails. The closure that escaped into a global
+// has to keep the value it captured, not a stack slot the next line reuses.
+func TestAStoppedLineDoesNotStrandACapturedValue(t *testing.T) {
+	var out bytes.Buffer
+	vm := NewVM(&out)
+	compiler := NewCompiler(NewSymbolTable(true))
+
+	run := func(source string) error {
+		t.Helper()
+		p := NewParser(NewLexer(source))
+		program := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			t.Fatalf("syntax errors: %v", errs)
+		}
+		bc, err := compiler.Compile(program)
+		if err != nil {
+			t.Fatalf("compile: %v", err)
+		}
+		_, err = vm.Run(bc)
+		return err
+	}
+
+	// The block captures a local, hands the closure to a global, then the same
+	// line stops with an error, so the frame never returns.
+	err := run(`let saved = nil
+if true {
+    let x = 41
+    saved = fn() { return x + 1 }
+}
+error("stop here")`)
+	if err == nil {
+		t.Fatal("expected the line to fail")
+	}
+
+	if err := run(`print(saved())`); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if got, want := out.String(), "42\n"; got != want {
 		t.Errorf("output = %q, want %q", got, want)
 	}
 }

@@ -56,6 +56,7 @@ const (
 	OpSetIndex       // container[index] = value, leaving the value
 	OpCall           // call a function with n arguments
 	OpReturnValue    // return the top of the stack
+	OpCloseUpvalues  // copy the cells at and above a local slot off the stack
 )
 
 type definition struct {
@@ -106,6 +107,7 @@ var definitions = map[Opcode]*definition{
 	OpSetIndex:       {"OpSetIndex", nil},
 	OpCall:           {"OpCall", []int{1}},
 	OpReturnValue:    {"OpReturnValue", nil},
+	OpCloseUpvalues:  {"OpCloseUpvalues", []int{2}},
 }
 
 // Lookup returns an opcode's definition.
