@@ -1,24 +1,105 @@
+<div align="center">
+
 # Jin
 
-Jin is a small, fast programming language designed to be as easy to write as
-Python but with fewer footguns and much better performance.
+**A small, fast programming language — as easy to write as Python, with fewer footguns and much better performance.**
 
-## Design rules
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
+[![Build](https://img.shields.io/badge/build-stage%206%20of%207-blueviolet)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-219%20passing-brightgreen)](#testing)
+[![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
-1. **Braces, not invisible whitespace.** No broken programs because of a stray tab.
-2. **One obvious way to do things.** No decorators, no metaclasses, no dunder magic.
-3. **No silent type mixing.** `1 + 1.5` is an error, not a surprise. Convert with `int()` or `float()`.
-4. **Conditions must be `bool`.** `if 1 { }` is rejected instead of quietly being truthy.
-5. **No accidental globals.** Assigning to a name that was never declared is an error.
-6. **A missing key is an error.** `m["nope"]` is not quietly `nil`; ask with `has(m, "nope")`.
-7. **A captured variable is shared, not copied.** Two functions written side by
-   side see each other's writes to it, and each pass of a loop gets its own
-   binding rather than the last value the loop reached.
-8. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
-   tree-walking interpreter is still there for cross-checking, but it is not
-   what `run` uses.
+A complete language implementation written from scratch — lexer, parser, type
+checker, bytecode compiler, stack virtual machine and standard library — in pure
+Go, with no third-party dependencies.
 
-## Example
+[Quick Start](#quick-start) · [Language Tour](#language-tour) · [Architecture](#architecture) · [Project Status](#project-status)
+
+</div>
+
+---
+
+## Table of Contents
+
+- [What is Jin?](#what-is-jin)
+  - [Why Jin exists](#why-jin-exists)
+  - [Why "Jin"?](#why-jin)
+- [A first look](#a-first-look)
+- [Quick Start](#quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Build and run](#build-and-run)
+  - [Command line reference](#command-line-reference)
+- [Key capabilities](#key-capabilities)
+- [The design rules](#the-design-rules)
+- [Language tour](#language-tour)
+  - [Built-ins](#built-ins)
+- [Maps](#maps)
+- [Files](#files)
+- [Types are optional, but checked](#types-are-optional-but-checked)
+- [Closures](#closures)
+- [Architecture](#architecture)
+  - [The pipeline](#the-pipeline)
+  - [Project layout](#project-layout)
+  - [Kept in one place](#kept-in-one-place)
+- [Performance](#performance)
+- [Testing](#testing)
+- [Project status](#project-status)
+  - [What is in, and what is not](#what-is-in-and-what-is-not)
+  - [Roadmap](#roadmap)
+- [Developer](#developer)
+- [License](#license)
+
+---
+
+## What is Jin?
+
+Jin is a small, statically-checked, bytecode-compiled programming language. It is
+designed around one idea: **the easy way to write something should also be the
+correct way.**
+
+Python is pleasant to write and unpleasant to debug, because most of its worst
+surprises are quiet ones — a `1 + "1"` that fails at line 400 instead of at the
+line you typed, a missing dictionary key that returns `None`, an `if` that
+silently accepts a truthy integer, a typo that quietly creates a new global.
+Jin keeps Python's readability and removes those surprises by making them
+errors, and reports them *before* the program runs.
+
+Underneath, Jin is not an interpreter wearing a hat. Source text is compiled to
+bytecode and executed on a stack virtual machine, which is why it can hold its
+own against CPython on call-heavy work.
+
+<a id="why-jin-exists"></a>
+<details>
+<summary><strong>Why Jin exists</strong></summary>
+
+Most "my own language" projects stop at a tree-walking interpreter. Jin was built
+to go the whole distance, one stage at a time, and to prove each stage works
+against the ones around it:
+
+- **A real front end.** Lexer, Pratt parser and a flow-sensitive type checker.
+- **A real back end.** A bytecode compiler and a stack VM with pooled constants,
+  pre-allocated frame slots and shared call frames.
+- **A reference implementation.** The original tree-walking interpreter is kept
+  as a second engine, and the test suite runs every program on *both* engines and
+  demands byte-identical output. Two independent implementations agreeing is a
+  far stronger correctness signal than either one passing on its own.
+
+</details>
+
+<a id="why-jin"></a>
+<details>
+<summary><strong>Why "Jin"?</strong></summary>
+
+Short, easy to type, and not already taken by a language you would confuse it
+with. It is also two letters away from "Jin" being the only thing the compiler
+needs to know about you.
+
+</details>
+
+---
+
+## A first look
 
 ```jin
 fn fib(n) {
@@ -39,30 +120,91 @@ Output:
 fib: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
 ```
 
-## Usage
+Braces instead of whitespace, `{interpolation}` inside strings, optional type
+annotations, and a standard library small enough to keep in your head.
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- **Go 1.26 or newer** — the only requirement. Jin has no third-party
+  dependencies, so `go build` works offline on a fresh checkout.
+- **Windows, Linux or macOS** — the CLI, the VM and the standard library are
+  platform-independent; only the file built-ins touch the host.
+
+### Build and run
 
 ```sh
 go build -o jin.exe .
 
-./jin.exe examples/tour.jin        # run a program (bytecode VM)
-./jin.exe examples/soak.jin        # a bigger program: closures, recursion, loops
-./jin.exe examples/collections.jin # maps, lists and the built-ins for them
-./jin.exe examples/types.jin       # run the type-checked demo
-./jin.exe examples/files.jin       # reading and writing files
-./jin.exe interpret examples/tour.jin # run on the tree-walking interpreter
-./jin.exe check examples/tour.jin  # type-check without running
-./jin.exe compile examples/tour.jin # print the bytecode
-./jin.exe parse examples/tour.jin  # print the syntax tree
-./jin.exe tokens examples/tour.jin # print the token stream
-./jin.exe                           # REPL
+./jin.exe examples/tour.jin         # run a program (bytecode VM)
+./jin.exe examples/soak.jin         # a bigger program: closures, recursion, loops
+./jin.exe examples/collections.jin  # maps, lists and the built-ins for them
+./jin.exe examples/types.jin        # the type-checked demo
+./jin.exe examples/files.jin        # reading and writing files
+./jin.exe examples/closures.jin     # shared captures and mutual recursion
+./jin.exe                           # start the REPL
 go test ./...
 ```
 
-Stages 1, 2, 4 and 5 (`tokens`, `parse`, `check`, `compile`) are available on
-their own, so you can watch each layer of the pipeline separately. `run` and
-`interpret` must agree on every program, and the test suite checks exactly
-that: every program in the differential corpus, every error message, and every
-file in `examples/` has to produce byte-identical output on both back ends.
+### Command line reference
+
+| Command | What it does |
+|---|---|
+| `jin <file.jin>` | Compile and run on the bytecode VM |
+| `jin run <file.jin>` | The same thing, spelled out |
+| `jin interpret <file.jin>` | Run on the tree-walking reference interpreter |
+| `jin check <file.jin>` | Type-check without running anything |
+| `jin compile <file.jin>` | Print the bytecode instead of running it |
+| `jin parse <file.jin>` | Print the syntax tree |
+| `jin tokens <file.jin>` | Print the raw token stream |
+| `jin` | Start the REPL |
+| `jin --version` / `jin --help` | Print the version, or the usage text |
+
+Each pipeline stage is available on its own, so you can watch the language being
+translated one layer at a time. `run` and `interpret` must agree on every
+program, and the test suite enforces exactly that — every program in the
+differential corpus, every error message, and every file in `examples/` has to
+produce byte-identical output on both back ends.
+
+---
+
+## Key capabilities
+
+- **Errors caught before the program starts.** Undeclared names, wrong argument
+  counts, mismatched types, non-`bool` conditions and bad indexing are all
+  reported by `jin check`, with the line and column they came from.
+- **A real compiler and VM.** Names resolve to slots before execution; small
+  integers, booleans and `nil` are pooled; call frames are reused.
+- **Genuine closures with shared captures.** A captured variable is the
+  variable, not a snapshot, and each loop pass gets a fresh binding.
+- **Maps as the record type.** Ordered entries, `int` / `str` / `bool` keys, and
+  a missing key that is an error rather than a silent `nil`.
+- **One obvious way to do things.** No decorators, no metaclasses, no dunder
+  magic, no implicit truthiness.
+- **Two engines, one meaning.** A bytecode VM and a tree-walking interpreter
+  that the test suite forces to agree, byte for byte.
+
+---
+
+## The design rules
+
+1. **Braces, not invisible whitespace.** No broken programs because of a stray tab.
+2. **One obvious way to do things.** No decorators, no metaclasses, no dunder magic.
+3. **No silent type mixing.** `1 + 1.5` is an error, not a surprise. Convert with `int()` or `float()`.
+4. **Conditions must be `bool`.** `if 1 { }` is rejected instead of quietly being truthy.
+5. **No accidental globals.** Assigning to a name that was never declared is an error.
+6. **A missing key is an error.** `m["nope"]` is not quietly `nil`; ask with `has(m, "nope")`.
+7. **A captured variable is shared, not copied.** Two functions written side by
+   side see each other's writes to it, and each pass of a loop gets its own
+   binding rather than the last value the loop reached.
+8. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
+   tree-walking interpreter is still there for cross-checking, but it is not
+   what `run` uses.
+
+---
 
 ## Language tour
 
@@ -90,7 +232,7 @@ print(person["name"], has(person, "job")) # Ada false
 for field in person { print(field) }      # maps loop over their keys
 ```
 
-Built-ins:
+### Built-ins
 
 | Group | Functions |
 |---|---|
@@ -103,7 +245,10 @@ Built-ins:
 | Control | `error` |
 
 Multi-word built-ins use underscores, so `starts_with` is the shape to expect
-from anything added later.
+from anything added later. A local or global that reuses a built-in's name hides
+it, in the type checker as well as at run time.
+
+---
 
 ## Maps
 
@@ -145,6 +290,8 @@ print(get(server, "nope", 0)) # 0
 and `slice` share that style with `push`: they return something new and leave
 the original alone.
 
+---
+
 ## Files
 
 ```jin
@@ -161,6 +308,8 @@ delete_file("notes.txt")
 Every file function takes a path as a `str` and reports the operating system's
 own reason when it fails. Because Jin has no `try` yet, a failure stops the
 program, so `file_exists(path)` is how you ask first.
+
+---
 
 ## Types are optional, but checked
 
@@ -200,75 +349,7 @@ let person: map = {"name": "Ada", "age": 36}
 let mixed: array = [1, "two"]
 ```
 
-## How it works
-
-A language is built as a pipeline. Jin is through stage 6:
-
-```
-source text
-   |  lexer.go        -> tokens
-   v
-tokens
-   |  parser.go       -> syntax tree
-   v
-syntax tree            (ast.go)
-   |  typechecker.go  -> type errors, or a clean bill of health
-   v
-syntax tree
-   |  compiler.go     -> bytecode
-   v
-bytecode               (code.go)
-   |  vm.go           -> result
-   v
-values                 (object.go, symboltable.go, builtins.go)
-
-alternate back end
-syntax tree
-   |  interpreter.go  -> result       (jin interpret)
-   v
-values                 (object.go, environment.go, builtins.go)
-```
-
-The compiler resolves every name to a slot before the program runs: a global
-slot, a slot in the current call frame, a captured variable, or a built-in.
-That is why `compile` can show you the bytecode, and why `jin check` and
-`jin compile` catch different classes of mistake.
-
-Every instruction carries the line and column it came from, so an error thrown
-by the VM points at the same place the interpreter would.
-
-| File | Role |
-|---|---|
-| `token.go` | Token types and keywords |
-| `lexer.go` | Source text to tokens, with line/column tracking |
-| `ast.go` | Syntax tree node definitions |
-| `parser.go` | Tokens to syntax tree (Pratt parser) |
-| `dump.go` | Renders a syntax tree as indented text |
-| `typechecker.go` | Static types, and every check that runs before the program does |
-| `template.go` | Splits `{interpolation}` inside strings, shared by the checker and compiler |
-| `code.go` | Opcodes, instruction encoding, and the disassembler behind `jin compile` |
-| `symboltable.go` | Name resolution: globals, frame slots, captured variables, block scopes |
-| `compiler.go` | Syntax tree to bytecode |
-| `frame.go` | One active call: its closure, its position, and where its locals live |
-| `vm.go` | The stack machine that runs bytecode |
-| `object.go` | Runtime values, including compiled functions, closures and maps |
-| `environment.go` | Variable scopes, used by the interpreter back end |
-| `builtins.go` | Built-in functions, shared by both back ends |
-| `interpreter.go` | Evaluates the tree, kept as a reference implementation |
-| `main.go` | CLI and REPL |
-
-Two pieces of logic live in exactly one place so the back ends cannot drift
-apart: `indexInto` and `setInto` in `vm.go` do every indexed read and write,
-and `iterateValues` decides what a `for` loop walks. The interpreter calls all
-three, which is why an error message about a map key is the same whichever
-engine you run.
-
-The second thing kept in one place is the capture semantics. The interpreter
-already shared a captured variable, because it hands every function a pointer
-to the environment it was written in; the VM now matches it with cells (in
-`object.go`), opened on the stack when a closure is made and closed when the
-scope ends. Both engines run the same differential test corpus, so the two
-cannot drift apart without a test noticing.
+---
 
 ## Closures
 
@@ -334,7 +415,88 @@ cell points straight at the frame's stack slot, so an ordinary local read or
 write is seen by every closure holding it; the cell is closed (the value copied
 off the stack) when the scope ends or each time a loop starts another pass.
 
-## Speed
+---
+
+## Architecture
+
+### The pipeline
+
+A language is built as a pipeline. Jin is through stage 6:
+
+```
+source text
+   |  lexer.go        -> tokens
+   v
+tokens
+   |  parser.go       -> syntax tree
+   v
+syntax tree            (ast.go)
+   |  typechecker.go  -> type errors, or a clean bill of health
+   v
+syntax tree
+   |  compiler.go     -> bytecode
+   v
+bytecode               (code.go)
+   |  vm.go           -> result
+   v
+values                 (object.go, symboltable.go, builtins.go)
+
+alternate back end
+syntax tree
+   |  interpreter.go  -> result       (jin interpret)
+   v
+values                 (object.go, environment.go, builtins.go)
+```
+
+The compiler resolves every name to a slot before the program runs: a global
+slot, a slot in the current call frame, a captured variable, or a built-in.
+That is why `compile` can show you the bytecode, and why `jin check` and
+`jin compile` catch different classes of mistake.
+
+Every instruction carries the line and column it came from, so an error thrown
+by the VM points at the same place the interpreter would.
+
+### Project layout
+
+| File | Role |
+|---|---|
+| `token.go` | Token types and keywords |
+| `lexer.go` | Source text to tokens, with line/column tracking |
+| `ast.go` | Syntax tree node definitions |
+| `parser.go` | Tokens to syntax tree (Pratt parser) |
+| `dump.go` | Renders a syntax tree as indented text |
+| `typechecker.go` | Static types, and every check that runs before the program does |
+| `template.go` | Splits `{interpolation}` inside strings, shared by the checker and compiler |
+| `code.go` | Opcodes, instruction encoding, and the disassembler behind `jin compile` |
+| `symboltable.go` | Name resolution: globals, frame slots, captured variables, block scopes |
+| `compiler.go` | Syntax tree to bytecode |
+| `frame.go` | One active call: its closure, its position, and where its locals live |
+| `vm.go` | The stack machine that runs bytecode |
+| `object.go` | Runtime values, including compiled functions, closures and maps |
+| `environment.go` | Variable scopes, used by the interpreter back end |
+| `builtins.go` | Built-in functions, shared by both back ends |
+| `interpreter.go` | Evaluates the tree, kept as a reference implementation |
+| `main.go` | CLI and REPL |
+| `examples/` | Programs that both engines must run identically |
+
+### Kept in one place
+
+Two pieces of logic live in exactly one place so the back ends cannot drift
+apart. `indexInto` and `setInto` in `vm.go` do every indexed read and write, and
+`iterateValues` decides what a `for` loop walks. The interpreter calls all
+three, which is why an error message about a map key is the same whichever
+engine you run.
+
+The second thing kept in one place is the capture semantics. The interpreter
+already shared a captured variable, because it hands every function a pointer to
+the environment it was written in; the VM matches it with cells (in `object.go`),
+opened on the stack when a closure is made and closed when the scope ends. Both
+engines run the same differential test corpus, so the two cannot drift apart
+without a test noticing.
+
+---
+
+## Performance
 
 Naive `fib(30)`, wall clock including start-up, compile and type-check, on the
 same machine (Windows, Go 1.26, CPython 3.14):
@@ -346,17 +508,37 @@ same machine (Windows, Go 1.26, CPython 3.14):
 | CPython 3.14, same program | ~0.34 s |
 
 So the VM is roughly six times faster than Jin's own tree-walking back end, and
-in the same ballpark as CPython on a call-heavy benchmark. Getting
-clearly past CPython would need unboxed stack slots and inline caches, which
-are a later stage's work.
+in the same ballpark as CPython on a call-heavy benchmark. Getting clearly past
+CPython would need unboxed stack slots and inline caches, which are a later
+stage's work.
 
-The VM keeps that lead by resolving names to slots before running, pooling
-small integers, booleans and `nil` instead of allocating them, reusing call
-frames, and handling the common arithmetic cases without building any objects
-that get thrown away.
+The VM keeps that lead by resolving names to slots before running, pooling small
+integers, booleans and `nil` instead of allocating them, reusing call frames,
+and handling the common arithmetic cases without building any objects that get
+thrown away.
 
+---
 
-## Status
+## Testing
+
+```sh
+go test ./...      # the whole suite
+go vet ./...       # static checks
+gofmt -l .         # formatting (prints nothing when clean)
+```
+
+219 test cases pass, covering the lexer, parser, type checker, compiler,
+interpreter, the VM, the runtime value model and every example program.
+
+The centrepiece is the **differential corpus**: each program is run on the
+bytecode VM and on the tree-walking interpreter, and the two results — including
+error text — have to match exactly. Error programs take the same route, which is
+what keeps the two engines honest about their messages rather than merely
+compatible.
+
+---
+
+## Project status
 
 - [x] Stage 1: lexer
 - [x] Stage 2: parser
@@ -367,7 +549,9 @@ that get thrown away.
 - [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
 - [ ] Stage 7: package manager + CLI
 
-### Stage 6: what is in, and what is not
+Current version: `0.6.1 (stage 6: shared captures)` — see `jin --version`.
+
+### What is in, and what is not
 
 In: maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
 `error`, and file reading and writing. `examples/collections.jin` and
@@ -382,7 +566,39 @@ Not in, and honest about it:
 - No user-defined types or records. A map is the record type, which is why a
   map's values are allowed to differ in type while an array's are not.
 - No `input` from the terminal yet; the REPL is the only interactive path.
+- No property access (`a.b`) or string literals spanning lines yet.
+
+### Roadmap
+
+- **Stage 7 — package manager + CLI:** `import`, multi-file programs,
+  `jin new` / `jin build`, and command-line arguments.
+- **Later — a faster VM:** unboxed stack slots and inline caches, to move clearly
+  ahead of CPython rather than alongside it.
+
+---
+
+## Developer
+
+**JOJIN JOHN** — designed and written from scratch.
+
+- GitHub: [@jojin1709](https://github.com/jojin1709)
+- Repository: [jojin1709/jin](https://github.com/jojin1709/jin)
+
+Every stage of this project — the lexer, the parser, the type checker, the
+bytecode compiler, the virtual machine, the standard library and the test suite —
+was implemented by hand in Go, without a parser generator or a third-party
+library.
+
+---
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE) for the full text.
+
+Copyright © 2026 JOJIN JOHN.
+
+<div align="center">
+
+**Built by [JOJIN JOHN](https://github.com/jojin1709)**
+
+</div>
