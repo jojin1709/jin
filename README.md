@@ -17,32 +17,66 @@ Python but with fewer footguns and much better performance.
 ## Example
 
 ```jin
-fn greet(name: str) -> str {
-    return "Hello, {name}!"
+fn classify(n: int) -> str {
+    if n % 2 == 0 {
+        return "even"
+    } else if n == 3 {
+        return "three"
+    } else {
+        return "odd"
+    }
 }
 
-let numbers = [1, 2, 3, 4, 5]
+fn main() {
+    let numbers = [1, 2, 3, 4, 5]
 
-for n in numbers {
-    if n % 2 == 0 {
-        print(greet("friend #{n}"))
+    for n in numbers {
+        print("{n} is {classify(n)}")
     }
 }
 ```
 
-## Build and run
+## Usage
 
 ```sh
 go build -o jin.exe .
-./jin.exe examples/hello.jin   # print the token stream
-./jin.exe                      # start the REPL
-go test ./...                  # run the test suite
+
+./jin.exe examples/control.jin   # parse a file, print its syntax tree
+./jin.exe tokens examples/control.jin   # print the raw token stream
+./jin.exe                        # REPL
+./jin.exe --version
 ```
+
+## How it works
+
+A language is built in pipeline stages. Jin is currently through stage 2:
+
+```
+source text
+   |  lexer.go      = tokens
+   v
+tokens
+   |  parser.go     = syntax tree
+   v
+syntax tree          (ast.go, printed by dump.go)
+   |  <next: interpreter>
+   v
+result
+```
+
+| File | Role |
+|---|---|
+| `token.go` | Token types and keywords |
+| `lexer.go` | Source text to tokens, with line/column tracking |
+| `ast.go` | Syntax tree node definitions |
+| `parser.go` | Tokens to syntax tree (Pratt parser) |
+| `dump.go` | Renders a syntax tree as indented text |
+| `main.go` | CLI and REPL |
 
 ## Status
 
 - [x] Stage 1: lexer
-- [ ] Stage 2: parser
+- [x] Stage 2: parser
 - [ ] Stage 3: interpreter
 - [ ] Stage 4: type checker
 - [ ] Stage 5: bytecode compiler + VM

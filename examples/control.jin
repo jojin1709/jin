@@ -1,0 +1,32 @@
+# Jin control flow example
+# Stage 2: this file is parsed into a syntax tree, not executed yet.
+
+fn classify(n: int) -> str {
+    if n % 2 == 0 {
+        return "even"
+    } else if n == 3 {
+        return "three"
+    } else {
+        return "odd"
+    }
+}
+
+fn main() {
+    let numbers = [1, 2, 3, 4, 5]
+
+    for n in numbers {
+        print("{n} is {classify(n)}")
+    }
+
+    let count = 0
+    while count < 3 {
+        count = count + 1
+        if count == 2 {
+            continue
+        }
+        print("count is {count}")
+    }
+
+    let doubler = fn(x) { return x * 2 }
+    print(doubler(21))
+}
