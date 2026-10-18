@@ -1,0 +1,14 @@
+# Jin example program
+# Stage 1: this file is only tokenized, not executed yet.
+
+fn greet(name: str) -> str {
+    return "Hello, {name}!"
+}
+
+let numbers = [1, 2, 3, 4, 5]
+
+for n in numbers {
+    if n % 2 == 0 {
+        print(greet("friend #{n}"))
+    }
+}
