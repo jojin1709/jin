@@ -1,0 +1,38 @@
+# Reading and writing files. Run this from the project directory.
+
+let path = "jin_demo_notes.txt"
+
+# Start from a clean slate, so running this twice gives the same result.
+if file_exists(path) {
+    delete_file(path)
+}
+print("there before we write it: {file_exists(path)}")
+
+# Write a file in one go.
+write_file(path, "first line\nsecond line\n")
+print("there after we write it:  {file_exists(path)}")
+
+# Add to the end of it without losing what is already there.
+append_file(path, "third line\n")
+
+let text = read_file(path)
+print("the file holds {len(text)} characters")
+print(lines(text))
+
+# Read it back, one line at a time, and do something with each line.
+for line in lines(read_file(path)) {
+    print("{len(line)}: {upper(line)}")
+}
+
+# Turn the text into a map, which is what reading a small data file usually
+# comes down to.
+let report = {}
+for line in lines(read_file(path)) {
+    report[line] = len(line)
+}
+for key in sort(keys(report)) {
+    print("{key} -> {report[key]}")
+}
+
+delete_file(path)
+print("cleaned up: {file_exists(path)}")

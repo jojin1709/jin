@@ -19,13 +19,14 @@ const (
 	TypeBool
 	TypeNil
 	TypeArray
+	TypeMap
 	TypeFn
 )
 
 // Type describes the type of a value.
 type Type struct {
 	Kind     TypeKind
-	Elem     *Type   // arrays
+	Elem     *Type   // arrays and maps
 	Params   []*Type // functions
 	Ret      *Type   // functions
 	Variadic bool
@@ -38,9 +39,15 @@ var (
 	strT   = &Type{Kind: TypeStr}
 	boolT  = &Type{Kind: TypeBool}
 	nilT   = &Type{Kind: TypeNil}
+	mapT   = &Type{Kind: TypeMap}
 )
 
 func arrayOf(elem *Type) *Type { return &Type{Kind: TypeArray, Elem: elem} }
+
+// mapOf describes a map. Jin has no record types, so a map is how a value with
+// named fields is written; that means its values are free to differ in type and
+// the element type is only recorded when there is something precise to say.
+func mapOf(elem *Type) *Type { return &Type{Kind: TypeMap, Elem: elem} }
 
 // fnOf builds a function type. A nil return type is displayed as any because
 // an unannotated function is not return-checked.
@@ -70,6 +77,11 @@ func (t *Type) String() string {
 			return "array"
 		}
 		return "array<" + t.Elem.String() + ">"
+	case TypeMap:
+		if t.Elem == nil || t.Elem.Kind == TypeAny {
+			return "map"
+		}
+		return "map<" + t.Elem.String() + ">"
 	case TypeFn:
 		parts := make([]string, 0, len(t.Params))
 		for _, p := range t.Params {
@@ -100,7 +112,7 @@ func assignable(target, value *Type) bool {
 		return false
 	}
 	switch target.Kind {
-	case TypeArray:
+	case TypeArray, TypeMap:
 		return assignable(target.Elem, value.Elem)
 	case TypeFn:
 		if len(target.Params) != len(value.Params) {
@@ -132,6 +144,9 @@ func unify(a, b *Type) *Type {
 	}
 	if a.Kind == TypeArray {
 		return arrayOf(unify(a.Elem, b.Elem))
+	}
+	if a.Kind == TypeMap {
+		return mapOf(unify(a.Elem, b.Elem))
 	}
 	return a
 }
@@ -289,6 +304,9 @@ func (c *Checker) annotationType(ann *TypeAnnotation) *Type {
 	case "array":
 		// Element types are inferred; a bare "array" means array<any>.
 		return arrayOf(anyT)
+	case "map":
+		// A map's values may differ in type, so "map" means map<any>.
+		return mapOf(anyT)
 	case "any":
 		return anyT
 	}
@@ -379,6 +397,9 @@ func (c *Checker) checkStatement(stmt Statement) *Type {
 			}
 		case TypeStr:
 			elemType = strT
+		case TypeMap:
+			// A map loops over its keys, which may be an int, a str or a bool.
+			elemType = anyT
 		case TypeAny:
 			elemType = anyT
 		default:
@@ -548,6 +569,16 @@ func (c *Checker) checkExpression(expr Expression) *Type {
 			elem = unify(elem, c.checkExpression(el))
 		}
 		return arrayOf(elem)
+
+	case *MapLiteral:
+		// Every key and value is still checked, but the map itself is
+		// deliberately loose: a map holding a name and an age at once is the
+		// normal way to write a record here.
+		for _, pair := range node.Pairs {
+			c.checkExpression(pair.Key)
+			c.checkExpression(pair.Value)
+		}
+		return mapOf(anyT)
 
 	case *FunctionLiteral:
 		return c.checkFunctionBody("", node.Parameters, node.ReturnType, node.Body, node.Token)
@@ -719,6 +750,14 @@ func (c *Checker) checkAssign(node *AssignExpression) *Type {
 	case *IndexExpression:
 		containerType := c.checkExpression(target.Left)
 		indexType := c.checkExpression(target.Index)
+		switch containerType.Kind {
+		case TypeMap:
+			c.checkMapKey(node.Token, indexType)
+			return valueType
+		case TypeAny:
+			// unknown container, nothing to check
+			return valueType
+		}
 		if indexType.Kind != TypeAny && indexType.Kind != TypeInt {
 			c.errorf(node.Token, "index must be an int, got %s", indexType)
 		}
@@ -727,8 +766,6 @@ func (c *Checker) checkAssign(node *AssignExpression) *Type {
 			if !assignable(containerType.Elem, valueType) {
 				c.errorf(node.Token, "cannot assign %s into array of %s", valueType, containerType.Elem)
 			}
-		case TypeAny:
-			// unknown container, nothing to check
 		default:
 			c.errorf(node.Token, "cannot assign into %s", containerType)
 		}
@@ -743,24 +780,43 @@ func (c *Checker) checkIndex(node *IndexExpression) *Type {
 	containerType := c.checkExpression(node.Left)
 	indexType := c.checkExpression(node.Index)
 
-	if indexType.Kind != TypeAny && indexType.Kind != TypeInt {
-		c.errorf(node.Token, "index must be an int, got %s", indexType)
-	}
-
 	switch containerType.Kind {
-	case TypeArray:
+	case TypeMap:
+		// A map is looked up by key, and a key may be an int, a str or a bool.
+		c.checkMapKey(node.Token, indexType)
 		if containerType.Elem == nil {
 			return anyT
 		}
 		return containerType.Elem
-	case TypeStr:
-		return strT
+
+	case TypeArray, TypeStr:
+		if indexType.Kind != TypeAny && indexType.Kind != TypeInt {
+			c.errorf(node.Token, "index must be an int, got %s", indexType)
+		}
+		if containerType.Kind == TypeStr {
+			return strT
+		}
+		if containerType.Elem == nil {
+			return anyT
+		}
+		return containerType.Elem
+
 	case TypeAny:
+		// The value could be an array, a string or a map, so any key fits.
 		return anyT
 	}
 
 	c.errorf(node.Token, "cannot index %s", containerType)
 	return anyT
+}
+
+// checkMapKey makes sure a key is one of the values a map can be keyed by.
+func (c *Checker) checkMapKey(tok Token, keyType *Type) {
+	switch keyType.Kind {
+	case TypeInt, TypeStr, TypeBool, TypeAny:
+		return
+	}
+	c.errorf(tok, "map keys must be int, str or bool, got %s", keyType)
 }
 
 func (c *Checker) checkCall(node *CallExpression) *Type {
@@ -838,10 +894,10 @@ func newBuiltinSigs() map[string]*builtinSig {
 			return intT
 		}
 		switch args[0].Kind {
-		case TypeStr, TypeArray, TypeAny:
+		case TypeStr, TypeArray, TypeMap, TypeAny:
 			return intT
 		}
-		c.errorf(tok, "len() expects str or array, got %s", args[0])
+		c.errorf(tok, "len() expects str, array or map, got %s", args[0])
 		return intT
 	}}
 
@@ -950,10 +1006,313 @@ func newBuiltinSigs() map[string]*builtinSig {
 		}
 		switch args[0].Kind {
 		case TypeStr, TypeArray, TypeAny:
+		case TypeMap:
+			c.checkMapKey(tok, args[1])
 		default:
-			c.errorf(tok, "contains() expects str or array, got %s", args[0])
+			c.errorf(tok, "contains() expects str, array or map, got %s", args[0])
 		}
 		return boolT
+	}}
+
+	sigs["has"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("has", args, 2, tok) {
+			return boolT
+		}
+		if args[0].Kind != TypeMap && args[0].Kind != TypeAny {
+			c.errorf(tok, "has() expects map, got %s", args[0])
+			return boolT
+		}
+		c.checkMapKey(tok, args[1])
+		return boolT
+	}}
+
+	sigs["get"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("get", args, 3, tok) {
+			return anyT
+		}
+		if args[0].Kind != TypeMap && args[0].Kind != TypeAny {
+			c.errorf(tok, "get() expects map, got %s", args[0])
+			return anyT
+		}
+		c.checkMapKey(tok, args[1])
+		return unify(args[0].Elem, args[2])
+	}}
+
+	sigs["delete"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("delete", args, 2, tok) {
+			return nilT
+		}
+		if args[0].Kind != TypeMap && args[0].Kind != TypeAny {
+			c.errorf(tok, "delete() expects map, got %s", args[0])
+			return nilT
+		}
+		c.checkMapKey(tok, args[1])
+		return nilT
+	}}
+
+	sigs["keys"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("keys", args, 1, tok) {
+			return arrayOf(anyT)
+		}
+		if args[0].Kind != TypeMap && args[0].Kind != TypeAny {
+			c.errorf(tok, "keys() expects map, got %s", args[0])
+		}
+		return arrayOf(anyT)
+	}}
+
+	sigs["values"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("values", args, 1, tok) {
+			return arrayOf(anyT)
+		}
+		if args[0].Kind != TypeMap && args[0].Kind != TypeAny {
+			c.errorf(tok, "values() expects map, got %s", args[0])
+		}
+		if args[0].Kind == TypeMap || args[0].Kind == TypeAny {
+			return arrayOf(args[0].Elem)
+		}
+		return arrayOf(anyT)
+	}}
+
+	// ------------------------------------------------------------- files
+
+	for _, name := range []string{"read_file"} {
+		n := name
+		sigs[n] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+			if !c.expectArgs(n, args, 1, tok) {
+				return strT
+			}
+			if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+				c.errorf(tok, "%s() expects a path as str, got %s", n, args[0])
+			}
+			return strT
+		}}
+	}
+
+	for _, name := range []string{"write_file", "append_file"} {
+		n := name
+		sigs[n] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+			if !c.expectArgs(n, args, 2, tok) {
+				return nilT
+			}
+			for i, a := range args {
+				if a.Kind != TypeStr && a.Kind != TypeAny {
+					c.errorf(tok, "%s() argument %d expects str, got %s", n, i+1, a)
+				}
+			}
+			return nilT
+		}}
+	}
+
+	sigs["file_exists"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("file_exists", args, 1, tok) {
+			return boolT
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "file_exists() expects a path as str, got %s", args[0])
+		}
+		return boolT
+	}}
+
+	sigs["delete_file"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("delete_file", args, 1, tok) {
+			return nilT
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "delete_file() expects a path as str, got %s", args[0])
+		}
+		return nilT
+	}}
+
+	// ------------------------------------------------------------- collections
+
+	sigs["sort"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("sort", args, 1, tok) {
+			return arrayOf(anyT)
+		}
+		switch args[0].Kind {
+		case TypeArray:
+			return args[0]
+		case TypeAny:
+			return arrayOf(anyT)
+		}
+		c.errorf(tok, "sort() expects array, got %s", args[0])
+		return arrayOf(anyT)
+	}}
+
+	sigs["reverse"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("reverse", args, 1, tok) {
+			return anyT
+		}
+		switch args[0].Kind {
+		case TypeArray, TypeStr:
+			return args[0]
+		case TypeAny:
+			return anyT
+		}
+		c.errorf(tok, "reverse() expects array or str, got %s", args[0])
+		return anyT
+	}}
+
+	sigs["slice"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("slice", args, 3, tok) {
+			return anyT
+		}
+		for _, i := range []int{1, 2} {
+			if args[i].Kind != TypeInt && args[i].Kind != TypeAny {
+				c.errorf(tok, "slice() expects int bounds, got %s", args[i])
+			}
+		}
+		switch args[0].Kind {
+		case TypeArray, TypeStr:
+			return args[0]
+		case TypeAny:
+			return anyT
+		}
+		c.errorf(tok, "slice() expects array or str, got %s", args[0])
+		return anyT
+	}}
+
+	// ------------------------------------------------------------- strings
+
+	sigs["replace"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("replace", args, 3, tok) {
+			return strT
+		}
+		for i, a := range args {
+			if a.Kind != TypeStr && a.Kind != TypeAny {
+				c.errorf(tok, "replace() argument %d expects str, got %s", i+1, a)
+			}
+		}
+		return strT
+	}}
+
+	sigs["find"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("find", args, 2, tok) {
+			return intT
+		}
+		for i, a := range args {
+			if a.Kind != TypeStr && a.Kind != TypeAny {
+				c.errorf(tok, "find() argument %d expects str, got %s", i+1, a)
+			}
+		}
+		return intT
+	}}
+
+	for _, name := range []string{"starts_with", "ends_with"} {
+		n := name
+		sigs[n] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+			if !c.expectArgs(n, args, 2, tok) {
+				return boolT
+			}
+			for i, a := range args {
+				if a.Kind != TypeStr && a.Kind != TypeAny {
+					c.errorf(tok, "%s() argument %d expects str, got %s", n, i+1, a)
+				}
+			}
+			return boolT
+		}}
+	}
+
+	sigs["repeat"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("repeat", args, 2, tok) {
+			return strT
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "repeat() expects str, got %s", args[0])
+		}
+		if args[1].Kind != TypeInt && args[1].Kind != TypeAny {
+			c.errorf(tok, "repeat() expects int, got %s", args[1])
+		}
+		return strT
+	}}
+
+	sigs["chars"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("chars", args, 1, tok) {
+			return arrayOf(strT)
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "chars() expects str, got %s", args[0])
+		}
+		return arrayOf(strT)
+	}}
+
+	sigs["lines"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("lines", args, 1, tok) {
+			return arrayOf(strT)
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "lines() expects str, got %s", args[0])
+		}
+		return arrayOf(strT)
+	}}
+
+	// ------------------------------------------------------------- numbers
+
+	for _, name := range []string{"floor", "ceil", "round"} {
+		n := name
+		sigs[n] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+			if !c.expectArgs(n, args, 1, tok) {
+				return intT
+			}
+			if args[0].Kind != TypeInt && args[0].Kind != TypeFloat && args[0].Kind != TypeAny {
+				c.errorf(tok, "%s() expects int or float, got %s", n, args[0])
+			}
+			return intT
+		}}
+	}
+
+	sigs["sqrt"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("sqrt", args, 1, tok) {
+			return floatT
+		}
+		if args[0].Kind != TypeInt && args[0].Kind != TypeFloat && args[0].Kind != TypeAny {
+			c.errorf(tok, "sqrt() expects int or float, got %s", args[0])
+		}
+		return floatT
+	}}
+
+	sigs["pow"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("pow", args, 2, tok) {
+			return floatT
+		}
+		for i, a := range args {
+			if a.Kind != TypeInt && a.Kind != TypeFloat && a.Kind != TypeAny {
+				c.errorf(tok, "pow() argument %d expects int or float, got %s", i+1, a)
+			}
+		}
+		// A whole base and a whole exponent stay whole at run time, so the
+		// answer is only known to be a number here.
+		if args[0].Kind == TypeInt && args[1].Kind == TypeInt {
+			return intT
+		}
+		return floatT
+	}}
+
+	sigs["random"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		switch len(args) {
+		case 0:
+			return floatT
+		case 1, 2:
+			for i, a := range args {
+				if a.Kind != TypeInt && a.Kind != TypeAny {
+					c.errorf(tok, "random() argument %d expects int, got %s", i+1, a)
+				}
+			}
+			return intT
+		}
+		c.errorf(tok, "random() takes 0, 1 or 2 argument(s), got %d", len(args))
+		return floatT
+	}}
+
+	sigs["error"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("error", args, 1, tok) {
+			return anyT
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "error() expects str, got %s", args[0])
+		}
+		// error() never returns, so nothing after it is reached.
+		return anyT
 	}}
 
 	sigs["abs"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
@@ -978,6 +1337,13 @@ func newBuiltinSigs() map[string]*builtinSig {
 			if len(args) == 0 {
 				c.errorf(tok, "%s() needs at least one argument", n)
 				return anyT
+			}
+			// min(a) and max(a) over one array answer with an element.
+			if len(args) == 1 && args[0].Kind == TypeArray {
+				if args[0].Elem == nil {
+					return anyT
+				}
+				return args[0].Elem
 			}
 			result := args[0]
 			for _, a := range args {

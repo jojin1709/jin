@@ -73,6 +73,7 @@ func NewParser(l *Lexer) *Parser {
 		MINUS:    p.parsePrefixExpression,
 		LPAREN:   p.parseGroupedExpression,
 		LBRACKET: p.parseArrayLiteral,
+		LBRACE:   p.parseMapLiteral,
 		FUNCTION: p.parseFunctionLiteral,
 	}
 
@@ -534,6 +535,45 @@ func (p *Parser) parseArrayLiteral() Expression {
 	arr := &ArrayLiteral{Token: p.curToken}
 	arr.Elements = p.parseExpressionList(RBRACKET)
 	return arr
+}
+
+// parseMapLiteral reads {"key": value, ...}. A bare `{` only reaches here in
+// expression position; where a statement can start, `{` still opens a block.
+func (p *Parser) parseMapLiteral() Expression {
+	lit := &MapLiteral{Token: p.curToken, Pairs: []MapPair{}}
+
+	if p.peekTokenIs(RBRACE) {
+		p.nextToken() // move onto '}'
+		return lit
+	}
+
+	p.nextToken() // move onto the first key
+	for {
+		key := p.parseExpression(PREC_LOWEST)
+		if key == nil {
+			return nil
+		}
+
+		if !p.expectPeek(COLON) {
+			return nil
+		}
+		p.nextToken() // move onto the value
+
+		value := p.parseExpression(PREC_LOWEST)
+		if value == nil {
+			return nil
+		}
+		lit.Pairs = append(lit.Pairs, MapPair{Key: key, Value: value})
+
+		if p.peekTokenIs(RBRACE) {
+			p.nextToken()
+			return lit
+		}
+		if !p.expectPeek(COMMA) {
+			return nil
+		}
+		p.nextToken() // move onto the next key
+	}
 }
 
 func (p *Parser) parseFunctionLiteral() Expression {

@@ -106,10 +106,104 @@ for y in ys { print(y + 1) }`,
 		`let grid = [1, 2, 3]
 grid[1] = grid[0] + grid[2]
 grid`,
+		// Maps are the record type, so their values may differ in type.
+		`let person = {"name": "Ada", "age": 36}
+print(person["name"], person["age"], len(person))`,
+		`let m = {}
+m["a"] = 1
+m["b"] = 2
+has(m, "a")`,
+		`let m: map = {"a": 1}
+for k in m { print(k) }`,
+		`let m = {1: "one", true: 3}
+get(m, 1, "none")`,
+		`let xs = [3, 1, 2]
+sort(xs)
+reverse(xs)
+slice(xs, 0, 2)
+min(xs)
+max(xs)
+min(1, 2)`,
+		`replace("a-b", "-", "+")
+find("abc", "b")
+starts_with("abc", "a")
+ends_with("abc", "c")
+repeat("ab", 2)
+chars("abc")
+lines("a\nb")`,
+		`floor(1.5)
+ceil(1.5)
+round(1.5)
+sqrt(4)
+pow(2, 3)
+pow(2, 0.5)
+abs(-1)`,
 	}
 	for _, src := range programs {
 		expectClean(t, src)
 	}
+}
+
+func TestMapTypeChecking(t *testing.T) {
+	// A map is keyed by int, str or bool and by nothing else.
+	expectTypeError(t, `let m = {}
+m[[1]] = 2`, "map keys must be int, str or bool")
+	expectTypeError(t, `let m = {}
+print(m[[1]])`, "map keys must be int, str or bool")
+	expectTypeError(t, `let m = {}
+has(m, [1])`, "map keys must be int, str or bool")
+
+	// A key may be any of the three, so mixing them in one map is fine.
+	expectClean(t, `let m = {"a": 1}
+print(m[1], m["a"], m[true])`)
+
+	// "map" is a known annotation, and a map is not an array.
+	expectClean(t, `let m: map = {}`)
+	expectTypeError(t, `let m: int = {}`, "cannot assign map to int")
+
+	// len() takes a map, and the map helpers insist on a map.
+	expectClean(t, `len({})`)
+	expectTypeError(t, `has("abc", "a")`, "has() expects map")
+	expectTypeError(t, `keys([1, 2])`, "keys() expects map")
+	expectTypeError(t, `values([1, 2])`, "values() expects map")
+	expectTypeError(t, `get([1], 0, 1)`, "get() expects map")
+	expectTypeError(t, `delete([1], 0)`, "delete() expects map")
+
+	// Anything that is not iterable is still refused.
+	expectTypeError(t, `for k in 5 { print(k) }`, "cannot loop over int")
+	expectClean(t, `for k in {} { print(k) }`)
+}
+
+func TestFileBuiltinsAreChecked(t *testing.T) {
+	expectClean(t, `read_file("a.txt")`)
+	expectClean(t, `write_file("a.txt", "text")`)
+	expectClean(t, `append_file("a.txt", "more")`)
+	expectClean(t, `file_exists("a.txt")`)
+	expectClean(t, `delete_file("a.txt")`)
+	expectClean(t, `let text: str = read_file("a.txt")`)
+
+	expectTypeError(t, `read_file(1)`, "read_file() expects a path as str")
+	expectTypeError(t, `write_file(1, "x")`, "write_file() argument 1 expects str")
+	expectTypeError(t, `write_file("a", 1)`, "write_file() argument 2 expects str")
+	expectTypeError(t, `append_file("a")`, "append_file() takes 2 argument(s)")
+	expectTypeError(t, `file_exists(1)`, "file_exists() expects a path as str")
+	expectTypeError(t, `delete_file(1)`, "delete_file() expects a path as str")
+}
+
+func TestCollectionBuiltinsAreChecked(t *testing.T) {
+	expectTypeError(t, `sort(5)`, "sort() expects array")
+	expectTypeError(t, `reverse(5)`, "reverse() expects array or str")
+	expectTypeError(t, `slice(5, 0, 1)`, "slice() expects array or str")
+	expectTypeError(t, `slice([1], 0, "x")`, "slice() expects int bounds")
+	expectTypeError(t, `replace("a", "b", 1)`, "replace() argument 3 expects str")
+	expectTypeError(t, `find("a", 1)`, "find() argument 2 expects str")
+	expectTypeError(t, `starts_with("a", 1)`, "starts_with() argument 2 expects str")
+	expectTypeError(t, `repeat(1, 2)`, "repeat() expects str")
+	expectTypeError(t, `floor("x")`, "floor() expects int or float")
+	expectTypeError(t, `sqrt("x")`, "sqrt() expects int or float")
+	expectTypeError(t, `pow(1)`, "pow() takes 2 argument(s)")
+	expectTypeError(t, `error(1)`, "error() expects str")
+	expectTypeError(t, `random(1, 2, 3)`, "random() takes 0, 1 or 2 argument(s)")
 }
 
 func TestBasicTypeMismatches(t *testing.T) {
@@ -203,7 +297,7 @@ func TestIndexingIsChecked(t *testing.T) {
 }
 
 func TestBuiltinSignaturesAreChecked(t *testing.T) {
-	expectTypeError(t, `len(5)`, "len() expects str or array")
+	expectTypeError(t, `len(5)`, "len() expects str, array or map")
 	expectTypeError(t, `len("a", "b")`, "len() takes 1 argument")
 	expectTypeError(t, `upper(5)`, "upper() expects str")
 	expectTypeError(t, `push([1], 2, 3)`, "push() takes 2 argument(s)")
@@ -219,7 +313,7 @@ func TestBuiltinSignaturesAreChecked(t *testing.T) {
 func TestInterpolationIsTypeChecked(t *testing.T) {
 	expectTypeError(t, `"value is {undefinedThing}"`, `undefined variable "undefinedThing"`)
 	expectTypeError(t, `"bad {1 + \"x\"}"`, "cannot add int and str")
-	expectTypeError(t, `"bad {len(5)}"`, "len() expects str or array")
+	expectTypeError(t, `"bad {len(5)}"`, "len() expects str, array or map")
 	expectClean(t, `let n = 5`+"\n"+`"n is {n}, doubled {n * 2}"`)
 	expectClean(t, `"{{literal braces}}"`)
 	expectClean(t, `let xs = [1, 2]`+"\n"+`"count {len(xs)}"`)

@@ -177,6 +177,47 @@ func TestParseArrayAndAnonymousFn(t *testing.T) {
 	}
 }
 
+func TestParseMapLiterals(t *testing.T) {
+	program := parse(t, `let m = {"a": 1, "b": 2}`)
+	stmt := program.Statements[0].(*LetStatement)
+
+	m, ok := stmt.Value.(*MapLiteral)
+	if !ok {
+		t.Fatalf("want MapLiteral, got %T", stmt.Value)
+	}
+	if len(m.Pairs) != 2 {
+		t.Fatalf("want 2 pairs, got %d", len(m.Pairs))
+	}
+	if m.Pairs[0].Key.(*StringLiteral).Value != "a" {
+		t.Errorf("first key is %s, want \"a\"", m.Pairs[0].Key.String())
+	}
+	if m.Pairs[1].Value.(*IntegerLiteral).Value != 2 {
+		t.Errorf("second value is %s, want 2", m.Pairs[1].Value.String())
+	}
+	if m.String() != `{"a": 1, "b": 2}` {
+		t.Errorf("String() is %s", m.String())
+	}
+
+	// An empty map is allowed, and keys are not limited to strings.
+	empty := parse(t, `let e = {}`).Statements[0].(*LetStatement)
+	if em, ok := empty.Value.(*MapLiteral); !ok || len(em.Pairs) != 0 {
+		t.Errorf("want an empty MapLiteral, got %s", empty.Value.String())
+	}
+
+	mixed := parse(t, `let e = {1: "one", true: 2}`).Statements[0].(*LetStatement)
+	if mm, ok := mixed.Value.(*MapLiteral); !ok || len(mm.Pairs) != 2 {
+		t.Errorf("want a 2 pair MapLiteral, got %s", mixed.Value.String())
+	}
+}
+
+func TestMapLiteralNeedsAValue(t *testing.T) {
+	p := NewParser(NewLexer(`let m = {"a": }`))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Fatal("expected a parse error for a map entry with no value")
+	}
+}
+
 func TestParseErrorsAreReported(t *testing.T) {
 	p := NewParser(NewLexer(`let = 5`))
 	p.ParseProgram()

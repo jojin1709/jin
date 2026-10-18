@@ -50,6 +50,8 @@ const (
 	OpCurrentClosure // push the function currently running
 	OpClosure        // build a closure, capturing free variables
 	OpArray          // collect the top n values into an array
+	OpBuildMap       // collect the top n key/value pairs into a map
+	OpIterate        // replace the top with the values a for loop walks
 	OpIndex          // container[index]
 	OpSetIndex       // container[index] = value, leaving the value
 	OpCall           // call a function with n arguments
@@ -98,6 +100,8 @@ var definitions = map[Opcode]*definition{
 	OpCurrentClosure: {"OpCurrentClosure", nil},
 	OpClosure:        {"OpClosure", []int{2, 1}},
 	OpArray:          {"OpArray", []int{2}},
+	OpBuildMap:       {"OpBuildMap", []int{2}},
+	OpIterate:        {"OpIterate", nil},
 	OpIndex:          {"OpIndex", nil},
 	OpSetIndex:       {"OpSetIndex", nil},
 	OpCall:           {"OpCall", []int{1}},

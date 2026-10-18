@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const version = "0.5.0 (stage 5: bytecode VM)"
+const version = "0.6.0 (stage 6: standard library)"
 
 func main() {
 	args := os.Args[1:]

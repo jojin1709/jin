@@ -128,6 +128,148 @@ print(x)`,
 		want: "11\n",
 	},
 	{
+		name: "map literal and lookup",
+		source: `let person = {"name": "Ada", "age": 36}
+print(person)
+print(person["name"], person["age"], len(person))`,
+		want: "{\"name\": \"Ada\", \"age\": 36}\nAda 36 2\n",
+	},
+	{
+		name: "empty map",
+		source: `let m = {}
+print(m, len(m), type(m))`,
+		want: "{} 0 map\n",
+	},
+	{
+		name: "map keys of every allowed kind",
+		source: `let m = {1: "one", "two": 2, true: 3}
+print(m[1], m["two"], m[true], len(m))`,
+		want: "one 2 3 3\n",
+	},
+	{
+		name: "map assignment adds and replaces",
+		source: `let m = {"a": 1}
+m["a"] = 2
+m["b"] = 3
+print(m, len(m))`,
+		want: "{\"a\": 2, \"b\": 3} 2\n",
+	},
+	{
+		name: "map keeps insertion order",
+		source: `let m = {}
+m["z"] = 1
+m["a"] = 2
+m["m"] = 3
+print(m)
+print(keys(m), values(m))`,
+		want: "{\"z\": 1, \"a\": 2, \"m\": 3}\n[\"z\", \"a\", \"m\"] [1, 2, 3]\n",
+	},
+	{
+		name: "has and get with a default",
+		source: `let m = {"a": 1}
+print(has(m, "a"), has(m, "b"))
+print(get(m, "a", 0), get(m, "b", 0))
+print(contains(m, "a"))`,
+		want: "true false\n1 0\ntrue\n",
+	},
+	{
+		name: "delete removes a key",
+		source: `let m = {"a": 1, "b": 2, "c": 3}
+delete(m, "b")
+print(m, len(m), has(m, "b"))
+delete(m, "nope")
+print(m, len(m))`,
+		want: "{\"a\": 1, \"c\": 3} 2 false\n{\"a\": 1, \"c\": 3} 2\n",
+	},
+	{
+		name: "count words in a map",
+		source: `let words = ["pear", "apple", "pear", "fig", "apple", "pear"]
+let counts = {}
+for w in words {
+    counts[w] = get(counts, w, 0) + 1
+}
+print(counts)
+for k in counts { print(k, counts[k]) }`,
+		want: "{\"pear\": 3, \"apple\": 2, \"fig\": 1}\npear 3\napple 2\nfig 1\n",
+	},
+	{
+		name: "nested maps and arrays",
+		source: `let cfg = {"ports": [80, 443], "server": {"host": "local", "up": true}}
+print(cfg["server"]["host"], cfg["server"]["up"], cfg["ports"][1])`,
+		want: "local true 443\n",
+	},
+	{
+		name: "maps inside functions and closures",
+		source: `fn tally(items) {
+    let m = {}
+    for it in items { m[it] = get(m, it, 0) + 1 }
+    return m
+}
+print(tally(["x", "y", "x"]))`,
+		want: "{\"x\": 2, \"y\": 1}\n",
+	},
+	{
+		name: "map of arrays built in a loop",
+		source: `let groups = {}
+for n in range(6) {
+    let key = n % 2
+    if has(groups, key) { groups[key] = push(groups[key], n) }
+    else { groups[key] = [n] }
+}
+print(groups[0], groups[1])`,
+		want: "[0, 2, 4] [1, 3, 5]\n",
+	},
+	{
+		name: "sort reverse and slice",
+		source: `print(sort([3, 1, 2]))
+print(sort([2.5, 1.5, 2.0]))
+print(sort(["pear", "apple", "fig"]))
+print(reverse([1, 2, 3]), slice([1, 2, 3, 4], 1, 3))
+print(reverse("abc"), slice("hello", 1, 4))`,
+		want: "[1, 2, 3]\n[1.5, 2, 2.5]\n[\"apple\", \"fig\", \"pear\"]\n[3, 2, 1] [2, 3]\ncba ell\n",
+	},
+	{
+		name: "sort leaves the original alone",
+		source: `let a = [3, 1, 2]
+let b = sort(a)
+print(a, b)`,
+		want: "[3, 1, 2] [1, 2, 3]\n",
+	},
+	{
+		name:   "min and max over an array",
+		source: `print(min([4, 2, 9]), max([4, 2, 9]), min(3, 1), max(1.5, 2))`,
+		want:   "2 9 1 2\n",
+	},
+	{
+		name: "string helpers",
+		source: `print(replace("a-b-c", "-", "+"))
+print(find("hello", "ll"), find("hello", "zz"))
+print(starts_with("hello", "he"), ends_with("hello", "lo"))
+print(repeat("ab", 3))
+print(chars("hi"), lines("one\ntwo\n"))`,
+		want: "a+b+c\n2 -1\ntrue true\nababab\n[\"h\", \"i\"] [\"one\", \"two\"]\n",
+	},
+	{
+		name: "number helpers",
+		source: `print(floor(2.7), ceil(2.1), round(2.5))
+print(floor(7), ceil(7), round(7))
+print(sqrt(16), pow(2, 10), pow(2, 0.5))`,
+		want: "2 3 3\n7 7 7\n4 1024 1.4142135623730951\n",
+	},
+	{
+		name: "map inside a closure captures the map",
+		source: `fn counter() {
+    let hits = {}
+    return fn(name) {
+        hits[name] = get(hits, name, 0) + 1
+        return hits[name]
+    }
+}
+let bump = counter()
+print(bump("a"), bump("a"), bump("b"))`,
+		want: "1 2 1\n",
+	},
+	{
 		name: "if else as an expression",
 		source: `fn sign(n) {
     if n < 0 { return "neg" } else { return "pos" }
@@ -581,6 +723,142 @@ f(1, 2)`,
 f(1)`,
 		wantContains: "expects 2 argument(s), got 1",
 	},
+	{
+		name: "a missing map key",
+		source: `let m = {"a": 1}
+print(m["zz"])`,
+		wantContains: `key "zz" is not in the map`,
+	},
+	{
+		name: "int key is a key, not a position",
+		source: `let m = {"a": 1, "b": 2}
+print(m[0])`,
+		wantContains: "key 0 is not in the map",
+	},
+	{
+		name: "an array cannot be a map key",
+		source: `let m = {}
+m[[1]] = 2`,
+		wantContains: "cannot use array as a map key; keys must be int, str or bool",
+	},
+	{
+		name:         "sorting a mixed array",
+		source:       `print(sort([1, "a"]))`,
+		wantContains: "sort() needs a single kind of value",
+	},
+	{
+		name:         "sorting something that is not an array",
+		source:       `print(sort("abc"))`,
+		wantContains: "sort() expects array, got str",
+	},
+	{
+		name:         "slicing past the end",
+		source:       `print(slice([1, 2], 0, 9))`,
+		wantContains: "slice() end 9 is out of range",
+	},
+	{
+		name:         "reversing a number",
+		source:       `print(reverse(5))`,
+		wantContains: "reverse() expects array or str, got int",
+	},
+	{
+		name: "calling error",
+		source: `print("before")
+error("something broke")`,
+		wantContains: "something broke",
+	},
+	{
+		name:         "a random bound of zero",
+		source:       `print(random(0))`,
+		wantContains: "random() needs a bound above 0",
+	},
+	{
+		name:         "looping over a map is fine but lopping over a number is not",
+		source:       `for k in 5 { print(k) }`,
+		wantContains: "cannot loop over int",
+	},
+}
+
+// TestFileBuiltinsAgreeAcrossEngines uses a real temporary directory, so the
+// two engines can be compared on something that actually touches the disk.
+func TestFileBuiltinsAgreeAcrossEngines(t *testing.T) {
+	// Jin string literals use \\ for a backslash, so a Windows path has to be
+	// written with forward slashes or escaped.
+	path := filepath.ToSlash(filepath.Join(t.TempDir(), "notes.txt"))
+
+	source := `let path = "` + path + `"
+print(file_exists(path))
+write_file(path, "first\nsecond\n")
+print(file_exists(path))
+print(read_file(path))
+append_file(path, "third\n")
+print(len(lines(read_file(path))))
+print(lines(read_file(path)))
+delete_file(path)
+print(file_exists(path))`
+
+	want := "false\ntrue\nfirst\nsecond\n\n3\n[\"first\", \"second\", \"third\"]\nfalse\n"
+
+	vmOut, vmErr := runOnVM(t, source)
+	if vmErr != nil {
+		t.Fatalf("vm error: %v", vmErr)
+	}
+	if vmOut != want {
+		t.Errorf("vm output\n got: %q\nwant: %q", vmOut, want)
+	}
+
+	// Put the file back so the interpreter walk starts from the same place.
+	if _, err := os.Stat(path); err == nil {
+		os.Remove(path)
+	}
+	interpOut, interpErr := runOnInterpreter(t, source)
+	if interpErr != nil {
+		t.Fatalf("interpreter error: %v", interpErr)
+	}
+	if interpOut != want {
+		t.Errorf("interpreter output\n got: %q\nwant: %q", interpOut, want)
+	}
+}
+
+func TestFileBuiltinErrors(t *testing.T) {
+	missing := filepath.ToSlash(filepath.Join(t.TempDir(), "not-there.txt"))
+	cases := []struct{ name, source, want string }{
+		{
+			name:   "reading a missing file",
+			source: `print(read_file("` + missing + `"))`,
+			want:   "read_file() could not read " + missing,
+		},
+		{
+			name:   "creating a file below a missing directory",
+			source: `write_file("` + missing + `/child.txt", "x")`,
+			want:   "write_file() could not write",
+		},
+		{
+			name:   "deleting a missing file",
+			source: `delete_file("` + missing + `")`,
+			want:   "delete_file() could not delete " + missing,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, vmErr := runOnVM(t, tc.source)
+			if vmErr == nil {
+				t.Fatalf("vm accepted %s", tc.source)
+			}
+			if !strings.Contains(vmErr.Error(), tc.want) {
+				t.Errorf("vm error %q does not contain %q", vmErr, tc.want)
+			}
+
+			_, interpErr := runOnInterpreter(t, tc.source)
+			if interpErr == nil {
+				t.Fatalf("interpreter accepted %s", tc.source)
+			}
+			if !strings.Contains(interpErr.Error(), tc.want) {
+				t.Errorf("interpreter error %q does not contain %q", interpErr, tc.want)
+			}
+		})
+	}
 }
 
 func TestErrorsAgreeAcrossEngines(t *testing.T) {

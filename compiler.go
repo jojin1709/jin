@@ -420,6 +420,9 @@ func (c *Compiler) compileFor(node *ForStatement) error {
 	if err := c.compileExpression(node.Iterable); err != nil {
 		return err
 	}
+	// Turn whatever was given into something that can be walked by position,
+	// so an array, a string and a map all use the same loop.
+	c.emit(OpIterate)
 
 	// The sequence and the position are kept in hidden slots.
 	iterSym := c.symbols.DefineTemp()
@@ -583,6 +586,20 @@ func (c *Compiler) compileExpression(expr Expression) error {
 			}
 		}
 		c.emit(OpArray, len(node.Elements))
+		return nil
+
+	case *MapLiteral:
+		// Keys and values are pushed in pairs, so the map can pop them back
+		// in the order they were written.
+		for _, pair := range node.Pairs {
+			if err := c.compileExpression(pair.Key); err != nil {
+				return err
+			}
+			if err := c.compileExpression(pair.Value); err != nil {
+				return err
+			}
+		}
+		c.emit(OpBuildMap, len(node.Pairs))
 		return nil
 
 	case *FunctionLiteral:

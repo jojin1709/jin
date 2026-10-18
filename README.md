@@ -10,7 +10,8 @@ Python but with fewer footguns and much better performance.
 3. **No silent type mixing.** `1 + 1.5` is an error, not a surprise. Convert with `int()` or `float()`.
 4. **Conditions must be `bool`.** `if 1 { }` is rejected instead of quietly being truthy.
 5. **No accidental globals.** Assigning to a name that was never declared is an error.
-6. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
+6. **A missing key is an error.** `m["nope"]` is not quietly `nil`; ask with `has(m, "nope")`.
+7. **Fast by default.** Source compiles to bytecode and runs on a stack VM. The
    tree-walking interpreter is still there for cross-checking, but it is not
    what `run` uses.
 
@@ -42,7 +43,9 @@ go build -o jin.exe .
 
 ./jin.exe examples/tour.jin        # run a program (bytecode VM)
 ./jin.exe examples/soak.jin        # a bigger program: closures, recursion, loops
+./jin.exe examples/collections.jin # maps, lists and the built-ins for them
 ./jin.exe examples/types.jin       # run the type-checked demo
+./jin.exe examples/files.jin       # reading and writing files
 ./jin.exe interpret examples/tour.jin # run on the tree-walking interpreter
 ./jin.exe check examples/tour.jin  # type-check without running
 ./jin.exe compile examples/tour.jin # print the bytecode
@@ -55,7 +58,8 @@ go test ./...
 Stages 1, 2, 4 and 5 (`tokens`, `parse`, `check`, `compile`) are available on
 their own, so you can watch each layer of the pipeline separately. `run` and
 `interpret` must agree on every program, and the test suite checks exactly
-that.
+that: every program in the differential corpus, every error message, and every
+file in `examples/` has to produce byte-identical output on both back ends.
 
 ## Language tour
 
@@ -76,10 +80,83 @@ while x > 0 { x = x - 1; if x == 2 { break } }
 let f = fn(v) { v * 2 }              # anonymous functions
 print("{name} has {len(name)} letters")   # string interpolation
 print("use {{braces}} for literal braces")
+
+let person = {"name": "Ada", "age": 36}   # a map
+print(person["name"], has(person, "job")) # Ada false
+for field in person { print(field) }      # maps loop over their keys
 ```
 
-Built-ins: `print`, `len`, `push`, `str`, `int`, `float`, `type`, `range`,
-`upper`, `lower`, `trim`, `split`, `join`, `contains`, `abs`, `min`, `max`.
+Built-ins:
+
+| Group | Functions |
+|---|---|
+| Output | `print` |
+| Numbers | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `random`, `int`, `float`, `str`, `type` |
+| Strings | `len`, `upper`, `lower`, `trim`, `split`, `join`, `contains`, `replace`, `find`, `starts_with`, `ends_with`, `repeat`, `chars`, `lines` |
+| Lists | `len`, `push`, `reverse`, `sort`, `slice`, `contains`, `range` |
+| Maps | `len`, `has`, `get`, `delete`, `keys`, `values`, `contains` |
+| Files | `read_file`, `write_file`, `append_file`, `file_exists`, `delete_file` |
+| Control | `error` |
+
+Multi-word built-ins use underscores, so `starts_with` is the shape to expect
+from anything added later.
+
+## Maps
+
+A map is the way to write a value with named fields, and it is the only one, so
+its values may have different types:
+
+```jin
+let server = {"host": "local", "port": 8080, "up": true}
+print(server["host"], server["port"])   # local 8080
+
+server["port"] = 9090                   # replace
+server["tags"] = ["a", "b"]             # add
+delete(server, "up")                    # remove
+print(len(server), keys(server))         # 3 ["host", "port", "tags"]
+```
+
+Keys may be an `int`, a `str` or a `bool`. Entries keep the order they were
+added in, so printing a map and looping over one are predictable:
+
+```jin
+let counts = {}
+for w in ["pear", "apple", "pear"] {
+    counts[w] = get(counts, w, 0) + 1
+}
+print(counts)             # {"pear": 2, "apple": 1}
+for w in counts { print(w, counts[w]) }
+```
+
+Reading a key that is not there is an error rather than a quiet `nil`, which is
+the same rule as an out-of-range list index:
+
+```jin
+print(server["nope"])         # error: key "nope" is not in the map
+print(has(server, "nope"))    # false
+print(get(server, "nope", 0)) # 0
+```
+
+`m[k] = v` changes the map in place, and so does `delete`. `sort`, `reverse`
+and `slice` share that style with `push`: they return something new and leave
+the original alone.
+
+## Files
+
+```jin
+write_file("notes.txt", "first\nsecond\n")
+append_file("notes.txt", "third\n")
+
+for line in lines(read_file("notes.txt")) {
+    print(upper(line))
+}
+
+delete_file("notes.txt")
+```
+
+Every file function takes a path as a `str` and reports the operating system's
+own reason when it fails. Because Jin has no `try` yet, a failure stops the
+program, so `file_exists(path)` is how you ask first.
 
 ## Types are optional, but checked
 
@@ -110,9 +187,18 @@ assignment, function arguments and returns, loop bodies, indexing, built-in
 calls, misplaced `break` / `continue` / `return`, and the expressions inside
 `{interpolation}`.
 
+The annotation names are `int`, `float`, `str`, `bool`, `nil`, `array`, `map`
+and `any`. A bare `array` or `map` leaves the elements alone, which is usually
+what you want, because a map holding a name and an age at once is normal:
+
+```jin
+let person: map = {"name": "Ada", "age": 36}
+let mixed: array = [1, "two"]
+```
+
 ## How it works
 
-A language is built as a pipeline. Jin is through stage 5:
+A language is built as a pipeline. Jin is through stage 6:
 
 ```
 source text
@@ -161,11 +247,17 @@ by the VM points at the same place the interpreter would.
 | `compiler.go` | Syntax tree to bytecode |
 | `frame.go` | One active call: its closure, its position, and where its locals live |
 | `vm.go` | The stack machine that runs bytecode |
-| `object.go` | Runtime values, including compiled functions and closures |
+| `object.go` | Runtime values, including compiled functions, closures and maps |
 | `environment.go` | Variable scopes, used by the interpreter back end |
 | `builtins.go` | Built-in functions, shared by both back ends |
 | `interpreter.go` | Evaluates the tree, kept as a reference implementation |
 | `main.go` | CLI and REPL |
+
+Two pieces of logic live in exactly one place so the back ends cannot drift
+apart: `indexInto` and `setInto` in `vm.go` do every indexed read and write,
+and `iterateValues` decides what a `for` loop walks. The interpreter calls all
+three, which is why an error message about a map key is the same whichever
+engine you run.
 
 ## Closures
 
@@ -223,8 +315,24 @@ that get thrown away.
 - [x] Stage 3: interpreter
 - [x] Stage 4: type checker
 - [x] Stage 5: bytecode compiler + VM
-- [ ] Stage 6: standard library
+- [x] Stage 6: standard library
 - [ ] Stage 7: package manager + CLI
+
+### Stage 6: what is in, and what is not
+
+In: maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
+`error`, and file reading and writing. `examples/collections.jin` and
+`examples/files.jin` exercise all of it.
+
+Not in, and honest about it:
+
+- No `try` / `catch`, so `error(...)` and a failed `read_file` end the program.
+  `file_exists` and `has` are how you check before acting.
+- No user-supplied comparison for `sort`. It orders numbers or strings, and
+  refuses an array that mixes them instead of guessing.
+- No user-defined types or records. A map is the record type, which is why a
+  map's values are allowed to differ in type while an array's are not.
+- No `input` from the terminal yet; the REPL is the only interactive path.
 
 ## License
 

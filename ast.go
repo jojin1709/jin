@@ -448,3 +448,25 @@ func joinParams(params []*Parameter) string {
 	}
 	return strings.Join(parts, ", ")
 }
+
+// MapPair is one key and value written inside a map literal.
+type MapPair struct {
+	Key   Expression
+	Value Expression
+}
+
+// MapLiteral is a map written out in full, such as {"a": 1, "b": 2}.
+type MapLiteral struct {
+	Token Token
+	Pairs []MapPair
+}
+
+func (e *MapLiteral) expressionNode()      {}
+func (e *MapLiteral) TokenLiteral() string { return e.Token.Literal }
+func (e *MapLiteral) String() string {
+	parts := make([]string, 0, len(e.Pairs))
+	for _, pair := range e.Pairs {
+		parts = append(parts, pair.Key.String()+": "+pair.Value.String())
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
+}

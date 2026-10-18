@@ -1,0 +1,105 @@
+# Lists, maps and the built-ins that work on them.
+
+# ---------------------------------------------------------------- maps
+
+let person = {"name": "Ada", "age": 36, "city": "London"}
+print(person)
+print("name: {person[\"name\"]}, age: {person[\"age\"]}, fields: {len(person)}")
+
+# Look up a key, add one, replace one, remove one.
+person["age"] = 37
+person["job"] = "engineer"
+print(person)
+delete(person, "city")
+print(person)
+
+# A map is the way to write a value with named fields, so its values may have
+# different types.
+let server = {"host": "localhost", "port": 8080, "up": true, "tags": ["a", "b"]}
+print(server["host"], server["port"], server["up"], server["tags"][1])
+
+# Missing keys are an error, so use has() to ask first or get() for a default.
+print(has(person, "age"), has(person, "nickname"))
+print(get(person, "nickname", "none given"))
+
+# ---------------------------------------------------------------- counting
+
+let words = ["pear", "apple", "pear", "fig", "apple", "pear"]
+
+let counts = {}
+for w in words {
+    counts[w] = get(counts, w, 0) + 1
+}
+print(counts)
+
+# A map loops over its keys, in the order they were added.
+for w in counts {
+    print("{w}: {counts[w]}")
+}
+
+# Group values by a key.
+let byFirst = {}
+for w in words {
+    let initial = w[0]
+    if has(byFirst, initial) {
+        byFirst[initial] = push(byFirst[initial], w)
+    } else {
+        byFirst[initial] = [w]
+    }
+}
+print(byFirst)
+print(keys(byFirst), values(byFirst))
+
+# ---------------------------------------------------------------- lists
+
+let scores = [42, 7, 19, 88, 3]
+print("sorted:  {sort(scores)}")
+print("reversed: {reverse(scores)}")
+print("a slice:  {slice(scores, 1, 4)}")
+print("low: {min(scores)}, high: {max(scores)}, as given: {scores}")
+
+# Sorting strings, and sorting is not an in-place change.
+let names = ["pear", "apple", "fig"]
+print(sort(names), names)
+print(join(sort(names), " < "))
+
+# ---------------------------------------------------------------- strings
+
+let line = "  the quick brown fox  "
+print("[{trim(line)}]")
+print(upper("quiet"), lower("LOUD"))
+print(replace("a-b-c", "-", "+"))
+print("contains 'quick': {contains(line, \"quick\")}")
+print("first space at {find(line, \" \")}")
+print(starts_with("jin", "ji"), ends_with("jin", "in"))
+print(repeat("=", 12))
+print(chars("abc"))
+print(lines("first\nsecond\nthird"))
+
+# ---------------------------------------------------------------- numbers
+
+print(floor(2.7), ceil(2.7), round(2.5))
+print(sqrt(144), pow(2, 10), abs(-9))
+print(min(3, 1, 4, 1, 5), max(3, 1, 4, 1, 5))
+
+# ---------------------------------------------------------------- together
+
+# Group, then report. This is the shape most small programs want.
+let inventory = {
+    "apple": 3,
+    "pear": 0,
+    "fig": 7
+}
+
+let inStock = []
+for item in inventory {
+    if inventory[item] > 0 {
+        inStock = push(inStock, item)
+    }
+}
+print("in stock: {join(sort(inStock), \", \")} ({len(inStock)} of {len(inventory)})")
+
+for item in sort(keys(inventory)) {
+    let bars = repeat("*", inventory[item])
+    print("{item}: {bars}")
+}

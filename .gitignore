@@ -6,3 +6,6 @@
 # Go test and coverage output
 *.test
 *.out
+
+# Scratch files written by examples/files.jin
+/jin_demo_notes.txt

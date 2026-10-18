@@ -206,17 +206,13 @@ func (i *Interpreter) evalWhile(node *WhileStatement, env *Environment) (Object,
 
 // iterate turns a value into a list of items a for loop can walk.
 func (i *Interpreter) iterate(obj Object, tok Token) ([]Object, error) {
-	switch v := obj.(type) {
-	case *Array:
-		return v.Elements, nil
-	case *String:
-		items := make([]Object, 0, len(v.Value))
-		for _, r := range v.Value {
-			items = append(items, &String{Value: string(r)})
-		}
-		return items, nil
+	seq, err := iterateValues(obj)
+	if err != nil {
+		return nil, fmt.Errorf("%d:%d: %s", tok.Line, tok.Column, err)
 	}
-	return nil, fmt.Errorf("%d:%d: cannot loop over %s", tok.Line, tok.Column, obj.Type())
+	// iterateValues hands back an array for every collection, and for an array
+	// it hands back the array itself, so a loop sees the live elements.
+	return seq.(*Array).Elements, nil
 }
 
 // ---------------------------------------------------------------- expressions
@@ -268,9 +264,25 @@ func (i *Interpreter) evalExpression(expr Expression, env *Environment) (Object,
 		}
 		return &Array{Elements: elems}, nil
 
+	case *MapLiteral:
+		m := &Map{}
+		for _, pair := range node.Pairs {
+			key, err := i.evalExpression(pair.Key, env)
+			if err != nil {
+				return nil, err
+			}
+			value, err := i.evalExpression(pair.Value, env)
+			if err != nil {
+				return nil, err
+			}
+			if err := m.Set(key, value); err != nil {
+				return nil, fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
+			}
+		}
+		return m, nil
+
 	case *FunctionLiteral:
 		return &Function{Parameters: node.Parameters, Body: node.Body, Env: env}, nil
-
 	case *MemberExpression:
 		return nil, fmt.Errorf("%d:%d: property access (.%s) is not supported yet",
 			node.Token.Line, node.Token.Column, node.Property.Value)
@@ -520,19 +532,13 @@ func (i *Interpreter) evalAssign(node *AssignExpression, env *Environment) (Obje
 		if err != nil {
 			return nil, err
 		}
-		arr, ok := container.(*Array)
-		if !ok {
-			return nil, fmt.Errorf("%d:%d: cannot assign into %s", target.Token.Line, target.Token.Column, container.Type())
-		}
-		idx, err := i.indexValue(target.Index, env, target.Token)
+		index, err := i.evalExpression(target.Index, env)
 		if err != nil {
 			return nil, err
 		}
-		if idx < 0 || idx >= int64(len(arr.Elements)) {
-			return nil, fmt.Errorf("%d:%d: index %d out of range (length %d)",
-				target.Token.Line, target.Token.Column, idx, len(arr.Elements))
+		if err := setInto(container, index, value); err != nil {
+			return nil, fmt.Errorf("%d:%d: %s", target.Token.Line, target.Token.Column, err)
 		}
-		arr.Elements[idx] = value
 		return value, nil
 	}
 
@@ -544,42 +550,16 @@ func (i *Interpreter) evalIndex(node *IndexExpression, env *Environment) (Object
 	if err != nil {
 		return nil, err
 	}
-	idx, err := i.indexValue(node.Index, env, node.Token)
+	index, err := i.evalExpression(node.Index, env)
 	if err != nil {
 		return nil, err
 	}
 
-	switch c := container.(type) {
-	case *Array:
-		if idx < 0 || idx >= int64(len(c.Elements)) {
-			return nil, fmt.Errorf("%d:%d: index %d out of range (length %d)",
-				node.Token.Line, node.Token.Column, idx, len(c.Elements))
-		}
-		return c.Elements[idx], nil
-	case *String:
-		runes := []rune(c.Value)
-		if idx < 0 || idx >= int64(len(runes)) {
-			return nil, fmt.Errorf("%d:%d: index %d out of range (length %d)",
-				node.Token.Line, node.Token.Column, idx, len(runes))
-		}
-		return &String{Value: string(runes[idx])}, nil
-	}
-
-	return nil, fmt.Errorf("%d:%d: cannot index %s", node.Token.Line, node.Token.Column, container.Type())
-}
-
-// indexValue evaluates an index expression and requires it to be an int. The
-// token is only used to point at the right place when it is not.
-func (i *Interpreter) indexValue(expr Expression, env *Environment, tok Token) (int64, error) {
-	obj, err := i.evalExpression(expr, env)
+	value, err := indexInto(container, index)
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
 	}
-	n, ok := obj.(*Integer)
-	if !ok {
-		return 0, fmt.Errorf("%d:%d: index must be an int, got %s", tok.Line, tok.Column, obj.Type())
-	}
-	return n.Value, nil
+	return value, nil
 }
 
 func (i *Interpreter) evalCall(node *CallExpression, env *Environment) (Object, error) {
@@ -601,7 +581,11 @@ func (i *Interpreter) evalCall(node *CallExpression, env *Environment) (Object, 
 	case *Function:
 		return i.applyFunction(fn, args, node.Token)
 	case *Builtin:
-		return fn.Fn(args)
+		result, err := fn.Fn(args)
+		if err != nil {
+			return nil, fmt.Errorf("%d:%d: %s", node.Token.Line, node.Token.Column, err)
+		}
+		return result, nil
 	}
 
 	return nil, fmt.Errorf("%d:%d: %s is not callable", node.Token.Line, node.Token.Column, callee.Type())

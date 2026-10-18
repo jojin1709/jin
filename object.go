@@ -15,6 +15,7 @@ const (
 	BOOLEAN_OBJ  ObjectType = "bool"
 	NIL_OBJ      ObjectType = "nil"
 	ARRAY_OBJ    ObjectType = "array"
+	MAP_OBJ      ObjectType = "map"
 	FUNCTION_OBJ ObjectType = "fn"
 	BUILTIN_OBJ  ObjectType = "builtin"
 	RETURN_OBJ   ObjectType = "return"
@@ -114,6 +115,113 @@ func (o *Array) Inspect() string {
 		parts = append(parts, repr(el))
 	}
 	return "[" + joinWith(parts, ", ") + "]"
+}
+
+// MapEntry is one key and value in a map.
+type MapEntry struct {
+	Key   Object
+	Value Object
+}
+
+// Map is a dictionary. Entries keep the order they were added in, so printing
+// a map and looping over one are predictable; a small index on the side keeps
+// lookups from scanning every entry.
+type Map struct {
+	Entries []MapEntry
+	index   map[string]int
+}
+
+func (o *Map) Type() ObjectType { return MAP_OBJ }
+func (o *Map) Inspect() string {
+	parts := make([]string, 0, len(o.Entries))
+	for _, e := range o.Entries {
+		parts = append(parts, repr(e.Key)+": "+repr(e.Value))
+	}
+	return "{" + joinWith(parts, ", ") + "}"
+}
+
+// Len is how many entries the map holds.
+func (o *Map) Len() int { return len(o.Entries) }
+
+// Keys returns the keys in insertion order.
+func (o *Map) Keys() []Object {
+	keys := make([]Object, len(o.Entries))
+	for i, e := range o.Entries {
+		keys[i] = e.Key
+	}
+	return keys
+}
+
+// Get looks up a key. The second result reports whether the key was there.
+func (o *Map) Get(key Object) (Object, bool, error) {
+	text, err := mapKeyText(key)
+	if err != nil {
+		return nil, false, err
+	}
+	if o.index == nil {
+		return nil, false, nil
+	}
+	at, ok := o.index[text]
+	if !ok {
+		return nil, false, nil
+	}
+	return o.Entries[at].Value, true, nil
+}
+
+// Set stores a value under a key, replacing any previous one.
+func (o *Map) Set(key, value Object) error {
+	text, err := mapKeyText(key)
+	if err != nil {
+		return err
+	}
+	if o.index == nil {
+		o.index = map[string]int{}
+	}
+	if at, ok := o.index[text]; ok {
+		o.Entries[at].Value = value
+		return nil
+	}
+	o.index[text] = len(o.Entries)
+	o.Entries = append(o.Entries, MapEntry{Key: key, Value: value})
+	return nil
+}
+
+// Delete removes a key. The result reports whether the key was there.
+func (o *Map) Delete(key Object) (bool, error) {
+	text, err := mapKeyText(key)
+	if err != nil {
+		return false, err
+	}
+	at, ok := o.index[text]
+	if !ok {
+		return false, nil
+	}
+
+	o.Entries = append(o.Entries[:at], o.Entries[at+1:]...)
+	delete(o.index, text)
+	// Everything after the hole moved down one place.
+	for i := at; i < len(o.Entries); i++ {
+		moved, err := mapKeyText(o.Entries[i].Key)
+		if err != nil {
+			return false, err
+		}
+		o.index[moved] = i
+	}
+	return true, nil
+}
+
+// mapKeyText turns a key into the string the internal index is built from.
+// Only values that can be compared exactly are allowed as keys.
+func mapKeyText(key Object) (string, error) {
+	switch k := key.(type) {
+	case *Integer:
+		return "i" + strconv.FormatInt(k.Value, 10), nil
+	case *String:
+		return "s" + k.Value, nil
+	case *Boolean:
+		return "b" + strconv.FormatBool(k.Value), nil
+	}
+	return "", fmt.Errorf("cannot use %s as a map key; keys must be int, str or bool", key.Type())
 }
 
 // Function is a user-defined function together with its captured scope.

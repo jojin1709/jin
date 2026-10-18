@@ -295,10 +295,34 @@ func (vm *VM) Run(bc *Bytecode) (Object, error) {
 			}
 			vm.push(&Array{Elements: elements})
 
+		case OpBuildMap:
+			count := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			// Pairs went on in written order, so read them back the same way.
+			pairs := make([]MapEntry, count)
+			for i := count - 1; i >= 0; i-- {
+				value := vm.pop()
+				pairs[i] = MapEntry{Key: vm.pop(), Value: value}
+			}
+			m := &Map{}
+			for _, pair := range pairs {
+				if err := m.Set(pair.Key, pair.Value); err != nil {
+					return nil, vm.errorf("%s", err)
+				}
+			}
+			vm.push(m)
+
+		case OpIterate:
+			seq, err := iterateValues(vm.pop())
+			if err != nil {
+				return nil, vm.errorf("%s", err)
+			}
+			vm.push(seq)
+
 		case OpIndex:
 			index := vm.pop()
 			container := vm.pop()
-			value, err := indexValue(container, index)
+			value, err := indexInto(container, index)
 			if err != nil {
 				return nil, vm.errorf("%s", err)
 			}
@@ -308,7 +332,7 @@ func (vm *VM) Run(bc *Bytecode) (Object, error) {
 			value := vm.pop()
 			index := vm.pop()
 			container := vm.peek()
-			if err := setIndex(container, index, value); err != nil {
+			if err := setInto(container, index, value); err != nil {
 				return nil, vm.errorf("%s", err)
 			}
 			// Assignment is an expression, so the value stays on the stack.
@@ -623,9 +647,22 @@ func isTruthy(obj Object) bool {
 	return ok && b.Value
 }
 
-// ---------------------------------------------------------------- indexing
+// ---------------------------------------------------------------- collections
 
-func indexValue(container, index Object) (Object, error) {
+// indexInto reads container[index]. Both back ends go through this, so an
+// indexed read and its error text cannot drift apart.
+func indexInto(container, index Object) (Object, error) {
+	if m, ok := container.(*Map); ok {
+		value, found, err := m.Get(index)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("key %s is not in the map", repr(index))
+		}
+		return value, nil
+	}
+
 	n, ok := index.(*Integer)
 	if !ok {
 		return nil, fmt.Errorf("index must be an int, got %s", index.Type())
@@ -648,14 +685,17 @@ func indexValue(container, index Object) (Object, error) {
 	return nil, fmt.Errorf("cannot index %s", container.Type())
 }
 
-func setIndex(container, index, value Object) error {
-	n, ok := index.(*Integer)
-	if !ok {
-		return fmt.Errorf("index must be an int, got %s", index.Type())
-	}
-
+// setInto carries out container[index] = value.
+func setInto(container, index, value Object) error {
 	switch c := container.(type) {
+	case *Map:
+		return c.Set(index, value)
+
 	case *Array:
+		n, ok := index.(*Integer)
+		if !ok {
+			return fmt.Errorf("index must be an int, got %s", index.Type())
+		}
 		if n.Value < 0 || n.Value >= int64(len(c.Elements)) {
 			return fmt.Errorf("index %d out of range (length %d)", n.Value, len(c.Elements))
 		}
@@ -666,12 +706,34 @@ func setIndex(container, index, value Object) error {
 	return fmt.Errorf("cannot assign into %s", container.Type())
 }
 
+// iterateValues turns a collection into the values a for loop walks: an array
+// stays as it is, a string becomes its characters, and a map becomes its keys
+// in the order they were added.
+func iterateValues(obj Object) (Object, error) {
+	switch v := obj.(type) {
+	case *Array:
+		return v, nil
+	case *String:
+		runes := []rune(v.Value)
+		items := make([]Object, len(runes))
+		for i, r := range runes {
+			items[i] = &String{Value: string(r)}
+		}
+		return &Array{Elements: items}, nil
+	case *Map:
+		return &Array{Elements: v.Keys()}, nil
+	}
+	return nil, fmt.Errorf("cannot loop over %s", obj.Type())
+}
+
 func lengthOf(obj Object) (int64, error) {
 	switch v := obj.(type) {
 	case *String:
 		return int64(utf8.RuneCountInString(v.Value)), nil
 	case *Array:
 		return int64(len(v.Elements)), nil
+	case *Map:
+		return int64(v.Len()), nil
 	}
 	return 0, fmt.Errorf("cannot take the length of %s", obj.Type())
 }
