@@ -362,8 +362,28 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 		case OpSetIndex:
 			value := vm.pop()
 			index := vm.pop()
-			container := vm.peek()
+			container := vm.pop()
 			if err := setInto(container, index, value); err != nil {
+				return nil, vm.errorf("%s", err)
+			}
+			// Assignment is an expression, so the value stays on the stack.
+			vm.push(value)
+
+		case OpGetField:
+			index := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			value, err := getField(vm.pop(), fieldName(vm.constants[index]))
+			if err != nil {
+				return nil, vm.errorf("%s", err)
+			}
+			vm.push(value)
+
+		case OpSetField:
+			index := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			value := vm.pop()
+			container := vm.pop()
+			if err := setField(container, fieldName(vm.constants[index]), value); err != nil {
 				return nil, vm.errorf("%s", err)
 			}
 			// Assignment is an expression, so the value stays on the stack.
@@ -488,6 +508,21 @@ func (vm *VM) call(argc int) error {
 			return vm.errorf("%s", err)
 		}
 		vm.push(result)
+		return nil
+
+	case *StructType:
+		// A record type is called to make an instance, the way a class is.
+		args := make([]Object, argc)
+		for i := argc - 1; i >= 0; i-- {
+			args[i] = vm.pop()
+		}
+		vm.pop() // the type itself
+
+		value, err := newStruct(fn, args)
+		if err != nil {
+			return vm.errorf("%s", err)
+		}
+		vm.push(value)
 		return nil
 	}
 

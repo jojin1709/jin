@@ -271,3 +271,51 @@ func TestParseEmptyProgram(t *testing.T) {
 		t.Errorf("want 0 statements, got %d", len(program.Statements))
 	}
 }
+
+func TestParseStruct(t *testing.T) {
+	src := `struct Point {
+    x: int,
+    y: int
+}
+struct Empty {}`
+	program := parse(t, src)
+	if len(program.Statements) != 2 {
+		t.Fatalf("want 2 statements, got %d", len(program.Statements))
+	}
+
+	st, ok := program.Statements[0].(*StructStatement)
+	if !ok {
+		t.Fatalf("want StructStatement, got %T", program.Statements[0])
+	}
+	if st.Name.Value != "Point" {
+		t.Errorf("want name Point, got %q", st.Name.Value)
+	}
+	if len(st.Fields) != 2 {
+		t.Fatalf("want 2 fields, got %d", len(st.Fields))
+	}
+	if st.Fields[0].Name.Value != "x" || st.Fields[0].Type.Name != "int" {
+		t.Errorf("field 0 mismatch: %s: %s", st.Fields[0].Name.Value, st.Fields[0].Type.Name)
+	}
+	if st.Fields[1].Name.Value != "y" || st.Fields[1].Type.Name != "int" {
+		t.Errorf("field 1 mismatch: %s: %s", st.Fields[1].Name.Value, st.Fields[1].Type.Name)
+	}
+
+	empty, ok := program.Statements[1].(*StructStatement)
+	if !ok {
+		t.Fatalf("want StructStatement, got %T", program.Statements[1])
+	}
+	if empty.Name.Value != "Empty" || len(empty.Fields) != 0 {
+		t.Errorf("empty struct mismatch: name=%s fields=%d", empty.Name.Value, len(empty.Fields))
+	}
+}
+
+func TestParseStructInsideBlockRejected(t *testing.T) {
+	p := NewParser(NewLexer(`fn f() { struct Bad { x: int } }`))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Fatal("expected parse error for struct inside a block, got none")
+	}
+	if !strings.Contains(p.Errors()[0], "only allowed at the top level") {
+		t.Errorf("unexpected error message: %s", p.Errors()[0])
+	}
+}

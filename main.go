@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "0.7.0 (stage 7: projects and imports)"
+const version = "0.8.0 (stage 8: records)"
 
 func main() {
 	args := os.Args[1:]
@@ -450,10 +450,12 @@ func repl() {
 			fmt.Printf("  error: %v\n", err)
 			continue
 		}
-		if _, isNil := result.(*Nil); !isNil {
-			if _, isFn := result.(*Closure); !isFn {
-				fmt.Println(result.Inspect())
-			}
+		// A declaration produces a value, but showing a function or a type
+		// back at you says nothing useful, so only real results are printed.
+		switch result.(type) {
+		case nil, *Nil, *Closure, *StructType:
+		default:
+			fmt.Println(result.Inspect())
 		}
 	}
 

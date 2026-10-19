@@ -139,6 +139,16 @@ func (i *Interpreter) evalStatement(stmt Statement, env *Environment) (Object, e
 		env.Set(node.Name.Value, fn)
 		return fn, nil
 
+	case *StructStatement:
+		// A record type becomes a value the name holds, so the name can be
+		// called to make an instance, and can be reached through an import.
+		t := &StructType{Name: node.Name.Value, Fields: make([]string, 0, len(node.Fields))}
+		for _, f := range node.Fields {
+			t.Fields = append(t.Fields, f.Name.Value)
+		}
+		env.Set(node.Name.Value, t)
+		return t, nil
+
 	case *IfStatement:
 		return i.evalIf(node, env)
 
@@ -352,8 +362,9 @@ func (i *Interpreter) evalExpression(expr Expression, env *Environment) (Object,
 	return nil, fmt.Errorf("cannot evaluate %T", expr)
 }
 
-// evalMember reads a name from an imported file: u.name. Only a file's
-// top-level names are reachable, and only through the alias the import gave it.
+// evalMember reads a name from an imported file (u.name), or a field of a
+// record (p.x). Only a file's top-level names are reachable, and only through
+// the alias the import gave it.
 func (i *Interpreter) evalMember(node *MemberExpression, env *Environment) (Object, error) {
 	if id, ok := node.Object.(*Identifier); ok {
 		if _, shadowed := env.Get(id.Value); !shadowed {
@@ -366,7 +377,16 @@ func (i *Interpreter) evalMember(node *MemberExpression, env *Environment) (Obje
 			}
 		}
 	}
-	return nil, at(node.Token, "property access (.%s) is not supported yet", node.Property.Value)
+
+	obj, err := i.evalExpression(node.Object, env)
+	if err != nil {
+		return nil, err
+	}
+	value, err := getField(obj, node.Property.Value)
+	if err != nil {
+		return nil, at(node.Token, "%s", err)
+	}
+	return value, nil
 }
 
 func (i *Interpreter) evalIdentifier(node *Identifier, env *Environment) (Object, error) {
@@ -628,6 +648,14 @@ func (i *Interpreter) evalAssign(node *AssignExpression, env *Environment) (Obje
 				}
 			}
 		}
+		obj, err := i.evalExpression(target.Object, env)
+		if err != nil {
+			return nil, err
+		}
+		if err := setField(obj, target.Property.Value, value); err != nil {
+			return nil, at(target.Token, "%s", err)
+		}
+		return value, nil
 	}
 
 	return nil, at(node.Token, "cannot assign to this expression")
@@ -674,6 +702,13 @@ func (i *Interpreter) evalCall(node *CallExpression, env *Environment) (Object, 
 			return nil, at(node.Token, "%s", err)
 		}
 		return result, nil
+	case *StructType:
+		// A record type is called to make an instance, the way a class is.
+		value, err := newStruct(fn, args)
+		if err != nil {
+			return nil, at(node.Token, "%s", err)
+		}
+		return value, nil
 	}
 
 	return nil, at(node.Token, "%s is not callable", callee.Type())
@@ -814,6 +849,19 @@ func objectsEqual(a, b Object) bool {
 		}
 		for idx := range av.Elements {
 			if !objectsEqual(av.Elements[idx], bv.Elements[idx]) {
+				return false
+			}
+		}
+		return true
+	case *Struct:
+		// Two records are equal when they are the same kind of record and
+		// every field holds an equal value, the same way two arrays are.
+		bv, ok := b.(*Struct)
+		if !ok || av.Def.Name != bv.Def.Name || len(av.Fields) != len(bv.Fields) {
+			return false
+		}
+		for idx := range av.Fields {
+			if !objectsEqual(av.Fields[idx], bv.Fields[idx]) {
 				return false
 			}
 		}

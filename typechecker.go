@@ -21,7 +21,27 @@ const (
 	TypeArray
 	TypeMap
 	TypeFn
+	// TypeStruct is an instance of a declared record type, and TypeStructType
+	// is the type name itself, which is a value: `Point` in `Point(1, 2)`.
+	TypeStruct
+	TypeStructType
 )
+
+// StructInfo is one record type's shape: the name it was declared under and its
+// fields, in the order they were written. The name and every value of that type
+// point at the same info, so a field may name a struct written further down the
+// file — including the struct it is itself a field of — without the shape
+// having to be finished when the field is read.
+type StructInfo struct {
+	Name   string
+	Fields []StructField
+}
+
+// StructField is one field of a record type.
+type StructField struct {
+	Name string
+	Type *Type
+}
 
 // Type describes the type of a value.
 type Type struct {
@@ -30,6 +50,7 @@ type Type struct {
 	Params   []*Type // functions
 	Ret      *Type   // functions
 	Variadic bool
+	Struct   *StructInfo // record types
 }
 
 var (
@@ -43,6 +64,40 @@ var (
 )
 
 func arrayOf(elem *Type) *Type { return &Type{Kind: TypeArray, Elem: elem} }
+
+// structTypeValue is the type of a struct's name: the value `Point`, which can
+// be called to build an instance and can be passed around like any other value.
+func structTypeValue(info *StructInfo) *Type {
+	return &Type{Kind: TypeStructType, Struct: info}
+}
+
+// structInstance is the type of an instance of a record, the type `Point(1, 2)`
+// has.
+func structInstance(info *StructInfo) *Type {
+	return &Type{Kind: TypeStruct, Struct: info}
+}
+
+// structName reports the name a record type was declared under. Only the two
+// record kinds have one.
+func structName(t *Type) string {
+	if t.Struct == nil {
+		return ""
+	}
+	return t.Struct.Name
+}
+
+// fieldOf finds one of a record's fields by name.
+func fieldOf(t *Type, name string) (StructField, bool) {
+	if t.Struct == nil {
+		return StructField{}, false
+	}
+	for _, f := range t.Struct.Fields {
+		if f.Name == name {
+			return f, true
+		}
+	}
+	return StructField{}, false
+}
 
 // mapOf describes a map. Jin has no record types, so a map is how a value with
 // named fields is written; that means its values are free to differ in type and
@@ -91,6 +146,11 @@ func (t *Type) String() string {
 			parts[len(parts)-1] += "..."
 		}
 		return "fn(" + strings.Join(parts, ", ") + ") -> " + t.Ret.String()
+	case TypeStruct, TypeStructType:
+		if t.Struct == nil {
+			return "?"
+		}
+		return t.Struct.Name
 	}
 	return "?"
 }
@@ -114,6 +174,11 @@ func assignable(target, value *Type) bool {
 	switch target.Kind {
 	case TypeArray, TypeMap:
 		return assignable(target.Elem, value.Elem)
+	case TypeStruct, TypeStructType:
+		// Records are matched by name: the name is what the value carries at
+		// run time, and one record type is not another even when their fields
+		// happen to line up.
+		return structName(target) == structName(value)
 	case TypeFn:
 		if len(target.Params) != len(value.Params) {
 			return false
@@ -141,6 +206,14 @@ func unify(a, b *Type) *Type {
 	}
 	if a.Kind != b.Kind {
 		return anyT
+	}
+	if a.Kind == TypeStruct || a.Kind == TypeStructType {
+		// Two different record types have no common type but `any`, unless
+		// they are the same record, in which case that record is the answer.
+		if structName(a) != structName(b) {
+			return anyT
+		}
+		return a
 	}
 	if a.Kind == TypeArray {
 		return arrayOf(unify(a.Elem, b.Elem))
@@ -328,8 +401,42 @@ func (c *Checker) lookup(name string) (*Type, bool) {
 	return nil, false
 }
 
-// predeclare registers every top-level function so calls can go in any order.
+// predeclare registers every top-level function so calls can go in any order,
+// and every record type, whose fields are resolved in a second pass.
 func (c *Checker) predeclare(program *Program) {
+	// Record names go in first, all of them, so a field may name a struct
+	// written further down the file — including the struct it is a field of,
+	// which is how a linked node is written.
+	type declared struct {
+		info *StructInfo
+		node *StructStatement
+	}
+	var records []declared
+	for _, stmt := range program.Statements {
+		if node, ok := stmt.(*StructStatement); ok {
+			info := &StructInfo{Name: node.Name.Value}
+			c.declare(node.Name.Value, structTypeValue(info))
+			records = append(records, declared{info: info, node: node})
+		}
+	}
+
+	// Only now are the field types read, so every name they might use is
+	// already known.
+	for _, rec := range records {
+		seen := map[string]bool{}
+		for _, f := range rec.node.Fields {
+			if seen[f.Name.Value] {
+				c.errorf(f.Token, "duplicate field %q in struct %s", f.Name.Value, rec.info.Name)
+				continue
+			}
+			seen[f.Name.Value] = true
+			rec.info.Fields = append(rec.info.Fields, StructField{
+				Name: f.Name.Value,
+				Type: c.annotationType(f.Type),
+			})
+		}
+	}
+
 	for _, stmt := range program.Statements {
 		if fn, ok := stmt.(*FunctionStatement); ok {
 			c.declare(fn.Name.Value, c.fnSignature(fn.Parameters, fn.ReturnType))
@@ -362,6 +469,13 @@ func (c *Checker) annotationType(ann *TypeAnnotation) *Type {
 	case "any":
 		return anyT
 	}
+
+	// A type name that is not built in may be a record declared in this file,
+	// which is what makes `let p: Point = ...` and a field of type Point work.
+	if t, ok := c.lookup(ann.Name); ok && t.Kind == TypeStructType {
+		return structInstance(t.Struct)
+	}
+
 	c.errorf(ann.Token, "unknown type %q", ann.Name)
 	return anyT
 }
@@ -391,6 +505,12 @@ func (c *Checker) checkStatement(stmt Statement) *Type {
 	case *ImportStatement:
 		// The file it names was checked before this one, and its top-level
 		// types are in c.modules, so there is nothing to check here.
+		return nilT
+
+	case *StructStatement:
+		// A record type is declared, and its field types are resolved, in
+		// predeclare. There is nothing left to check by the time its statement
+		// is reached.
 		return nilT
 
 	case *ExpressionStatement:
@@ -661,9 +781,9 @@ func (c *Checker) checkExpression(expr Expression) *Type {
 	return anyT
 }
 
-// checkMember reads a name from an imported file: u.name. The type is the one
-// recorded when that file was checked, so calling u.helper() is checked against
-// helper's real parameters.
+// checkMember reads a name from an imported file (u.name), or a field of a
+// record (p.x). The module case is settled first, because an alias is not a
+// value; everything else is asked what it is, and only a record has fields.
 func (c *Checker) checkMember(node *MemberExpression) *Type {
 	if id, ok := node.Object.(*Identifier); ok {
 		if _, shadowed := c.lookup(id.Value); !shadowed {
@@ -676,8 +796,26 @@ func (c *Checker) checkMember(node *MemberExpression) *Type {
 			}
 		}
 	}
-	// Property access on a value is not implemented yet; the run time reports
-	// it when the program gets there.
+
+	objType := c.checkExpression(node.Object)
+	switch objType.Kind {
+	case TypeStruct:
+		if f, ok := fieldOf(objType, node.Property.Value); ok {
+			return f.Type
+		}
+		c.errorf(node.Token, "%s has no field %q", objType, node.Property.Value)
+		return anyT
+	case TypeStructType:
+		c.errorf(node.Token, "cannot read a field of the type %s; make a %s first", objType, objType)
+		return anyT
+	case TypeAny:
+		// The value's shape is unknown, so the run time has the last word.
+		return anyT
+	case TypeMap:
+		c.errorf(node.Token, `cannot read a field of map; use m[%q] to read a key`, node.Property.Value)
+		return anyT
+	}
+	c.errorf(node.Token, "cannot read a field of %s", objType)
 	return anyT
 }
 
@@ -871,6 +1009,28 @@ func (c *Checker) checkAssign(node *AssignExpression) *Type {
 				}
 			}
 		}
+
+		objType := c.checkExpression(target.Object)
+		switch objType.Kind {
+		case TypeStruct:
+			f, ok := fieldOf(objType, target.Property.Value)
+			if !ok {
+				c.errorf(target.Token, "%s has no field %q", objType, target.Property.Value)
+				return valueType
+			}
+			if !assignable(f.Type, valueType) {
+				c.errorf(target.Token, "cannot assign %s to %s field %q", valueType, f.Type, target.Property.Value)
+			}
+			return valueType
+		case TypeStructType:
+			c.errorf(target.Token, "cannot assign a field of the type %s; make a %s first", objType, objType)
+			return valueType
+		case TypeAny:
+			// The value's shape is unknown, so the run time has the last word.
+			return valueType
+		}
+		c.errorf(target.Token, "cannot assign a field of %s", objType)
+		return valueType
 	}
 
 	c.errorf(node.Token, "cannot assign to this expression")
@@ -943,6 +1103,12 @@ func (c *Checker) checkCall(node *CallExpression) *Type {
 	calleeType := c.checkExpression(node.Function)
 	argTypes := c.checkArgs(node.Arguments)
 
+	// A record type's name is a constructor: Point(1, 2) makes an instance
+	// whose fields are the values, in the order the struct declared them.
+	if calleeType.Kind == TypeStructType {
+		return c.checkConstructor(calleeType, argTypes, node.Token)
+	}
+
 	if calleeType.Kind == TypeAny {
 		return anyT
 	}
@@ -970,6 +1136,23 @@ func (c *Checker) checkCall(node *CallExpression) *Type {
 	}
 
 	return calleeType.Ret
+}
+
+// checkConstructor checks a call of a record type's name: one value per field,
+// in the order the fields were declared, each of them the right type.
+func (c *Checker) checkConstructor(t *Type, argTypes []*Type, tok Token) *Type {
+	info := t.Struct
+	instance := structInstance(info)
+	if len(argTypes) != len(info.Fields) {
+		c.errorf(tok, "%s(...) expects %d value(s), got %d", t, len(info.Fields), len(argTypes))
+		return instance
+	}
+	for i, f := range info.Fields {
+		if !assignable(f.Type, argTypes[i]) {
+			c.errorf(tok, "field %q: cannot use %s where %s is expected", f.Name, argTypes[i], f.Type)
+		}
+	}
+	return instance
 }
 
 func (c *Checker) checkArgs(args []Expression) []*Type {

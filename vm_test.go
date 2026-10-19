@@ -917,6 +917,74 @@ fn while_version() {
 print(while_version())`,
 		want: "[0, 2]\n2\n[0, 10, 30]\n",
 	},
+	{
+		name: "records: build, read and write a field",
+		source: `struct Point { x: int, y: int }
+
+let p = Point(1, 2)
+print(p)
+p.x = 10
+print(p.x, p.y, p)
+
+fn shift(pt: Point, d: int) -> Point {
+    pt.x = pt.x + d
+    pt.y = pt.y + d
+    return pt
+}
+let moved = shift(p, 5)
+print(moved, p, moved == p)`,
+		want: "Point{x: 1, y: 2}\n10 2 Point{x: 10, y: 2}\nPoint{x: 15, y: 7} Point{x: 15, y: 7} true\n",
+	},
+	{
+		name: "records: a record inside a record, an array and a map",
+		source: `struct Point { x: int, y: int }
+struct Line { a: Point, b: Point }
+
+let l = Line(Point(0, 0), Point(3, 4))
+print(l)
+print(l.b.y, type(l), type(l.a))
+print(l.a == Point(0, 0), l.a == Point(1, 0))
+
+let pts = [Point(1, 1), Point(2, 2)]
+print(pts)
+print(len(pts), pts[1].y)
+let named = {"origin": Point(0, 0)}
+print(named["origin"], named["origin"].x)`,
+		want: "Line{a: Point{x: 0, y: 0}, b: Point{x: 3, y: 4}}\n" +
+			"4 Line Point\ntrue false\n" +
+			"[Point{x: 1, y: 1}, Point{x: 2, y: 2}]\n2 2\n" +
+			"Point{x: 0, y: 0} 0\n",
+	},
+	{
+		name: "records: an assignment is an expression",
+		source: `let a = [1, 2, 3]
+print(1 + (a[0] = 5))
+print(a)
+struct Point { x: int, y: int }
+let p = Point(1, 2)
+print((p.x = 7) * 2, p)
+print((p.y = 3) == 3, p)
+let m = {"k": 0}
+print((m["k"] = 9) + 1, m)`,
+		want: "6\n[5, 2, 3]\n14 Point{x: 7, y: 2}\ntrue Point{x: 7, y: 3}\n10 {\"k\": 9}\n",
+	},
+	{
+		name: "records: a field holding the same record again",
+		source: `struct Node { value: int, next: Node }
+
+let head = Node(1, Node(2, Node(3, nil)))
+let n = head
+let total = 0
+while n != nil {
+    total = total + n.value
+    n = n.next
+}
+print(total)
+print(head.next.next.value, type(head.next))
+print(head)`,
+		want: "6\n3 Node\n" +
+			"Node{value: 1, next: Node{value: 2, next: Node{value: 3, next: nil}}}\n",
+	},
 }
 
 func TestProgramsAgreeAcrossEngines(t *testing.T) {

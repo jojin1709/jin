@@ -67,6 +67,20 @@ func (p *Parameter) String() string {
 	return p.Name.String()
 }
 
+// Field is one named, typed slot in a struct.
+type Field struct {
+	Token Token
+	Name  *Identifier
+	Type  *TypeAnnotation
+}
+
+func (f *Field) String() string {
+	if f.Type != nil {
+		return f.Name.String() + ": " + f.Type.String()
+	}
+	return f.Name.String()
+}
+
 // ---------------------------------------------------------------- statements
 
 // LetStatement declares a variable: let name: type = value
@@ -135,6 +149,24 @@ func (s *ImportStatement) statementNode()       {}
 func (s *ImportStatement) TokenLiteral() string { return s.Token.Literal }
 func (s *ImportStatement) String() string {
 	return "import \"" + s.Path + "\" as " + s.Alias.String()
+}
+
+// StructStatement declares a user-defined record type:
+// struct Point { x: int, y: int }
+type StructStatement struct {
+	Token  Token
+	Name   *Identifier
+	Fields []*Field
+}
+
+func (s *StructStatement) statementNode()       {}
+func (s *StructStatement) TokenLiteral() string { return s.Token.Literal }
+func (s *StructStatement) String() string {
+	parts := make([]string, 0, len(s.Fields))
+	for _, f := range s.Fields {
+		parts = append(parts, f.String())
+	}
+	return "struct " + s.Name.String() + " { " + strings.Join(parts, ", ") + " }"
 }
 
 // ReturnStatement returns a value from a function.

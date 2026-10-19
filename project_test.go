@@ -320,7 +320,7 @@ func TestAnAliasIsUsedOncePerFile(t *testing.T) {
 }
 
 func TestAnAliasMayNotClashWithAnOwnName(t *testing.T) {
-	for _, decl := range []string{"let u = 1", "fn u() { return 1 }"} {
+	for _, decl := range []string{"let u = 1", "fn u() { return 1 }", "struct u { x: int }"} {
 		t.Run(decl, func(t *testing.T) {
 			dir := writeFiles(t, map[string]string{
 				"main.jin":  "import \"utils\" as u\n" + decl,
@@ -762,6 +762,20 @@ func TestProjectsAgreeAcrossEngines(t *testing.T) {
 				"call.jin": "fn apply(n: int) -> int {\n    return twice(n)\n}",
 			},
 			want: "42\n",
+		},
+		{
+			name: "a struct imported from a module",
+			files: map[string]string{
+				"main.jin": "import \"geo\" as geo\n" +
+					"let p = geo.Point(10, 20)\n" +
+					"p.x = p.x + 5\n" +
+					"print(p, p.x, p.y, geo.scale(p, 2))",
+				"geo.jin": "struct Point { x: int, y: int }\n" +
+					"fn scale(p: Point, f: int) -> Point {\n" +
+					"    return Point(p.x * f, p.y * f)\n" +
+					"}",
+			},
+			want: "Point{x: 15, y: 20} 15 20 Point{x: 30, y: 40}\n",
 		},
 	}
 

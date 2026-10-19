@@ -6,8 +6,8 @@
 
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
-[![Build](https://img.shields.io/badge/build-stage%207%20of%207-blueviolet)](#project-status)
-[![Tests](https://img.shields.io/badge/tests-313%20passing-brightgreen)](#testing)
+[![Build](https://img.shields.io/badge/build-stage%208%20of%208-blueviolet)](#project-status)
+[![Tests](https://img.shields.io/badge/tests-323%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -34,6 +34,7 @@ manager — in pure Go, with no third-party dependencies.
 - [The design rules](#the-design-rules)
 - [Language tour](#language-tour)
   - [Built-ins](#built-ins)
+- [Records](#records)
 - [Maps](#maps)
 - [Files](#files)
 - [Types are optional, but checked](#types-are-optional-but-checked)
@@ -272,10 +273,39 @@ it, in the type checker as well as at run time.
 
 ---
 
+## Records
+
+User-defined types with named fields are declared with `struct` and constructed
+like a function call. Records are reference values, so passing one to a function
+allows that function to modify its fields:
+
+```jin
+struct Point { x: int, y: int }
+
+let p = Point(10, 20)
+p.x = 15
+print(p)                # Point{x: 15, y: 20}
+print(p.x, p.y)         # 15 20
+
+fn shift(pt: Point, d: int) -> Point {
+    pt.x = pt.x + d
+    pt.y = pt.y + d
+    return pt
+}
+shift(p, 5)
+print(p)                # Point{x: 20, y: 25}
+```
+
+Records can be nested, stored in arrays and maps, and even refer to their own
+type recursively (e.g., `struct Node { value: int, next: Node }`). See
+`examples/records.jin` for a runnable walkthrough.
+
+---
+
 ## Maps
 
-A map is the way to write a value with named fields, and it is the only one, so
-its values may have different types:
+A map is how arbitrary key-value pairs are stored. Unlike records, map keys can
+be dynamically added, queried with `has`, and deleted:
 
 ```jin
 let server = {"host": "local", "port": 8080, "up": true}
@@ -540,7 +570,7 @@ there is no separate artefact to keep in step with the source.
 
 ### The pipeline
 
-A language is built as a pipeline. Jin is through stage 7:
+A language is built as a pipeline. Jin is through stage 8:
 
 ```
 source text
@@ -561,7 +591,7 @@ syntax tree
 bytecode               (code.go)
    |  vm.go           -> result
    v
-values                 (object.go, symboltable.go, builtins.go)
+values                 (object.go, record.go, symboltable.go, builtins.go)
 
 alternate back end
 syntax tree
@@ -684,13 +714,14 @@ prints, and on where it fails when a module, an alias or an import path is wrong
 - [x] Stage 6: standard library
 - [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
 - [x] Stage 7: package manager + CLI — imports, projects, `jin new` / `jin build`, `args()`
+- [x] Stage 8: records — user-defined struct types, constructors, dotted field access and mutation
 
-Current version: `0.7.0 (stage 7: projects and imports)` — see `jin --version`.
+Current version: `0.8.0 (stage 8: records)` — see `jin --version`.
 
 ### What is in, and what is not
 
-In: maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
-`error`, and file reading and writing. `examples/collections.jin` and
+In: records, maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
+`error`, and file reading and writing. `examples/records.jin`, `examples/collections.jin` and
 `examples/files.jin` exercise all of it. Multi-file programs are in too:
 `import "utils" as u` puts another file's top-level names behind an alias, a
 folder with a `jin.toml` is a project, and `jin new`, `jin build`, `jin check`
@@ -708,16 +739,12 @@ Not in, and honest about it:
   `file_exists` and `has` are how you check before acting.
 - No user-supplied comparison for `sort`. It orders numbers or strings, and
   refuses an array that mixes them instead of guessing.
-- No user-defined types or records. A map is the record type, which is why a
-  map's values are allowed to differ in type while an array's are not.
 - No `input` from the terminal yet; the REPL is the only interactive path.
-- No property access on a *value*: `a.b` reads a name from the file `a` names,
-  and nothing else, so there are no records with dotted fields yet.
 - No string literals spanning lines.
 
 ### Roadmap
 
-- **Stage 8 — remote packages:** a registry and a versioned lock file, so
+- **Stage 9 — remote packages:** a registry and a versioned lock file, so
   `import "json" as json` can pull a package instead of a folder. The loader in
   `module.go` is where that lands: it already decides what a path means, what a
   project is, and how files depend on each other.

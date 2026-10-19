@@ -1,0 +1,54 @@
+# Records in Jin: user-defined types with named fields.
+#
+# Declared with 'struct', constructed like a function, accessed and
+# updated with dot notation. Records are reference types, so passing
+# one to a function allows that function to update its fields.
+
+struct Point {
+    x: int,
+    y: int
+}
+
+struct Circle {
+    center: Point,
+    radius: int
+}
+
+# Construct an instance
+let p = Point(10, 20)
+print("point:", p)
+print("x:", p.x, "y:", p.y)
+
+# Modify a field
+p.x = 15
+print("updated:", p)
+
+# Pass to a function (records are references)
+fn shift(pt: Point, dx: int, dy: int) -> Point {
+    pt.x = pt.x + dx
+    pt.y = pt.y + dy
+    return pt
+}
+
+shift(p, 5, -10)
+print("shifted:", p)
+
+# Nested records
+let c = Circle(Point(0, 0), 25)
+print("circle:", c)
+print("center x:", c.center.x, "radius:", c.radius)
+
+# Linked structures
+struct Node {
+    value: int,
+    next: Node
+}
+
+let head = Node(1, Node(2, Node(3, nil)))
+let curr = head
+let total = 0
+while curr != nil {
+    total = total + curr.value
+    curr = curr.next
+}
+print("sum of linked nodes:", total)

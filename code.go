@@ -54,6 +54,8 @@ const (
 	OpIterate        // replace the top with the values a for loop walks
 	OpIndex          // container[index]
 	OpSetIndex       // container[index] = value, leaving the value
+	OpGetField       // record.field
+	OpSetField       // record.field = value, leaving the value
 	OpCall           // call a function with n arguments
 	OpReturnValue    // return the top of the stack
 	OpCloseUpvalues  // copy the cells at and above a local slot off the stack
@@ -105,6 +107,8 @@ var definitions = map[Opcode]*definition{
 	OpIterate:        {"OpIterate", nil},
 	OpIndex:          {"OpIndex", nil},
 	OpSetIndex:       {"OpSetIndex", nil},
+	OpGetField:       {"OpGetField", []int{2}},
+	OpSetField:       {"OpSetField", []int{2}},
 	OpCall:           {"OpCall", []int{1}},
 	OpReturnValue:    {"OpReturnValue", nil},
 	OpCloseUpvalues:  {"OpCloseUpvalues", []int{2}},

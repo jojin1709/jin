@@ -460,3 +460,42 @@ func TestScopeRollbackUndoesFailedLine(t *testing.T) {
 		t.Fatalf("expected y to be undefined after rollback, got %v", errs)
 	}
 }
+
+func TestStructTypeChecking(t *testing.T) {
+	// Valid programs
+	expectClean(t, `struct Point { x: int, y: int }
+let p = Point(1, 2)
+p.x = 10
+let px: int = p.x`)
+
+	expectClean(t, `struct Node { value: int, next: Node }
+let n = Node(1, Node(2, nil))
+let v: int = n.value`)
+
+	expectClean(t, `struct User { name: str, active: bool }
+fn check(u: User) -> bool {
+    return u.active
+}`)
+
+	// Errors
+	expectTypeError(t, `struct Point { x: int, x: str }`, "duplicate field \"x\"")
+	expectTypeError(t, `struct Point { x: UnknownType }`, "unknown type \"UnknownType\"")
+	expectTypeError(t, `struct Point { x: int, y: int }
+Point(1)`, "expects 2 value(s), got 1")
+	expectTypeError(t, `struct Point { x: int, y: int }
+Point(1, "bad")`, "field \"y\": cannot use str where int is expected")
+	expectTypeError(t, `struct Point { x: int, y: int }
+let p = Point(1, 2)
+p.z`, "has no field \"z\"")
+	expectTypeError(t, `struct Point { x: int, y: int }
+let p = Point(1, 2)
+p.x = "str"`, "cannot assign str to int field \"x\"")
+	expectTypeError(t, `struct Point { x: int }
+Point.x`, "cannot read a field of the type Point")
+	expectTypeError(t, `struct Point { x: int }
+Point.x = 1`, "cannot assign a field of the type Point")
+	expectTypeError(t, `let m = {"a": 1}
+m.a`, "cannot read a field of map; use m[\"a\"]")
+	expectTypeError(t, `let x = 42
+x.a`, "cannot read a field of int")
+}

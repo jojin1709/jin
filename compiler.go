@@ -174,6 +174,8 @@ func (c *Compiler) predefineTopLevel(m *Module) {
 			c.symbols.Define(c.globalName(node.Name.Value))
 		case *FunctionStatement:
 			c.symbols.Define(c.globalName(node.Name.Value))
+		case *StructStatement:
+			c.symbols.Define(c.globalName(node.Name.Value))
 		}
 	}
 }
@@ -336,6 +338,8 @@ func statementToken(stmt Statement) Token {
 		return node.Token
 	case *FunctionStatement:
 		return node.Token
+	case *StructStatement:
+		return node.Token
 	case *ReturnStatement:
 		return node.Token
 	case *BlockStatement:
@@ -397,6 +401,19 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 		if err := c.compileFunction(node.Parameters, node.Body, node.Name.Value); err != nil {
 			return err
 		}
+		c.emit(OpDup)
+		c.emitSet(sym)
+		return nil
+
+	case *StructStatement:
+		// A struct is a run-time value: its name holds the type, so the name
+		// can be called like anything else to make an instance.
+		t := &StructType{Name: node.Name.Value, Fields: make([]string, 0, len(node.Fields))}
+		for _, f := range node.Fields {
+			t.Fields = append(t.Fields, f.Name.Value)
+		}
+		c.emit(OpConstant, c.addConstant(t))
+		sym := c.symbols.Define(c.globalName(node.Name.Value))
 		c.emit(OpDup)
 		c.emitSet(sym)
 		return nil
@@ -779,7 +796,16 @@ func (c *Compiler) compileExpression(expr Expression) error {
 				return nil
 			}
 		}
-		return c.fail(node.Token, "property access (.%s) is not supported yet", node.Property.Value)
+		// Anything else is a field of a value: push the value, then read the
+		// field by name. The compiler has no types, so whether the value is
+		// really a record, and really has that field, is settled when it runs
+		// — which the type checker has usually already done in advance.
+		if err := c.compileExpression(node.Object); err != nil {
+			return err
+		}
+		c.at(node.Token)
+		c.emit(OpGetField, c.addConstant(&String{Value: node.Property.Value}))
+		return nil
 	}
 
 	return fmt.Errorf("cannot compile %T", expr)
@@ -884,6 +910,18 @@ func (c *Compiler) compileAssign(node *AssignExpression) error {
 					id.Value, target.Property.Value)
 			}
 		}
+		// p.x = value: push the record, then the value, then write the field.
+		// The value is pushed second so it ends up on top, where the write
+		// expects it, and the write leaves the value behind as its result.
+		if err := c.compileExpression(target.Object); err != nil {
+			return err
+		}
+		if err := c.compileExpression(node.Value); err != nil {
+			return err
+		}
+		c.at(target.Token)
+		c.emit(OpSetField, c.addConstant(&String{Value: target.Property.Value}))
+		return nil
 	}
 
 	return c.fail(node.Token, "cannot assign to this expression")

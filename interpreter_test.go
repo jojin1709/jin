@@ -296,7 +296,7 @@ func TestRuntimeErrors(t *testing.T) {
 		{"5[0]", "cannot index"},
 		{"[1, 2][9]", "out of range"},
 		{"[1, 2] - [1]", "cannot use -"},
-		{"let a = 1\na.b", "not supported yet"},
+		{"let a = 1\na.b", "cannot read a field of int"},
 		{`"hi {1 +}"`, "bad interpolation"},
 	}
 	for _, c := range cases {

@@ -170,6 +170,8 @@ func (p *Parser) parseStatement() Statement {
 	switch p.curToken.Type {
 	case IMPORT:
 		return p.parseImportStatement()
+	case STRUCT:
+		return p.parseStructStatement()
 	case LET:
 		return p.parseLetStatement()
 	case FUNCTION:
@@ -209,6 +211,58 @@ func (p *Parser) parseImportStatement() *ImportStatement {
 		return nil
 	}
 	stmt.Alias = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	return stmt
+}
+
+// parseStructStatement reads a record type:
+//
+//	struct Point { x: int, y: int }
+//
+// Fields may be separated by a comma, or by nothing at all — a newline is a
+// separator in Jin, as it is anywhere else. The closing brace is left in
+// curToken, the way every other braced statement leaves it.
+func (p *Parser) parseStructStatement() *StructStatement {
+	stmt := &StructStatement{Token: p.curToken, Fields: []*Field{}}
+
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	p.nextToken() // move onto the first field, or the closing brace
+	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		if p.curTokenIs(COMMA) || p.curTokenIs(SEMICOLON) {
+			p.nextToken()
+			continue
+		}
+		if !p.curTokenIs(IDENT) {
+			p.errorf("expected a field name, got %s", p.curToken.Type)
+			return nil
+		}
+
+		field := &Field{
+			Token: p.curToken,
+			Name:  &Identifier{Token: p.curToken, Value: p.curToken.Literal},
+		}
+		if !p.expectPeek(COLON) {
+			return nil
+		}
+		if !p.expectPeek(IDENT) {
+			return nil
+		}
+		field.Type = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
+		stmt.Fields = append(stmt.Fields, field)
+
+		p.nextToken() // move onto the separator, the next field, or '}'
+	}
+
+	if !p.curTokenIs(RBRACE) {
+		p.errorf("expected }, got %s", p.curToken.Type)
+	}
 	return stmt
 }
 
@@ -429,6 +483,14 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 		if p.curTokenIs(IMPORT) {
 			p.errorf("'import' is only allowed at the top level of a file")
 			p.parseImportStatement()
+			p.nextToken()
+			continue
+		}
+		// A struct is a named type, and a type belongs to the file it is
+		// written in, so it cannot be declared inside a block.
+		if p.curTokenIs(STRUCT) {
+			p.errorf("'struct' is only allowed at the top level of a file")
+			p.parseStructStatement()
 			p.nextToken()
 			continue
 		}

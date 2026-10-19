@@ -64,6 +64,10 @@ func (m *Module) defines(name string) bool {
 			if node.Name.Value == name {
 				return true
 			}
+		case *StructStatement:
+			if node.Name.Value == name {
+				return true
+			}
 		}
 	}
 	return false

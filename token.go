@@ -52,6 +52,7 @@ const (
 	// Keywords
 	IMPORT   TokenType = "import"
 	AS       TokenType = "as"
+	STRUCT   TokenType = "struct"
 	FUNCTION TokenType = "fn"
 	LET      TokenType = "let"
 	IF       TokenType = "if"
@@ -90,6 +91,7 @@ func (t Token) Position() string {
 var keywords = map[string]TokenType{
 	"import":   IMPORT,
 	"as":       AS,
+	"struct":   STRUCT,
 	"fn":       FUNCTION,
 	"let":      LET,
 	"if":       IF,
