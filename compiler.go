@@ -65,7 +65,8 @@ type Compiler struct {
 	// Files already put into this chunk, and the namespaces handed out so far.
 	// A REPL reuses one compiler, so an import typed on one line stays usable
 	// on the next.
-	compiled map[*Module]bool
+	compiled    map[*Module]bool
+	structTypes map[string]*StructType
 }
 
 // NewCompiler prepares a compiler that shares a global symbol table. Pass nil
@@ -75,11 +76,12 @@ func NewCompiler(globals *SymbolTable) *Compiler {
 		globals = NewSymbolTable(true)
 	}
 	return &Compiler{
-		pool:     &constantPool{},
-		symbols:  globals,
-		root:     globals,
-		aliases:  map[string]*Module{},
-		compiled: map[*Module]bool{},
+		pool:        &constantPool{},
+		symbols:     globals,
+		root:        globals,
+		aliases:     map[string]*Module{},
+		compiled:    map[*Module]bool{},
+		structTypes: map[string]*StructType{},
 	}
 }
 
@@ -173,9 +175,20 @@ func (c *Compiler) predefineTopLevel(m *Module) {
 		case *LetStatement:
 			c.symbols.Define(c.globalName(node.Name.Value))
 		case *FunctionStatement:
-			c.symbols.Define(c.globalName(node.Name.Value))
+			if node.Receiver == nil {
+				c.symbols.Define(c.globalName(node.Name.Value))
+			}
 		case *StructStatement:
 			c.symbols.Define(c.globalName(node.Name.Value))
+			t := &StructType{
+				Name:    node.Name.Value,
+				Fields:  make([]string, 0, len(node.Fields)),
+				Methods: make(map[string]Object),
+			}
+			for _, f := range node.Fields {
+				t.Fields = append(t.Fields, f.Name.Value)
+			}
+			c.structTypes[c.globalName(node.Name.Value)] = t
 		}
 	}
 }
@@ -397,6 +410,21 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 		return nil
 
 	case *FunctionStatement:
+		if node.Receiver != nil {
+			t := c.structTypes[c.globalName(node.Receiver.Type.Name)]
+			if t == nil {
+				return c.fail(node.Receiver.Token, "unknown type %q for method %s", node.Receiver.Type.Name, node.Name.Value)
+			}
+			methodParams := append([]*Parameter{node.Receiver}, node.Parameters...)
+			methodFullName := node.Receiver.Type.Name + "." + node.Name.Value
+			if err := c.compileFunction(methodParams, node.Body, methodFullName); err != nil {
+				return err
+			}
+			typeConst := c.addConstant(t)
+			nameConst := c.addConstant(&String{Value: node.Name.Value})
+			c.emit(OpDefineMethod, typeConst, nameConst)
+			return nil
+		}
 		sym := c.symbols.Define(c.globalName(node.Name.Value))
 		if err := c.compileFunction(node.Parameters, node.Body, node.Name.Value); err != nil {
 			return err
@@ -408,9 +436,17 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 	case *StructStatement:
 		// A struct is a run-time value: its name holds the type, so the name
 		// can be called like anything else to make an instance.
-		t := &StructType{Name: node.Name.Value, Fields: make([]string, 0, len(node.Fields))}
-		for _, f := range node.Fields {
-			t.Fields = append(t.Fields, f.Name.Value)
+		t := c.structTypes[c.globalName(node.Name.Value)]
+		if t == nil {
+			t = &StructType{
+				Name:    node.Name.Value,
+				Fields:  make([]string, 0, len(node.Fields)),
+				Methods: make(map[string]Object),
+			}
+			for _, f := range node.Fields {
+				t.Fields = append(t.Fields, f.Name.Value)
+			}
+			c.structTypes[c.globalName(node.Name.Value)] = t
 		}
 		c.emit(OpConstant, c.addConstant(t))
 		sym := c.symbols.Define(c.globalName(node.Name.Value))
@@ -991,6 +1027,7 @@ func (c *Compiler) compileFunction(params []*Parameter, body *BlockStatement, na
 		functionName: name,
 		modulePrefix: c.modulePrefix,
 		aliases:      c.aliases,
+		structTypes:  c.structTypes,
 	}
 	child.position = Position{Line: body.Token.Line, Col: body.Token.Column, File: body.Token.File}
 

@@ -37,7 +37,11 @@ func dumpNode(sb *strings.Builder, n Node, indent int) {
 		dumpNode(sb, node.Value, indent+1)
 
 	case *FunctionStatement:
-		dumpLine(sb, indent, "Function %s(%s)", node.Name.Value, joinParams(node.Parameters))
+		if node.Receiver != nil {
+			dumpLine(sb, indent, "Method (%s: %s) %s(%s)", node.Receiver.Name.Value, node.Receiver.Type.String(), node.Name.Value, joinParams(node.Parameters))
+		} else {
+			dumpLine(sb, indent, "Function %s(%s)", node.Name.Value, joinParams(node.Parameters))
+		}
 		if node.ReturnType != nil {
 			dumpLine(sb, indent+1, "returns %s", node.ReturnType.String())
 		}

@@ -985,6 +985,61 @@ print(head)`,
 		want: "6\n3 Node\n" +
 			"Node{value: 1, next: Node{value: 2, next: Node{value: 3, next: nil}}}\n",
 	},
+	{
+		name: "records: method call, receiver mutation, and return value",
+		source: `struct Counter { count: int }
+
+fn (c: Counter) add(n: int) -> int {
+    c.count = c.count + n
+    return c.count
+}
+
+fn (c: Counter) get_val() -> int {
+    return c.count
+}
+
+let c = Counter(10)
+print(c.add(5))
+print(c.get_val(), c.count)
+c.add(20)
+print(c.get_val())`,
+		want: "15\n15 15\n35\n",
+	},
+	{
+		name: "records: method calling another method and bound method in variable",
+		source: `struct Point { x: int, y: int }
+
+fn (p: Point) sum() -> int {
+    return p.x + p.y
+}
+
+fn (p: Point) scale_and_sum(factor: int) -> int {
+    p.x = p.x * factor
+    p.y = p.y * factor
+    return p.sum()
+}
+
+let pt = Point(2, 3)
+print(pt.sum())
+print(pt.scale_and_sum(10))
+print(pt)
+
+let f = pt.sum
+print(f())`,
+		want: "5\n50\nPoint{x: 20, y: 30}\n50\n",
+	},
+	{
+		name: "records: method defined before struct declaration",
+		source: `fn (p: Point) describe() -> str {
+    return "({p.x}, {p.y})"
+}
+
+struct Point { x: int, y: int }
+
+let p = Point(7, 9)
+print(p.describe())`,
+		want: "(7, 9)\n",
+	},
 }
 
 func TestProgramsAgreeAcrossEngines(t *testing.T) {

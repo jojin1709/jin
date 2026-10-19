@@ -10,8 +10,9 @@ import "fmt"
 // what lets it be passed around, stored in variables and reached through an
 // import alias as u.Point.
 type StructType struct {
-	Name   string
-	Fields []string // the field names, in the order they were declared
+	Name    string
+	Fields  []string          // the field names, in the order they were declared
+	Methods map[string]Object // method name -> *Closure (VM) or *Function (Interpreter)
 }
 
 // Type reports the type's own name, so a message about a Point reads the same
@@ -66,6 +67,16 @@ func newStruct(t *StructType, values []Object) (Object, error) {
 
 // ---------------------------------------------------------------- field access
 
+// BoundMethod pairs a record instance with a method, so pt.length is a
+// callable value that passes pt as the receiver.
+type BoundMethod struct {
+	Receiver *Struct
+	Method   Object // *Closure or *Function
+}
+
+func (o *BoundMethod) Type() ObjectType { return FUNCTION_OBJ }
+func (o *BoundMethod) Inspect() string  { return "<method " + repr(o.Method) + ">" }
+
 // fieldName reads the field name an OpGetField or OpSetField carries. It is
 // always the constant the compiler put there, so a missing one would be a
 // compiler bug rather than something a program can reach.
@@ -76,13 +87,18 @@ func fieldName(obj Object) string {
 	return ""
 }
 
-// getField reads one field of one record. The message for a name the record
-// does not have is built here and nowhere else, so the two back ends cannot
-// report it differently.
+// getField reads one field or method of one record. The message for a name the
+// record does not have is built here and nowhere else, so the two back ends
+// cannot report it differently.
 func getField(obj Object, name string) (Object, error) {
 	if s, ok := obj.(*Struct); ok {
 		if i, found := s.Def.index(name); found {
 			return s.Fields[i], nil
+		}
+		if s.Def.Methods != nil {
+			if m, found := s.Def.Methods[name]; found {
+				return &BoundMethod{Receiver: s, Method: m}, nil
+			}
 		}
 		return nil, fmt.Errorf("%s has no field %q", s.Def.Name, name)
 	}
@@ -96,6 +112,11 @@ func setField(obj Object, name string, value Object) error {
 		if i, found := s.Def.index(name); found {
 			s.Fields[i] = value
 			return nil
+		}
+		if s.Def.Methods != nil {
+			if _, found := s.Def.Methods[name]; found {
+				return fmt.Errorf("cannot assign to method %q of %s", name, s.Def.Name)
+			}
 		}
 		return fmt.Errorf("%s has no field %q", s.Def.Name, name)
 	}

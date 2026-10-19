@@ -23,20 +23,26 @@ print("x:", p.x, "y:", p.y)
 p.x = 15
 print("updated:", p)
 
-# Pass to a function (records are references)
-fn shift(pt: Point, dx: int, dy: int) -> Point {
+# Methods on records: declared with receiver syntax at the top level
+fn (pt: Point) move(dx: int, dy: int) -> Point {
     pt.x = pt.x + dx
     pt.y = pt.y + dy
     return pt
 }
 
-shift(p, 5, -10)
-print("shifted:", p)
+p.move(5, -10)
+print("moved via method:", p)
 
 # Nested records
 let c = Circle(Point(0, 0), 25)
 print("circle:", c)
 print("center x:", c.center.x, "radius:", c.radius)
+
+fn (c: Circle) area() -> int {
+    return 3 * c.radius * c.radius
+}
+
+print("circle area:", c.area())
 
 # Linked structures
 struct Node {

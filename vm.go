@@ -389,6 +389,18 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			// Assignment is an expression, so the value stays on the stack.
 			vm.push(value)
 
+		case OpDefineMethod:
+			typeIndex := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			nameIndex := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			method := vm.pop()
+			st := vm.constants[typeIndex].(*StructType)
+			if st.Methods == nil {
+				st.Methods = make(map[string]Object)
+			}
+			st.Methods[fieldName(vm.constants[nameIndex])] = method
+
 		case OpCall:
 			argc := int(ReadUint8(ins[frame.ip:]))
 			frame.ip++
@@ -524,6 +536,15 @@ func (vm *VM) call(argc int) error {
 		}
 		vm.push(value)
 		return nil
+
+	case *BoundMethod:
+		vm.push(nilObject)
+		for i := vm.sp - 1; i > calleeIndex+1; i-- {
+			vm.stack[i] = vm.stack[i-1]
+		}
+		vm.stack[calleeIndex+1] = fn.Receiver
+		vm.stack[calleeIndex] = fn.Method
+		return vm.call(argc + 1)
 	}
 
 	return vm.errorf("%s is not callable", callee.Type())

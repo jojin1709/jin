@@ -56,6 +56,7 @@ const (
 	OpSetIndex       // container[index] = value, leaving the value
 	OpGetField       // record.field
 	OpSetField       // record.field = value, leaving the value
+	OpDefineMethod   // attach a method closure to a struct type
 	OpCall           // call a function with n arguments
 	OpReturnValue    // return the top of the stack
 	OpCloseUpvalues  // copy the cells at and above a local slot off the stack
@@ -109,6 +110,7 @@ var definitions = map[Opcode]*definition{
 	OpSetIndex:       {"OpSetIndex", nil},
 	OpGetField:       {"OpGetField", []int{2}},
 	OpSetField:       {"OpSetField", []int{2}},
+	OpDefineMethod:   {"OpDefineMethod", []int{2, 2}},
 	OpCall:           {"OpCall", []int{1}},
 	OpReturnValue:    {"OpReturnValue", nil},
 	OpCloseUpvalues:  {"OpCloseUpvalues", []int{2}},

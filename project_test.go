@@ -777,6 +777,24 @@ func TestProjectsAgreeAcrossEngines(t *testing.T) {
 			},
 			want: "Point{x: 15, y: 20} 15 20 Point{x: 30, y: 40}\n",
 		},
+		{
+			name: "a struct method imported from a module",
+			files: map[string]string{
+				"main.jin": "import \"geo\" as geo\n" +
+					"let p = geo.Point(10, 20)\n" +
+					"p.move(5, 5)\n" +
+					"print(p, p.area())",
+				"geo.jin": "struct Point { x: int, y: int }\n" +
+					"fn (p: Point) move(dx: int, dy: int) {\n" +
+					"    p.x = p.x + dx\n" +
+					"    p.y = p.y + dy\n" +
+					"}\n" +
+					"fn (p: Point) area() -> int {\n" +
+					"    return p.x * p.y\n" +
+					"}",
+			},
+			want: "Point{x: 15, y: 25} 375\n",
+		},
 	}
 
 	for _, tc := range cases {

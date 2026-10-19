@@ -499,3 +499,52 @@ m.a`, "cannot read a field of map; use m[\"a\"]")
 	expectTypeError(t, `let x = 42
 x.a`, "cannot read a field of int")
 }
+
+func TestRecordMethodsTypeChecking(t *testing.T) {
+	// Valid method definitions and calls
+	expectClean(t, `struct Point { x: int, y: int }
+fn (p: Point) sum() -> int {
+    return p.x + p.y
+}
+let pt = Point(3, 4)
+let total: int = pt.sum()`)
+
+	expectClean(t, `struct Counter { count: int }
+fn (c: Counter) bump(amount: int) -> int {
+    c.count = c.count + amount
+    return c.count
+}
+let c = Counter(0)
+c.bump(5)`)
+
+	expectClean(t, `struct Point { x: int, y: int }
+fn (p: Point) clone() -> Point {
+    return Point(p.x, p.y)
+}
+let p = Point(1, 2)
+let p2: Point = p.clone()`)
+
+	// Errors
+	expectTypeError(t, `fn (p: Unknown) foo() {}`, "cannot define method on unknown type \"Unknown\"")
+	expectTypeError(t, `struct Point { x: int }
+fn (p: Point) x() {}`, "method \"x\" clashes with field of struct Point")
+	expectTypeError(t, `struct Point { x: int }
+fn (p: Point) foo() {}
+fn (p: Point) foo() {}`, "duplicate method \"foo\" on struct Point")
+	expectTypeError(t, `struct Point { x: int }
+fn (p: Point) add(a: int) -> int { return p.x + a }
+let p = Point(1)
+p.add()`, "expects 1 argument(s), got 0")
+	expectTypeError(t, `struct Point { x: int }
+fn (p: Point) add(a: int) -> int { return p.x + a }
+let p = Point(1)
+p.add("not an int")`, "cannot use str where int is expected")
+	expectTypeError(t, `struct Point { x: int }
+fn (p: Point) length() -> int { return p.x }
+let p = Point(1)
+p.length = 10`, "cannot assign to method \"length\" of Point")
+	expectTypeError(t, `struct Point { x: int }
+fn (p: Point) badReturn() -> int {
+    return "not an int"
+}`, "cannot return str from a function declared to return int")
+}

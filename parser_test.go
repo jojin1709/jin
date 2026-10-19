@@ -319,3 +319,38 @@ func TestParseStructInsideBlockRejected(t *testing.T) {
 		t.Errorf("unexpected error message: %s", p.Errors()[0])
 	}
 }
+
+func TestParseMethod(t *testing.T) {
+	src := `fn (p: Point) length() -> int { return p.x }`
+	program := parse(t, src)
+	if len(program.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(program.Statements))
+	}
+	fn, ok := program.Statements[0].(*FunctionStatement)
+	if !ok {
+		t.Fatalf("want FunctionStatement, got %T", program.Statements[0])
+	}
+	if fn.Receiver == nil {
+		t.Fatal("expected non-nil Receiver")
+	}
+	if fn.Receiver.Name.Value != "p" || fn.Receiver.Type.Name != "Point" {
+		t.Errorf("receiver mismatch: %+v", fn.Receiver)
+	}
+	if fn.Name.Value != "length" {
+		t.Errorf("name: want length, got %s", fn.Name.Value)
+	}
+	if fn.ReturnType == nil || fn.ReturnType.Name != "int" {
+		t.Errorf("return type mismatch: %+v", fn.ReturnType)
+	}
+}
+
+func TestParseMethodInsideBlockRejected(t *testing.T) {
+	p := NewParser(NewLexer(`fn f() { fn (p: Point) bad() {} }`))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Fatal("expected parse error for method inside block, got none")
+	}
+	if !strings.Contains(p.Errors()[0], "methods are only allowed at the top level") {
+		t.Errorf("unexpected error message: %s", p.Errors()[0])
+	}
+}

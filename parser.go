@@ -298,6 +298,30 @@ func (p *Parser) parseLetStatement() *LetStatement {
 func (p *Parser) parseFunctionStatement() *FunctionStatement {
 	stmt := &FunctionStatement{Token: p.curToken}
 
+	if p.peekTokenIs(LPAREN) {
+		p.nextToken() // move onto '('
+		p.nextToken() // move onto the receiver parameter name
+		if !p.curTokenIs(IDENT) {
+			p.errorf("expected a receiver name, got %s", p.curToken.Type)
+			return nil
+		}
+		receiver := &Parameter{
+			Token: p.curToken,
+			Name:  &Identifier{Token: p.curToken, Value: p.curToken.Literal},
+		}
+		if !p.expectPeek(COLON) {
+			return nil
+		}
+		if !p.expectPeek(IDENT) {
+			return nil
+		}
+		receiver.Type = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
+		if !p.expectPeek(RPAREN) {
+			return nil
+		}
+		stmt.Receiver = receiver
+	}
+
 	if !p.expectPeek(IDENT) {
 		return nil
 	}
@@ -491,6 +515,13 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 		if p.curTokenIs(STRUCT) {
 			p.errorf("'struct' is only allowed at the top level of a file")
 			p.parseStructStatement()
+			p.nextToken()
+			continue
+		}
+		// Methods are attached to a type, so they belong at the top level.
+		if p.curTokenIs(FUNCTION) && p.peekTokenIs(LPAREN) {
+			p.errorf("methods are only allowed at the top level of a file")
+			p.parseFunctionStatement()
 			p.nextToken()
 			continue
 		}

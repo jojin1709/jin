@@ -33,8 +33,9 @@ const (
 // file — including the struct it is itself a field of — without the shape
 // having to be finished when the field is read.
 type StructInfo struct {
-	Name   string
-	Fields []StructField
+	Name    string
+	Fields  []StructField
+	Methods map[string]*Type
 }
 
 // StructField is one field of a record type.
@@ -97,6 +98,15 @@ func fieldOf(t *Type, name string) (StructField, bool) {
 		}
 	}
 	return StructField{}, false
+}
+
+// methodOf finds one of a record's methods by name.
+func methodOf(t *Type, name string) (*Type, bool) {
+	if t.Struct == nil || t.Struct.Methods == nil {
+		return nil, false
+	}
+	m, ok := t.Struct.Methods[name]
+	return m, ok
 }
 
 // mapOf describes a map. Jin has no record types, so a map is how a value with
@@ -335,7 +345,12 @@ func (c *Checker) CheckProgram(program *Program) []string {
 		c.checkStatement(stmt)
 	}
 	for _, fn := range deferred {
-		c.checkFunctionBody(fn.Name.Value, fn.Parameters, fn.ReturnType, fn.Body, fn.Token)
+		if fn.Receiver != nil {
+			methodParams := append([]*Parameter{fn.Receiver}, fn.Parameters...)
+			c.checkFunctionBody(fn.Receiver.Type.Name+"."+fn.Name.Value, methodParams, fn.ReturnType, fn.Body, fn.Token)
+		} else {
+			c.checkFunctionBody(fn.Name.Value, fn.Parameters, fn.ReturnType, fn.Body, fn.Token)
+		}
 	}
 
 	sort.SliceStable(c.errors, func(i, j int) bool {
@@ -439,7 +454,28 @@ func (c *Checker) predeclare(program *Program) {
 
 	for _, stmt := range program.Statements {
 		if fn, ok := stmt.(*FunctionStatement); ok {
-			c.declare(fn.Name.Value, c.fnSignature(fn.Parameters, fn.ReturnType))
+			if fn.Receiver != nil {
+				recType, ok := c.lookup(fn.Receiver.Type.Name)
+				if !ok || recType.Kind != TypeStructType {
+					c.errorf(fn.Receiver.Token, "cannot define method on unknown type %q", fn.Receiver.Type.Name)
+					continue
+				}
+				info := recType.Struct
+				if _, hasField := fieldOf(structInstance(info), fn.Name.Value); hasField {
+					c.errorf(fn.Name.Token, "method %q clashes with field of struct %s", fn.Name.Value, info.Name)
+					continue
+				}
+				if info.Methods == nil {
+					info.Methods = make(map[string]*Type)
+				}
+				if _, hasMethod := info.Methods[fn.Name.Value]; hasMethod {
+					c.errorf(fn.Name.Token, "duplicate method %q on struct %s", fn.Name.Value, info.Name)
+					continue
+				}
+				info.Methods[fn.Name.Value] = c.fnSignature(fn.Parameters, fn.ReturnType)
+			} else {
+				c.declare(fn.Name.Value, c.fnSignature(fn.Parameters, fn.ReturnType))
+			}
 		}
 	}
 }
@@ -803,6 +839,9 @@ func (c *Checker) checkMember(node *MemberExpression) *Type {
 		if f, ok := fieldOf(objType, node.Property.Value); ok {
 			return f.Type
 		}
+		if m, ok := methodOf(objType, node.Property.Value); ok {
+			return m
+		}
 		c.errorf(node.Token, "%s has no field %q", objType, node.Property.Value)
 		return anyT
 	case TypeStructType:
@@ -1015,6 +1054,10 @@ func (c *Checker) checkAssign(node *AssignExpression) *Type {
 		case TypeStruct:
 			f, ok := fieldOf(objType, target.Property.Value)
 			if !ok {
+				if _, isMethod := methodOf(objType, target.Property.Value); isMethod {
+					c.errorf(target.Token, "cannot assign to method %q of %s", target.Property.Value, objType)
+					return valueType
+				}
 				c.errorf(target.Token, "%s has no field %q", objType, target.Property.Value)
 				return valueType
 			}

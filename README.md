@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://img.shields.io/badge/build-stage%208%20of%208-blueviolet)](#project-status)
-[![Tests](https://img.shields.io/badge/tests-323%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-330%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -273,27 +273,31 @@ it, in the type checker as well as at run time.
 
 ---
 
-## Records
+## Records and methods
 
 User-defined types with named fields are declared with `struct` and constructed
-like a function call. Records are reference values, so passing one to a function
-allows that function to modify its fields:
+like a function call. Methods are declared at the top level with receiver syntax
+`fn (p: Point) method(...)` and called as `p.method(...)`:
 
 ```jin
 struct Point { x: int, y: int }
 
-let p = Point(10, 20)
-p.x = 15
-print(p)                # Point{x: 15, y: 20}
-print(p.x, p.y)         # 15 20
-
-fn shift(pt: Point, d: int) -> Point {
-    pt.x = pt.x + d
-    pt.y = pt.y + d
-    return pt
+# A method on Point with 'p' as the receiver
+fn (p: Point) shift(dx: int, dy: int) -> Point {
+    p.x = p.x + dx
+    p.y = p.y + dy
+    return p
 }
-shift(p, 5)
-print(p)                # Point{x: 20, y: 25}
+
+let p = Point(10, 20)
+p.shift(5, -10)
+print(p)                # Point{x: 15, y: 10}
+print(p.x, p.y)         # 15 10
+
+# Bound methods are first-class values
+let moveFn = p.shift
+moveFn(1, 1)
+print(p)                # Point{x: 16, y: 11}
 ```
 
 Records can be nested, stored in arrays and maps, and even refer to their own
@@ -714,7 +718,7 @@ prints, and on where it fails when a module, an alias or an import path is wrong
 - [x] Stage 6: standard library
 - [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
 - [x] Stage 7: package manager + CLI — imports, projects, `jin new` / `jin build`, `args()`
-- [x] Stage 8: records — user-defined struct types, constructors, dotted field access and mutation
+- [x] Stage 8: records — user-defined struct types, constructors, receiver methods (`fn (p: Point)`), dotted field access and mutation
 
 Current version: `0.8.0 (stage 8: records)` — see `jin --version`.
 

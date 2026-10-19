@@ -79,6 +79,22 @@ func (i *Interpreter) runModule(m *Module) error {
 // runProgram executes every statement of one file, stopping if control flow
 // escapes to the top level.
 func (i *Interpreter) runProgram(program *Program, env *Environment) (Object, error) {
+	// Predeclare struct types so functions and methods can reference them
+	// regardless of statement order.
+	for _, stmt := range program.Statements {
+		if node, ok := stmt.(*StructStatement); ok {
+			t := &StructType{
+				Name:    node.Name.Value,
+				Fields:  make([]string, 0, len(node.Fields)),
+				Methods: make(map[string]Object),
+			}
+			for _, f := range node.Fields {
+				t.Fields = append(t.Fields, f.Name.Value)
+			}
+			env.Set(node.Name.Value, t)
+		}
+	}
+
 	var result Object = &Nil{}
 
 	for _, stmt := range program.Statements {
@@ -130,6 +146,28 @@ func (i *Interpreter) evalStatement(stmt Statement, env *Environment) (Object, e
 		return i.evalBlock(node, env)
 
 	case *FunctionStatement:
+		if node.Receiver != nil {
+			typeVal, ok := env.Get(node.Receiver.Type.Name)
+			if !ok {
+				return nil, at(node.Receiver.Token, "unknown type %q for method %s", node.Receiver.Type.Name, node.Name.Value)
+			}
+			st, ok := typeVal.(*StructType)
+			if !ok {
+				return nil, at(node.Receiver.Token, "%s is not a record type", node.Receiver.Type.Name)
+			}
+			methodParams := append([]*Parameter{node.Receiver}, node.Parameters...)
+			fn := &Function{
+				Name:       node.Receiver.Type.Name + "." + node.Name.Value,
+				Parameters: methodParams,
+				Body:       node.Body,
+				Env:        env,
+			}
+			if st.Methods == nil {
+				st.Methods = make(map[string]Object)
+			}
+			st.Methods[node.Name.Value] = fn
+			return fn, nil
+		}
 		fn := &Function{
 			Name:       node.Name.Value,
 			Parameters: node.Parameters,
@@ -142,11 +180,23 @@ func (i *Interpreter) evalStatement(stmt Statement, env *Environment) (Object, e
 	case *StructStatement:
 		// A record type becomes a value the name holds, so the name can be
 		// called to make an instance, and can be reached through an import.
-		t := &StructType{Name: node.Name.Value, Fields: make([]string, 0, len(node.Fields))}
-		for _, f := range node.Fields {
-			t.Fields = append(t.Fields, f.Name.Value)
+		var t *StructType
+		if existing, ok := env.Get(node.Name.Value); ok {
+			if st, ok := existing.(*StructType); ok {
+				t = st
+			}
 		}
-		env.Set(node.Name.Value, t)
+		if t == nil {
+			t = &StructType{
+				Name:    node.Name.Value,
+				Fields:  make([]string, 0, len(node.Fields)),
+				Methods: make(map[string]Object),
+			}
+			for _, f := range node.Fields {
+				t.Fields = append(t.Fields, f.Name.Value)
+			}
+			env.Set(node.Name.Value, t)
+		}
 		return t, nil
 
 	case *IfStatement:
@@ -709,6 +759,19 @@ func (i *Interpreter) evalCall(node *CallExpression, env *Environment) (Object, 
 			return nil, at(node.Token, "%s", err)
 		}
 		return value, nil
+	case *BoundMethod:
+		callArgs := append([]Object{fn.Receiver}, args...)
+		switch m := fn.Method.(type) {
+		case *Function:
+			return i.applyFunction(m, callArgs, node.Token)
+		case *Builtin:
+			res, err := m.Fn(callArgs)
+			if err != nil {
+				return nil, at(node.Token, "%s", err)
+			}
+			return res, nil
+		}
+		return nil, at(node.Token, "%s is not callable", fn.Method.Type())
 	}
 
 	return nil, at(node.Token, "%s is not callable", callee.Type())
@@ -866,6 +929,12 @@ func objectsEqual(a, b Object) bool {
 			}
 		}
 		return true
+	case *BoundMethod:
+		bv, ok := b.(*BoundMethod)
+		if !ok {
+			return false
+		}
+		return objectsEqual(av.Receiver, bv.Receiver) && av.Method == bv.Method
 	}
 	return false
 }

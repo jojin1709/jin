@@ -108,9 +108,12 @@ func (s *LetStatement) String() string {
 	return sb.String()
 }
 
-// FunctionStatement declares a named function.
+// FunctionStatement declares a named function, or a method on a record type:
+// fn name(a: int) -> int { ... }
+// fn (p: Point) name(a: int) -> int { ... }
 type FunctionStatement struct {
 	Token      Token
+	Receiver   *Parameter // non-nil for methods: (p: Point)
 	Name       *Identifier
 	Parameters []*Parameter
 	ReturnType *TypeAnnotation
@@ -122,6 +125,9 @@ func (s *FunctionStatement) TokenLiteral() string { return s.Token.Literal }
 func (s *FunctionStatement) String() string {
 	var sb strings.Builder
 	sb.WriteString("fn ")
+	if s.Receiver != nil {
+		sb.WriteString("(" + s.Receiver.String() + ") ")
+	}
 	sb.WriteString(s.Name.String())
 	sb.WriteString("(")
 	sb.WriteString(joinParams(s.Parameters))
