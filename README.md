@@ -4,9 +4,9 @@
 
 **A small, fast programming language — as easy to write as Python, with fewer footguns and much better performance.**
 
-[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
-[![Build](https://img.shields.io/badge/build-stage%208%20of%208-blueviolet)](#project-status)
+[![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
 [![Tests](https://img.shields.io/badge/tests-330%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
@@ -34,7 +34,7 @@ manager — in pure Go, with no third-party dependencies.
 - [The design rules](#the-design-rules)
 - [Language tour](#language-tour)
   - [Built-ins](#built-ins)
-- [Records](#records)
+- [Records and methods](#records-and-methods)
 - [Maps](#maps)
 - [Files](#files)
 - [Types are optional, but checked](#types-are-optional-but-checked)
@@ -135,7 +135,7 @@ annotations, and a standard library small enough to keep in your head.
 
 ### Prerequisites
 
-- **Go 1.26 or newer** — the only requirement. Jin has no third-party
+- **Go 1.21 or newer** — the only requirement. Jin has no third-party
   dependencies, so `go build` works offline on a fresh checkout.
 - **Windows, Linux or macOS** — the CLI, the VM and the standard library are
   platform-independent; only the file built-ins touch the host.
@@ -196,7 +196,10 @@ project under test has to produce byte-identical output on both back ends.
   integers, booleans and `nil` are pooled; call frames are reused.
 - **Genuine closures with shared captures.** A captured variable is the
   variable, not a snapshot, and each loop pass gets a fresh binding.
-- **Maps as the record type.** Ordered entries, `int` / `str` / `bool` keys, and
+- **Structs and methods.** User-defined record types declared with `struct`,
+  constructor calls, dotted field access and mutation, and methods declared
+  with receiver syntax (`fn (p: Point)`).
+- **Fast ordered maps.** Ordered entries, `int` / `str` / `bool` keys, and
   a missing key that is an error rather than a silent `nil`.
 - **One obvious way to do things.** No decorators, no metaclasses, no dunder
   magic, no implicit truthiness.
@@ -270,6 +273,9 @@ for field in person { print(field) }      # maps loop over their keys
 Multi-word built-ins use underscores, so `starts_with` is the shape to expect
 from anything added later. A local or global that reuses a built-in's name hides
 it, in the type checker as well as at run time.
+
+For user-defined records, `type(p)` returns the struct's declared name as a
+string (e.g. `"Point"`), rather than a generic `"struct"` or `"object"`.
 
 ---
 
@@ -694,7 +700,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-313 test cases pass, covering the lexer, parser, type checker, compiler,
+330 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 
@@ -741,6 +747,9 @@ Not in, and honest about it:
   and a stale binary is worse than no binary.
 - No `try` / `catch`, so `error(...)` and a failed `read_file` end the program.
   `file_exists` and `has` are how you check before acting.
+- No default field values, no named construction (`Point{x: 1}`), no
+  inheritance or interfaces. Fields must all be passed in declaration order
+  when calling `Point(...)`.
 - No user-supplied comparison for `sort`. It orders numbers or strings, and
   refuses an array that mixes them instead of guessing.
 - No `input` from the terminal yet; the REPL is the only interactive path.
