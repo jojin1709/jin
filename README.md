@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
-[![Tests](https://img.shields.io/badge/tests-354%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -253,6 +253,12 @@ let f = fn(v) { v * 2 }              # anonymous functions
 print("{name} has {len(name)} letters")   # string interpolation
 print("use {{braces}} for literal braces")
 
+# multi-line string literals with triple quotes
+let banner = """
+Welcome to Jin!
+Name: {name}
+"""
+
 let person = {"name": "Ada", "age": 36}   # a map
 print(person["name"], has(person, "job")) # Ada false
 for field in person { print(field) }      # maps loop over their keys
@@ -262,10 +268,11 @@ for field in person { print(field) }      # maps loop over their keys
 
 | Group | Functions |
 |---|---|
-| Output | `print` |
+| I/O | `print`, `input`, `read_all_stdin` |
 | Numbers | `abs`, `min`, `max`, `floor`, `ceil`, `round`, `sqrt`, `pow`, `random`, `int`, `float`, `str`, `type` |
 | Strings | `len`, `upper`, `lower`, `trim`, `split`, `join`, `contains`, `replace`, `find`, `starts_with`, `ends_with`, `repeat`, `chars`, `lines` |
 | Lists | `len`, `push`, `reverse`, `sort`, `slice`, `contains`, `range` |
+| Functional | `map`, `filter`, `reduce`, `any`, `all`, `sort_by`, `find_index` |
 | Maps | `len`, `has`, `get`, `delete`, `keys`, `values`, `contains` |
 | Files | `read_file`, `write_file`, `append_file`, `file_exists`, `delete_file` |
 | Program | `args` |
@@ -283,8 +290,9 @@ string (e.g. `"Point"`), rather than a generic `"struct"` or `"object"`.
 ## Records and methods
 
 User-defined types with named fields are declared with `struct` and constructed
-like a function call. Methods are declared at the top level with receiver syntax
-`fn (p: Point) method(...)` and called as `p.method(...)`:
+either with positional arguments `Point(1, 2)` or named field syntax `Point{x: 1, y: 2}`
+(all fields required, in any order). Methods are declared at the top level with receiver
+syntax `fn (p: Point) method(...)` and called as `p.method(...)`:
 
 ```jin
 struct Point { x: int, y: int }
@@ -296,7 +304,9 @@ fn (p: Point) shift(dx: int, dy: int) -> Point {
     return p
 }
 
-let p = Point(10, 20)
+# Named construction (any field order) and positional construction
+let p = Point{y: 20, x: 10}
+let p2 = Point(10, 20)
 p.shift(5, -10)
 print(p)                # Point{x: 15, y: 10}
 print(p.x, p.y)         # 15 10
@@ -309,7 +319,7 @@ print(p)                # Point{x: 16, y: 11}
 
 Records can be nested, stored in arrays and maps, and even refer to their own
 type recursively (e.g., `struct Node { value: int, next: Node }`). See
-`examples/records.jin` for a runnable walkthrough.
+`examples/records.jin` and `examples/functional.jin` for runnable walkthroughs.
 
 ---
 
@@ -745,7 +755,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-354 test cases pass, covering the lexer, parser, type checker, compiler,
+375 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 
@@ -771,17 +781,21 @@ prints, and on where it fails when a module, an alias or an import path is wrong
 - [x] Stage 7: package manager + CLI — imports, projects, `jin new` / `jin build`, `args()`
 - [x] Stage 8: records — user-defined struct types, constructors, receiver methods (`fn (p: Point)`), dotted field access and mutation
 - [x] Stage 9: error handling — try / catch statements, catchable runtime errors and error(), re-raising
+- [x] Stage 10: real programs — terminal input (`input`, `read_all_stdin`), multi-line strings (`"""`), higher-order built-ins (`map`, `filter`, `reduce`, `any`, `all`, `sort_by`, `find_index`), and named record construction (`Point{x: 1, y: 2}`)
 
-Current version: `0.9.0 (stage 9: error handling)` — see `jin --version`.
+Current version: `0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)` — see `jin --version`.
 
 ### What is in, and what is not
 
-In: records, try / catch error handling, maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
-`error`, and file reading and writing. `examples/records.jin`, `examples/errors.jin`, `examples/collections.jin` and
-`examples/files.jin` exercise all of it. Multi-file programs are in too:
-`import "utils" as u` puts another file's top-level names behind an alias, a
-folder with a `jin.toml` is a project, and `jin new`, `jin build`, `jin check`
-and `jin run` work on one. `examples/greeting` is a two-file project.
+In: records (with named and positional construction), try / catch error handling,
+terminal input (`input`, `read_all_stdin`), multi-line strings (`"""`), higher-order
+functions (`map`, `filter`, `reduce`, `any`, `all`, `sort_by`, `find_index`), maps,
+`sort` / `reverse` / `slice`, string and number helpers, `error`, and file I/O.
+`examples/records.jin`, `examples/errors.jin`, `examples/functional.jin`,
+`examples/input.jin`, `examples/collections.jin` and `examples/files.jin` exercise all of it.
+Multi-file programs are in too: `import "utils" as u` puts another file's top-level
+names behind an alias, a folder with a `jin.toml` is a project, and `jin new`,
+`jin build`, `jin check` and `jin run` work on one. `examples/greeting` is a two-file project.
 
 Not in, and honest about it:
 
@@ -793,17 +807,11 @@ Not in, and honest about it:
   and a stale binary is worse than no binary.
 - No `finally` blocks, no custom error types, and no `try` as an expression. Catch
   blocks receive a `str` error message.
-- No default field values, no named construction (`Point{x: 1}`), no
-  inheritance or interfaces. Fields must all be passed in declaration order
-  when calling `Point(...)`.
-- No user-supplied comparison for `sort`. It orders numbers or strings, and
-  refuses an array that mixes them instead of guessing.
-- No `input` from the terminal yet; the REPL is the only interactive path.
-- No string literals spanning lines.
+- No default field values, no inheritance or interfaces.
 
 ### Roadmap
 
-- **Stage 10 — remote packages:** a registry and a versioned lock file, so
+- **Stage 11 — remote packages:** a registry and a versioned lock file, so
   `import "json" as json` can pull a package instead of a folder. The loader in
   `module.go` is where that lands: it already decides what a path means, what a
   project is, and how files depend on each other.

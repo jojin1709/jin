@@ -38,6 +38,7 @@ var precedences = map[TokenType]int{
 	LPAREN:   PREC_CALL,
 	LBRACKET: PREC_CALL,
 	DOT:      PREC_CALL,
+	LBRACE:   PREC_CALL,
 }
 
 type (
@@ -52,6 +53,8 @@ type Parser struct {
 
 	curToken  Token
 	peekToken Token
+
+	noStructLiteral bool
 
 	prefixParseFns map[TokenType]prefixParseFn
 	infixParseFns  map[TokenType]infixParseFn
@@ -95,6 +98,7 @@ func NewParser(l *Lexer) *Parser {
 		LPAREN:   p.parseCallExpression,
 		LBRACKET: p.parseIndexExpression,
 		DOT:      p.parseMemberExpression,
+		LBRACE:   p.parseStructLiteral,
 	}
 
 	// Prime curToken and peekToken.
@@ -124,6 +128,9 @@ func (p *Parser) expectPeek(t TokenType) bool {
 }
 
 func (p *Parser) peekPrecedence() int {
+	if p.peekToken.Type == LBRACE && p.noStructLiteral {
+		return PREC_LOWEST
+	}
 	if pr, ok := precedences[p.peekToken.Type]; ok {
 		return pr
 	}
@@ -417,7 +424,9 @@ func (p *Parser) parseIfStatement() Statement {
 	stmt := &IfStatement{Token: p.curToken}
 
 	p.nextToken()
+	p.noStructLiteral = true
 	stmt.Condition = p.parseExpression(PREC_LOWEST)
+	p.noStructLiteral = false
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -455,7 +464,9 @@ func (p *Parser) parseForStatement() *ForStatement {
 	}
 
 	p.nextToken()
+	p.noStructLiteral = true
 	stmt.Iterable = p.parseExpression(PREC_LOWEST)
+	p.noStructLiteral = false
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -468,7 +479,9 @@ func (p *Parser) parseWhileStatement() *WhileStatement {
 	stmt := &WhileStatement{Token: p.curToken}
 
 	p.nextToken()
+	p.noStructLiteral = true
 	stmt.Condition = p.parseExpression(PREC_LOWEST)
+	p.noStructLiteral = false
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -659,7 +672,10 @@ func (p *Parser) parseAssignExpression(left Expression) Expression {
 
 func (p *Parser) parseGroupedExpression() Expression {
 	p.nextToken()
+	saved := p.noStructLiteral
+	p.noStructLiteral = false
 	exp := p.parseExpression(PREC_LOWEST)
+	p.noStructLiteral = saved
 	if !p.expectPeek(RPAREN) {
 		return nil
 	}
@@ -785,4 +801,57 @@ func (p *Parser) parseExpressionList(end TokenType) []Expression {
 		return nil
 	}
 	return list
+}
+
+func (p *Parser) parseStructLiteral(rec Expression) Expression {
+	lit := &StructLiteral{
+		Token:  p.curToken,
+		Struct: rec,
+		Fields: []*StructFieldInit{},
+	}
+
+	if p.peekTokenIs(RBRACE) {
+		p.nextToken()
+		return lit
+	}
+
+	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		if !p.expectPeek(IDENT) {
+			return nil
+		}
+		name := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+		if !p.expectPeek(COLON) {
+			return nil
+		}
+
+		p.nextToken()
+		val := p.parseExpression(PREC_LOWEST)
+		if val == nil {
+			return nil
+		}
+
+		lit.Fields = append(lit.Fields, &StructFieldInit{
+			Name:  name,
+			Value: val,
+		})
+
+		if p.peekTokenIs(COMMA) {
+			p.nextToken()
+			if p.peekTokenIs(RBRACE) {
+				p.nextToken()
+				break
+			}
+			continue
+		}
+
+		if p.peekTokenIs(RBRACE) {
+			p.nextToken()
+			break
+		}
+		p.errorf("expected ',' or '}', got %s", p.peekToken.Type)
+		return nil
+	}
+
+	return lit
 }

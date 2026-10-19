@@ -890,6 +890,51 @@ func (c *Compiler) compileExpression(expr Expression) error {
 		c.at(node.Token)
 		c.emit(OpGetField, c.addConstant(&String{Value: node.Property.Value}))
 		return nil
+
+	case *StructLiteral:
+		c.at(node.Token)
+		if err := c.compileExpression(node.Struct); err != nil {
+			return err
+		}
+
+		var st *StructType
+		if id, ok := node.Struct.(*Identifier); ok {
+			st = c.structTypes[c.globalName(id.Value)]
+		} else if mem, ok := node.Struct.(*MemberExpression); ok {
+			if id, ok := mem.Object.(*Identifier); ok {
+				if mod, isModule := c.aliases[id.Value]; isModule {
+					st = c.structTypes[mod.Prefix+"_"+mem.Property.Value]
+				}
+			}
+		}
+
+		if st != nil && len(st.Fields) > 0 {
+			fieldMap := make(map[string]Expression, len(node.Fields))
+			for _, f := range node.Fields {
+				fieldMap[f.Name.Value] = f.Value
+			}
+			for _, fieldName := range st.Fields {
+				expr, ok := fieldMap[fieldName]
+				if ok {
+					if err := c.compileExpression(expr); err != nil {
+						return err
+					}
+				} else {
+					c.emit(OpNil)
+				}
+			}
+			c.at(node.Token)
+			c.emit(OpCall, len(st.Fields))
+		} else {
+			for _, f := range node.Fields {
+				if err := c.compileExpression(f.Value); err != nil {
+					return err
+				}
+			}
+			c.at(node.Token)
+			c.emit(OpCall, len(node.Fields))
+		}
+		return nil
 	}
 
 	return fmt.Errorf("cannot compile %T", expr)

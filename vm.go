@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"unicode/utf8"
 )
 
@@ -34,6 +35,7 @@ type VM struct {
 	globals    []Object
 	builtins   []*Builtin
 	lastPopped Object
+	in         io.Reader
 	out        io.Writer
 
 	// openCells holds one cell per local slot that some closure has captured
@@ -54,9 +56,23 @@ func NewVM(out io.Writer) *VM {
 // NewVMWithArgs prepares a virtual machine that also knows the arguments the
 // program was run with, which is what args() reports.
 func NewVMWithArgs(out io.Writer, programArgs []string) *VM {
+	return NewVMWithArgsAndIO(nil, out, programArgs)
+}
+
+// NewVMWithIO prepares a virtual machine with custom input and output.
+func NewVMWithIO(in io.Reader, out io.Writer) *VM {
+	return NewVMWithArgsAndIO(in, out, nil)
+}
+
+// NewVMWithArgsAndIO prepares a virtual machine with custom input, output, and args.
+func NewVMWithArgsAndIO(in io.Reader, out io.Writer, programArgs []string) *VM {
+	if in == nil {
+		in = os.Stdin
+	}
 	vm := &VM{
 		stack:   make([]Object, stackSize),
 		frames:  make([]*Frame, maxFrames),
+		in:      in,
 		out:     out,
 		globals: []Object{},
 	}
@@ -64,13 +80,13 @@ func NewVMWithArgs(out io.Writer, programArgs []string) *VM {
 	for i := range vm.frames {
 		vm.frames[i] = &Frame{}
 	}
-	vm.builtins = orderedBuiltins(out, programArgs)
+	vm.builtins = orderedBuiltins(in, out, programArgs, vm)
 	return vm
 }
 
 // orderedBuiltins returns the built-ins in the order OpGetBuiltin expects.
-func orderedBuiltins(out io.Writer, programArgs []string) []*Builtin {
-	byName := newBuiltins(out, programArgs)
+func orderedBuiltins(in io.Reader, out io.Writer, programArgs []string, caller Caller) []*Builtin {
+	byName := newBuiltins(in, out, programArgs, caller)
 	list := make([]*Builtin, len(builtinNames))
 	for i, name := range builtinNames {
 		list[i] = byName[name]
@@ -120,14 +136,44 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 		vm.push(nilObject)
 	}
 
+	return vm.runFrames(0)
+}
+
+// Call invokes a callable object (closure, builtin, struct type, or bound method)
+// with the given arguments. It implements the Caller interface so higher-order
+// built-ins can call Jin functions.
+func (vm *VM) Call(callee Object, args []Object) (Object, error) {
+	targetFrameTop := vm.frameTop
+	savedSP := vm.sp
+	vm.push(callee)
+	for _, arg := range args {
+		vm.push(arg)
+	}
+	if err := vm.call(len(args)); err != nil {
+		vm.sp = savedSP
+		return nil, err
+	}
+	if vm.frameTop > targetFrameTop {
+		res, err := vm.runFrames(targetFrameTop)
+		if err != nil {
+			vm.closeCells(savedSP)
+			vm.sp = savedSP
+			return nil, err
+		}
+		return res, nil
+	}
+	return vm.pop(), nil
+}
+
+func (vm *VM) runFrames(targetFrameTop int) (Object, error) {
 	// The running frame and its instructions are kept in locals: reading them
 	// back out of vm.frames on every instruction is pure overhead. They are
 	// refreshed whenever a call or a return changes the current frame.
-	frame := vm.frames[0]
+	frame := vm.frames[vm.frameTop-1]
 	ins := frame.cl.Fn.Instructions
 
 	raiseError := func(e error) error {
-		if len(vm.handlers) > 0 {
+		if len(vm.handlers) > 0 && vm.handlers[len(vm.handlers)-1].frameDepth > targetFrameTop {
 			h := vm.handlers[len(vm.handlers)-1]
 			vm.handlers = vm.handlers[:len(vm.handlers)-1]
 
@@ -143,6 +189,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			frame.ip = h.catchIP
 			return nil
 		}
+		for vm.frameTop > targetFrameTop {
+			vm.closeCells(vm.frames[vm.frameTop-1].basePointer)
+			vm.popFrame()
+		}
 		return e
 	}
 	fail := func(e error) error {
@@ -152,7 +202,7 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 		return raiseError(vm.errorf(format, args...))
 	}
 
-	for vm.frameTop > 0 {
+	for vm.frameTop > targetFrameTop {
 		if frame.ip >= len(ins) {
 			return nil, fmt.Errorf("ran past the end of a function")
 		}
@@ -517,10 +567,14 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 				vm.handlers = vm.handlers[:len(vm.handlers)-1]
 			}
 			done := vm.popFrame()
-			if vm.frameTop == 0 {
-				// The script has finished.
-				vm.sp = 0
-				continue
+			if vm.frameTop == targetFrameTop {
+				if targetFrameTop == 0 {
+					// The script has finished.
+					vm.sp = 0
+					continue
+				}
+				vm.sp = done.basePointer - 1
+				return result, nil
 			}
 			// Drop the callee and its arguments, then push the result.
 			vm.sp = done.basePointer - 1

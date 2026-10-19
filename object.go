@@ -240,6 +240,11 @@ func (o *Function) Inspect() string {
 	return "<fn " + o.Name + ">"
 }
 
+// Caller is an interface for calling a Jin function from a Go built-in.
+type Caller interface {
+	Call(fn Object, args []Object) (Object, error)
+}
+
 // Builtin is a function implemented in Go.
 type Builtin struct {
 	Name string

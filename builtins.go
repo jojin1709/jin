@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -24,13 +25,20 @@ var builtinNames = []string{
 	"floor", "ceil", "round", "sqrt", "pow", "random", "error",
 	"read_file", "write_file", "append_file", "file_exists", "delete_file",
 	"args",
+	"input", "read_all_stdin",
+	"map", "filter", "reduce", "any", "all", "sort_by", "find_index",
 }
 
 // newBuiltins returns the functions Jin provides out of the box. They are
 // shared by the tree-walking interpreter and the bytecode VM, so they only
 // depend on where output goes and on the arguments the program was run with.
-func newBuiltins(out io.Writer, programArgs []string) map[string]*Builtin {
+func newBuiltins(in io.Reader, out io.Writer, programArgs []string, caller Caller) map[string]*Builtin {
 	b := map[string]*Builtin{}
+
+	if in == nil {
+		in = os.Stdin
+	}
+	stdinReader := bufio.NewReader(in)
 
 	// args() is the arguments the program was run with, so a Jin program can
 	// be used as a command.
@@ -714,6 +722,242 @@ func newBuiltins(out io.Writer, programArgs []string) map[string]*Builtin {
 			return nil, fmt.Errorf("delete_file() could not delete %s: %s", path, fileReason(err))
 		}
 		return nilObject, nil
+	}}
+
+	// ------------------------------------------------------------- stdin & io
+
+	b["input"] = &Builtin{Name: "input", Fn: func(args []Object) (Object, error) {
+		if err := arity("input", args, 1); err != nil {
+			return nil, err
+		}
+		prompt, ok := args[0].(*String)
+		if !ok {
+			return nil, typeError("input", args[0], "str")
+		}
+		if out != nil {
+			fmt.Fprint(out, prompt.Value)
+			if f, ok := out.(interface{ Flush() error }); ok {
+				_ = f.Flush()
+			}
+		}
+		line, err := stdinReader.ReadString('\n')
+		if err == io.EOF && len(line) == 0 {
+			return nil, errors.New("end of input")
+		}
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		line = strings.TrimRight(line, "\r\n")
+		return &String{Value: line}, nil
+	}}
+
+	b["read_all_stdin"] = &Builtin{Name: "read_all_stdin", Fn: func(args []Object) (Object, error) {
+		if err := arity("read_all_stdin", args, 0); err != nil {
+			return nil, err
+		}
+		data, err := io.ReadAll(stdinReader)
+		if err != nil {
+			return nil, err
+		}
+		return &String{Value: string(data)}, nil
+	}}
+
+	// ------------------------------------------------------------- functional builtins
+
+	b["map"] = &Builtin{Name: "map", Fn: func(args []Object) (Object, error) {
+		if err := arity("map", args, 2); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("map", args[0], "array")
+		}
+		fn := args[1]
+		if caller == nil {
+			return nil, errors.New("map() has no function caller")
+		}
+		res := make([]Object, len(arr.Elements))
+		for idx, el := range arr.Elements {
+			v, err := caller.Call(fn, []Object{el})
+			if err != nil {
+				return nil, err
+			}
+			res[idx] = v
+		}
+		return &Array{Elements: res}, nil
+	}}
+
+	b["filter"] = &Builtin{Name: "filter", Fn: func(args []Object) (Object, error) {
+		if err := arity("filter", args, 2); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("filter", args[0], "array")
+		}
+		fn := args[1]
+		if caller == nil {
+			return nil, errors.New("filter() has no function caller")
+		}
+		res := make([]Object, 0)
+		for _, el := range arr.Elements {
+			v, err := caller.Call(fn, []Object{el})
+			if err != nil {
+				return nil, err
+			}
+			b, ok := v.(*Boolean)
+			if !ok {
+				return nil, fmt.Errorf("filter() predicate must return bool, got %s", v.Type())
+			}
+			if b.Value {
+				res = append(res, el)
+			}
+		}
+		return &Array{Elements: res}, nil
+	}}
+
+	b["reduce"] = &Builtin{Name: "reduce", Fn: func(args []Object) (Object, error) {
+		if err := arity("reduce", args, 3); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("reduce", args[0], "array")
+		}
+		fn := args[1]
+		acc := args[2]
+		if caller == nil {
+			return nil, errors.New("reduce() has no function caller")
+		}
+		for _, el := range arr.Elements {
+			v, err := caller.Call(fn, []Object{acc, el})
+			if err != nil {
+				return nil, err
+			}
+			acc = v
+		}
+		return acc, nil
+	}}
+
+	b["any"] = &Builtin{Name: "any", Fn: func(args []Object) (Object, error) {
+		if err := arity("any", args, 2); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("any", args[0], "array")
+		}
+		fn := args[1]
+		if caller == nil {
+			return nil, errors.New("any() has no function caller")
+		}
+		for _, el := range arr.Elements {
+			v, err := caller.Call(fn, []Object{el})
+			if err != nil {
+				return nil, err
+			}
+			b, ok := v.(*Boolean)
+			if !ok {
+				return nil, fmt.Errorf("any() predicate must return bool, got %s", v.Type())
+			}
+			if b.Value {
+				return trueObject, nil
+			}
+		}
+		return falseObject, nil
+	}}
+
+	b["all"] = &Builtin{Name: "all", Fn: func(args []Object) (Object, error) {
+		if err := arity("all", args, 2); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("all", args[0], "array")
+		}
+		fn := args[1]
+		if caller == nil {
+			return nil, errors.New("all() has no function caller")
+		}
+		for _, el := range arr.Elements {
+			v, err := caller.Call(fn, []Object{el})
+			if err != nil {
+				return nil, err
+			}
+			b, ok := v.(*Boolean)
+			if !ok {
+				return nil, fmt.Errorf("all() predicate must return bool, got %s", v.Type())
+			}
+			if !b.Value {
+				return falseObject, nil
+			}
+		}
+		return trueObject, nil
+	}}
+
+	b["sort_by"] = &Builtin{Name: "sort_by", Fn: func(args []Object) (Object, error) {
+		if err := arity("sort_by", args, 2); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("sort_by", args[0], "array")
+		}
+		fn := args[1]
+		if caller == nil {
+			return nil, errors.New("sort_by() has no function caller")
+		}
+		elems := make([]Object, len(arr.Elements))
+		copy(elems, arr.Elements)
+		var sortErr error
+		sort.SliceStable(elems, func(i, j int) bool {
+			if sortErr != nil {
+				return false
+			}
+			v, err := caller.Call(fn, []Object{elems[i], elems[j]})
+			if err != nil {
+				sortErr = err
+				return false
+			}
+			num, ok := v.(*Integer)
+			if !ok {
+				sortErr = fmt.Errorf("sort_by() comparator must return int, got %s", v.Type())
+				return false
+			}
+			return num.Value < 0
+		})
+		if sortErr != nil {
+			return nil, sortErr
+		}
+		return &Array{Elements: elems}, nil
+	}}
+
+	b["find_index"] = &Builtin{Name: "find_index", Fn: func(args []Object) (Object, error) {
+		if err := arity("find_index", args, 2); err != nil {
+			return nil, err
+		}
+		arr, ok := args[0].(*Array)
+		if !ok {
+			return nil, typeError("find_index", args[0], "array")
+		}
+		fn := args[1]
+		if caller == nil {
+			return nil, errors.New("find_index() has no function caller")
+		}
+		for idx, el := range arr.Elements {
+			v, err := caller.Call(fn, []Object{el})
+			if err != nil {
+				return nil, err
+			}
+			b, ok := v.(*Boolean)
+			if !ok {
+				return nil, fmt.Errorf("find_index() predicate must return bool, got %s", v.Type())
+			}
+			if b.Value {
+				return newInteger(int64(idx)), nil
+			}
+		}
+		return newInteger(-1), nil
 	}}
 
 	return b

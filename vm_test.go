@@ -2076,3 +2076,247 @@ print("done:", count)`
 		}
 	})
 }
+
+func TestStage10Differential(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{
+			name: "multi-line strings with interpolation",
+			source: `let val = 42
+let s = """
+line 1
+value: {val}
+line 3
+"""
+print(s)`,
+			want: "\nline 1\nvalue: 42\nline 3\n\n",
+		},
+		{
+			name: "multi-line string with quotes and braces",
+			source: `let title = "Jin"
+let raw = """
+"quoted"
+{{literal}}
+{title}
+"""
+print(raw)`,
+			want: "\n\"quoted\"\n{literal}\nJin\n\n",
+		},
+		{
+			name: "named struct construction and access",
+			source: `struct Point { x: int, y: int }
+let p1 = Point{x: 10, y: 20}
+let p2 = Point{y: 200, x: 100}
+let p3 = Point(1, 2)
+print(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y)`,
+			want: "10 20 100 200 1 2\n",
+		},
+		{
+			name: "named struct construction with methods",
+			source: `struct Vec { x: int, y: int }
+fn (v: Vec) length_sq() -> int {
+    return v.x * v.x + v.y * v.y
+}
+let v = Vec{y: 4, x: 3}
+print(v.length_sq())`,
+			want: "25\n",
+		},
+		{
+			name: "map with closure and builtin",
+			source: `let nums = [1, 2, 3]
+let doubled = map(nums, fn(x) { return x * 2 })
+let strs = ["10", "20", "30"]
+let ints = map(strs, int)
+print(doubled, ints)`,
+			want: "[2, 4, 6] [10, 20, 30]\n",
+		},
+		{
+			name: "filter builtin",
+			source: `let nums = [1, 2, 3, 4, 5, 6]
+let evens = filter(nums, fn(x) { return x % 2 == 0 })
+print(evens)`,
+			want: "[2, 4, 6]\n",
+		},
+		{
+			name: "reduce builtin",
+			source: `let nums = [1, 2, 3, 4]
+let sum = reduce(nums, fn(acc, x) { return acc + x }, 0)
+let prod = reduce(nums, fn(acc, x) { return acc * x }, 1)
+print(sum, prod)`,
+			want: "10 24\n",
+		},
+		{
+			name: "any and all builtins",
+			source: `let nums = [1, 2, 3, 4]
+print(any(nums, fn(x) { return x == 3 }))
+print(any(nums, fn(x) { return x == 9 }))
+print(all(nums, fn(x) { return x > 0 }))
+print(all(nums, fn(x) { return x > 2 }))`,
+			want: "true\nfalse\ntrue\nfalse\n",
+		},
+		{
+			name: "sort_by builtin numbers and strings",
+			source: `let nums = [5, 2, 8, 1, 9]
+let sorted_nums = sort_by(nums, fn(a, b) { return a - b })
+let words = ["banana", "pie", "apple", "fig"]
+let sorted_words = sort_by(words, fn(a, b) { return len(a) - len(b) })
+print(sorted_nums, sorted_words)`,
+			want: "[1, 2, 5, 8, 9] [\"pie\", \"fig\", \"apple\", \"banana\"]\n",
+		},
+		{
+			name: "find_index builtin",
+			source: `let words = ["apple", "banana", "cherry"]
+print(find_index(words, fn(x) { return x == "banana" }))
+print(find_index(words, fn(x) { return x == "orange" }))`,
+			want: "1\n-1\n",
+		},
+		{
+			name: "error propagation from map callback",
+			source: `try {
+    map([1, 2, 3], fn(x) {
+        if x == 2 { error("boom on 2") }
+        return x
+    })
+} catch e {
+    print("caught:", e)
+}`,
+			want: "caught: 3:26: boom on 2\n",
+		},
+		{
+			name: "error propagation from sort_by callback",
+			source: `try {
+    sort_by([1, 2, 3], fn(a, b) {
+        error("sort boom")
+    })
+} catch e {
+    print("caught:", e)
+}`,
+			want: "caught: 3:14: sort boom\n",
+		},
+		{
+			name: "inner try catch inside map callback",
+			source: `let res = map([1, 2, 3], fn(x) {
+    try {
+        if x == 2 { error("handled inside") }
+        return x * 10
+    } catch e {
+        return 999
+    }
+})
+print(res)`,
+			want: "[10, 999, 30]\n",
+		},
+		{
+			name: "nested higher order calls",
+			source: `let matrix = [[1, 2], [3, 4]]
+let doubled = map(matrix, fn(row) {
+    return map(row, fn(x) { return x * 2 })
+})
+print(doubled)`,
+			want: "[[2, 4], [6, 8]]\n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			vmOut, vmErr := runOnVM(t, tc.source)
+			if vmErr != nil {
+				t.Fatalf("vm failed: %v", vmErr)
+			}
+			interpOut, interpErr := runOnInterpreter(t, tc.source)
+			if interpErr != nil {
+				t.Fatalf("interpreter failed: %v", interpErr)
+			}
+			if vmOut != tc.want {
+				t.Errorf("vm output mismatch:\ngot:  %q\nwant: %q", vmOut, tc.want)
+			}
+			if interpOut != tc.want {
+				t.Errorf("interp output mismatch:\ngot:  %q\nwant: %q", interpOut, tc.want)
+			}
+		})
+	}
+}
+
+func TestStage10InputDifferential(t *testing.T) {
+	inputContent := "first line\nsecond line\r\nthird"
+
+	source := `let l1 = input("prompt1: ")
+let l2 = input("prompt2: ")
+print("got l1: {l1}")
+print("got l2: {l2}")
+try {
+    let l3 = input("prompt3: ")
+    print("got l3: {l3}")
+    let l4 = input("prompt4: ")
+    print("got l4: {l4}")
+} catch e {
+    print("at eof:", e)
+}`
+
+	runVMWithInput := func(inputStr, src string) (string, error) {
+		p := NewParser(NewLexer(src))
+		program := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			t.Fatalf("syntax errors: %v", errs)
+		}
+		bc, err := compileProgram(program)
+		if err != nil {
+			return "", err
+		}
+		var out bytes.Buffer
+		vm := NewVMWithIO(strings.NewReader(inputStr), &out)
+		_, err = vm.Run(bc)
+		return out.String(), err
+	}
+
+	runInterpWithInput := func(inputStr, src string) (string, error) {
+		p := NewParser(NewLexer(src))
+		program := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			t.Fatalf("syntax errors: %v", errs)
+		}
+		var out bytes.Buffer
+		interp := NewInterpreterWithIO(strings.NewReader(inputStr), &out)
+		_, err := interp.Run(program, NewEnvironment())
+		return out.String(), err
+	}
+
+	vmOut, vmErr := runVMWithInput(inputContent, source)
+	if vmErr != nil {
+		t.Fatalf("vm error: %v", vmErr)
+	}
+	interpOut, interpErr := runInterpWithInput(inputContent, source)
+	if interpErr != nil {
+		t.Fatalf("interp error: %v", interpErr)
+	}
+
+	if vmOut != interpOut {
+		t.Fatalf("engines disagree on input output:\nvm:\n%s\ninterp:\n%s", vmOut, interpOut)
+	}
+
+	want := "prompt1: prompt2: got l1: first line\ngot l2: second line\nprompt3: got l3: third\nprompt4: at eof: 8:19: end of input\n"
+	if vmOut != want {
+		t.Errorf("got %q, want %q", vmOut, want)
+	}
+
+	// Also test read_all_stdin()
+	readAllSrc := `let text = read_all_stdin()
+print("read {len(text)} bytes: {text}")`
+	vmAll, vmErr := runVMWithInput("hello stdin world", readAllSrc)
+	if vmErr != nil {
+		t.Fatalf("vm read_all_stdin error: %v", vmErr)
+	}
+	interpAll, interpErr := runInterpWithInput("hello stdin world", readAllSrc)
+	if interpErr != nil {
+		t.Fatalf("interp read_all_stdin error: %v", interpErr)
+	}
+	if vmAll != interpAll {
+		t.Fatalf("engines disagree on read_all_stdin:\nvm:\n%s\ninterp:\n%s", vmAll, interpAll)
+	}
+	if vmAll != "read 17 bytes: hello stdin world\n" {
+		t.Errorf("read_all_stdin unexpected output: %q", vmAll)
+	}
+}

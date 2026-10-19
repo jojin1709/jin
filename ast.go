@@ -550,3 +550,26 @@ func (e *MapLiteral) String() string {
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
 }
+
+// StructFieldInit is one field initialization in a named record construction: name: value
+type StructFieldInit struct {
+	Name  *Identifier
+	Value Expression
+}
+
+// StructLiteral constructs a record instance with named fields: Point{x: 1, y: 2}
+type StructLiteral struct {
+	Token  Token
+	Struct Expression
+	Fields []*StructFieldInit
+}
+
+func (e *StructLiteral) expressionNode()      {}
+func (e *StructLiteral) TokenLiteral() string { return e.Token.Literal }
+func (e *StructLiteral) String() string {
+	parts := make([]string, len(e.Fields))
+	for i, f := range e.Fields {
+		parts[i] = f.Name.String() + ": " + f.Value.String()
+	}
+	return e.Struct.String() + "{" + strings.Join(parts, ", ") + "}"
+}

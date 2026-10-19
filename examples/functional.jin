@@ -1,0 +1,75 @@
+# Functional programming, multi-line strings, and named records in Jin.
+
+# 1. Multi-line string literals with triple quotes
+let greeting = """
+========================================
+Welcome to Jin Functional Programming!
+Interpreter & Bytecode VM in harmony.
+========================================
+"""
+print(greeting)
+
+# Triple-quoted strings support expression interpolation:
+let user = "Alice"
+let score = 95
+let status = "Player"
+if score >= 90 {
+    status = "Master"
+}
+let banner = """
+Player: {user}
+Score:  {score}
+Status: {status}
+"""
+print(banner)
+
+# 2. Named record construction
+struct Item {
+    name: str,
+    price: int,
+    stock: int
+}
+
+# Construct records with named field syntax in any field order
+let apple = Item{name: "Apple", price: 3, stock: 10}
+let banana = Item{stock: 5, price: 2, name: "Banana"}
+let cherry = Item{price: 8, stock: 0, name: "Cherry"}
+let date = Item{name: "Date", price: 5, stock: 12}
+
+let inventory = [apple, banana, cherry, date]
+
+# 3. Higher-order functions
+
+# map: transform each element
+let names = map(inventory, fn(item) { return item.name })
+print("Item names: {names}")
+
+# filter: keep elements matching a predicate
+let in_stock = filter(inventory, fn(item) { return item.stock > 0 })
+let in_stock_names = map(in_stock, fn(i) { return i.name })
+print("In stock items: {in_stock_names}")
+
+# reduce: aggregate a list into a single value
+let total_inventory_value = reduce(inventory, fn(total, item) {
+    return total + (item.price * item.stock)
+}, 0)
+print("Total inventory value: ${total_inventory_value}")
+
+# any & all: check conditions across a list
+let has_expensive = any(inventory, fn(item) { return item.price > 7 })
+let all_available = all(inventory, fn(item) { return item.stock > 0 })
+print("Has expensive items (> $7): {has_expensive}")
+print("All items in stock: {all_available}")
+
+# find_index: locate the first matching index (-1 if none)
+let cherry_idx = find_index(inventory, fn(item) { return item.name == "Cherry" })
+print("Index of Cherry: {cherry_idx}")
+
+# sort_by: sort with custom comparator returning < 0, 0, or > 0
+let sorted_by_price = sort_by(inventory, fn(a, b) {
+    return a.price - b.price
+})
+print("Sorted by price (cheapest first):")
+for item in sorted_by_price {
+    print("  {item.name}: ${item.price}")
+}

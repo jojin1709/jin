@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"strings"
 )
 
 // Interpreter walks a syntax tree and produces a result.
 type Interpreter struct {
+	in       io.Reader
 	out      io.Writer
 	builtins map[string]*Builtin
 
@@ -28,12 +30,26 @@ func NewInterpreter(out io.Writer) *Interpreter {
 // NewInterpreterWithArgs creates an interpreter that also knows the arguments
 // the program was run with, which is what args() reports.
 func NewInterpreterWithArgs(out io.Writer, programArgs []string) *Interpreter {
+	return NewInterpreterWithArgsAndIO(nil, out, programArgs)
+}
+
+// NewInterpreterWithIO creates an interpreter with custom input and output.
+func NewInterpreterWithIO(in io.Reader, out io.Writer) *Interpreter {
+	return NewInterpreterWithArgsAndIO(in, out, nil)
+}
+
+// NewInterpreterWithArgsAndIO creates an interpreter with custom input, output, and args.
+func NewInterpreterWithArgsAndIO(in io.Reader, out io.Writer, programArgs []string) *Interpreter {
+	if in == nil {
+		in = os.Stdin
+	}
 	i := &Interpreter{
+		in:         in,
 		out:        out,
 		moduleEnvs: map[*Module]*Environment{},
 		ran:        map[*Module]bool{},
 	}
-	i.builtins = newBuiltins(out, programArgs)
+	i.builtins = newBuiltins(in, out, programArgs, i)
 	return i
 }
 
@@ -422,9 +438,44 @@ func (i *Interpreter) evalExpression(expr Expression, env *Environment) (Object,
 
 	case *MemberExpression:
 		return i.evalMember(node, env)
+
+	case *StructLiteral:
+		return i.evalStructLiteral(node, env)
 	}
 
 	return nil, fmt.Errorf("cannot evaluate %T", expr)
+}
+
+func (i *Interpreter) evalStructLiteral(node *StructLiteral, env *Environment) (Object, error) {
+	callee, err := i.evalExpression(node.Struct, env)
+	if err != nil {
+		return nil, err
+	}
+	st, ok := callee.(*StructType)
+	if !ok {
+		return nil, at(node.Token, "%s is not a struct", callee.Type())
+	}
+	fieldVals := make(map[string]Object, len(node.Fields))
+	for _, f := range node.Fields {
+		val, err := i.evalExpression(f.Value, env)
+		if err != nil {
+			return nil, err
+		}
+		fieldVals[f.Name.Value] = val
+	}
+	args := make([]Object, len(st.Fields))
+	for idx, name := range st.Fields {
+		val, ok := fieldVals[name]
+		if !ok {
+			return nil, at(node.Token, "missing field %s in %s", name, st.Name)
+		}
+		args[idx] = val
+	}
+	value, err := newStruct(st, args)
+	if err != nil {
+		return nil, at(node.Token, "%s", err)
+	}
+	return value, nil
 }
 
 // evalMember reads a name from an imported file (u.name), or a field of a
@@ -823,6 +874,31 @@ func (i *Interpreter) applyFunction(fn *Function, args []Object, tok Token) (Obj
 		return nil, controlFlowError(result)
 	}
 	return result, nil
+}
+
+// Call invokes a Jin function, builtin, struct constructor, or method.
+// It implements the Caller interface so higher-order built-ins can call Jin functions.
+func (i *Interpreter) Call(callee Object, args []Object) (Object, error) {
+	switch fn := callee.(type) {
+	case *Function:
+		dummyTok := Token{Type: IDENT, Literal: fn.Name, Line: 1, Column: 1}
+		return i.applyFunction(fn, args, dummyTok)
+	case *Builtin:
+		return fn.Fn(args)
+	case *StructType:
+		return newStruct(fn, args)
+	case *BoundMethod:
+		callArgs := append([]Object{fn.Receiver}, args...)
+		switch m := fn.Method.(type) {
+		case *Function:
+			dummyTok := Token{Type: IDENT, Literal: m.Name, Line: 1, Column: 1}
+			return i.applyFunction(m, callArgs, dummyTok)
+		case *Builtin:
+			return m.Fn(callArgs)
+		}
+		return nil, fmt.Errorf("%s is not callable", fn.Method.Type())
+	}
+	return nil, fmt.Errorf("%s is not callable", callee.Type())
 }
 
 // evalString produces a string value, resolving {expr} interpolation.

@@ -168,6 +168,13 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		return l.simple(RBRACKET, line, col)
 	case '"':
+		if strings.HasPrefix(l.input[l.position:], `"""`) {
+			lit, ok := l.readMultiLineString()
+			if !ok {
+				return l.tok(ILLEGAL, lit, line, col)
+			}
+			return l.tok(STRING, lit, line, col)
+		}
 		lit, ok := l.readString()
 		if !ok {
 			return l.tok(ILLEGAL, lit, line, col)
@@ -243,6 +250,54 @@ func (l *Lexer) readNumber() (string, TokenType) {
 
 	lit := strings.ReplaceAll(l.input[start:l.position], "_", "")
 	return lit, tt
+}
+
+// readMultiLineString reads a triple-quoted string """ ... """.
+func (l *Lexer) readMultiLineString() (string, bool) {
+	// Consume the 3 opening quotes
+	l.readChar() // 2nd quote
+	l.readChar() // 3rd quote
+	l.readChar() // move to first char of content
+
+	var sb strings.Builder
+	for {
+		if l.ch == eof {
+			return sb.String(), false
+		}
+		if l.ch == '\\' {
+			l.readChar()
+			switch l.ch {
+			case 'n':
+				sb.WriteRune('\n')
+			case 't':
+				sb.WriteRune('\t')
+			case 'r':
+				sb.WriteRune('\r')
+			case '0':
+				sb.WriteRune(0)
+			case '\\':
+				sb.WriteRune('\\')
+			case '"':
+				sb.WriteRune('"')
+			case eof:
+				return sb.String(), false
+			default:
+				sb.WriteRune('\\')
+				sb.WriteRune(l.ch)
+			}
+			l.readChar()
+			continue
+		}
+		if l.ch == '"' && strings.HasPrefix(l.input[l.position:], `"""`) {
+			// Found closing """
+			l.readChar() // 2nd quote
+			l.readChar() // 3rd quote
+			l.readChar() // move past 3rd quote
+			return sb.String(), true
+		}
+		sb.WriteRune(l.ch)
+		l.readChar()
+	}
 }
 
 // readString reads a double-quoted string and resolves escape sequences.

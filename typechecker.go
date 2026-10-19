@@ -830,9 +830,52 @@ func (c *Checker) checkExpression(expr Expression) *Type {
 
 	case *MemberExpression:
 		return c.checkMember(node)
+
+	case *StructLiteral:
+		return c.checkStructLiteral(node)
 	}
 
 	return anyT
+}
+
+func (c *Checker) checkStructLiteral(node *StructLiteral) *Type {
+	t := c.checkExpression(node.Struct)
+	if t.Kind != TypeStructType {
+		c.errorf(node.Token, "%s is not a record type", t)
+		return anyT
+	}
+	info := t.Struct
+	if info == nil {
+		return anyT
+	}
+
+	seen := make(map[string]bool)
+	for _, f := range node.Fields {
+		if seen[f.Name.Value] {
+			c.errorf(f.Name.Token, "duplicate field %q in %s", f.Name.Value, info.Name)
+		}
+		seen[f.Name.Value] = true
+
+		fieldInfo, found := fieldOf(t, f.Name.Value)
+		if !found {
+			c.errorf(f.Name.Token, "%s has no field %q", info.Name, f.Name.Value)
+			c.checkExpression(f.Value)
+			continue
+		}
+
+		valType := c.checkExpression(f.Value)
+		if !assignable(fieldInfo.Type, valType) {
+			c.errorf(f.Name.Token, "field %q: cannot use %s where %s is expected", f.Name.Value, valType, fieldInfo.Type)
+		}
+	}
+
+	for _, f := range info.Fields {
+		if !seen[f.Name] {
+			c.errorf(node.Token, "missing field %q in %s", f.Name, info.Name)
+		}
+	}
+
+	return structInstance(info)
 }
 
 // checkMember reads a name from an imported file (u.name), or a field of a
@@ -1712,6 +1755,91 @@ func newBuiltinSigs() map[string]*builtinSig {
 			return result
 		}}
 	}
+
+	sigs["input"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("input", args, 1, tok) {
+			return strT
+		}
+		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+			c.errorf(tok, "input() expects str, got %s", args[0])
+		}
+		return strT
+	}}
+
+	sigs["read_all_stdin"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		c.expectArgs("read_all_stdin", args, 0, tok)
+		return strT
+	}}
+
+	sigs["map"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("map", args, 2, tok) {
+			return arrayOf(anyT)
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "map() expects array, got %s", args[0])
+		}
+		return arrayOf(anyT)
+	}}
+
+	sigs["filter"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("filter", args, 2, tok) {
+			return arrayOf(anyT)
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "filter() expects array, got %s", args[0])
+		}
+		return args[0]
+	}}
+
+	sigs["reduce"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("reduce", args, 3, tok) {
+			return anyT
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "reduce() expects array, got %s", args[0])
+		}
+		return args[2]
+	}}
+
+	sigs["any"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("any", args, 2, tok) {
+			return boolT
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "any() expects array, got %s", args[0])
+		}
+		return boolT
+	}}
+
+	sigs["all"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("all", args, 2, tok) {
+			return boolT
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "all() expects array, got %s", args[0])
+		}
+		return boolT
+	}}
+
+	sigs["sort_by"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("sort_by", args, 2, tok) {
+			return arrayOf(anyT)
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "sort_by() expects array, got %s", args[0])
+		}
+		return args[0]
+	}}
+
+	sigs["find_index"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
+		if !c.expectArgs("find_index", args, 2, tok) {
+			return intT
+		}
+		if args[0].Kind != TypeArray && args[0].Kind != TypeAny {
+			c.errorf(tok, "find_index() expects array, got %s", args[0])
+		}
+		return intT
+	}}
 
 	return sigs
 }

@@ -96,3 +96,21 @@ func TestNumberSeparators(t *testing.T) {
 		t.Fatalf("want INT 1000000, got %s %q", got.Type, got.Literal)
 	}
 }
+
+func TestMultiLineString(t *testing.T) {
+	lex := NewLexer(`"""hello
+world"""`)
+	got := lex.NextToken()
+	if got.Type != STRING {
+		t.Fatalf("want STRING, got %s", got.Type)
+	}
+	if got.Literal != "hello\nworld" {
+		t.Fatalf("unexpected content: %q", got.Literal)
+	}
+
+	unterminated := NewLexer(`"""no closing quotes`)
+	got = unterminated.NextToken()
+	if got.Type != ILLEGAL {
+		t.Fatalf("want ILLEGAL for unterminated multi-line string, got %s", got.Type)
+	}
+}

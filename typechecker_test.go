@@ -597,3 +597,36 @@ print(e)`, `undefined variable "e"`)
     error(e)
 }`)
 }
+
+func TestTypeCheckStage10(t *testing.T) {
+	// 1. Struct literals
+	expectClean(t, `struct Point { x: int, y: int }
+let p1 = Point{x: 1, y: 2}
+let p2 = Point{y: 20, x: 10}`)
+
+	expectTypeError(t, `struct Point { x: int, y: int }
+let p = Point{x: 1, z: 2}`, `Point has no field "z"`)
+
+	expectTypeError(t, `struct Point { x: int, y: int }
+let p = Point{x: 1}`, `missing field "y" in Point`)
+
+	expectTypeError(t, `struct Point { x: int, y: int }
+let p = Point{x: 1, x: 2, y: 3}`, `duplicate field "x" in Point`)
+
+	expectTypeError(t, `struct Point { x: int, y: int }
+let p = Point{x: "bad", y: 2}`, `field "x": cannot use str where int is expected`)
+
+	// 2. Builtins
+	expectClean(t, `let s: str = input("name: ")
+let all_s: str = read_all_stdin()
+let m = map([1, 2, 3], fn(x) { return x * 2 })
+let f = filter([1, 2, 3], fn(x) { return x > 1 })
+let r: int = reduce([1, 2, 3], fn(acc, x) { return acc + x }, 0)
+let a: bool = any([1, 2, 3], fn(x) { return x > 2 })
+let al: bool = all([1, 2, 3], fn(x) { return x > 0 })
+let sb = sort_by([3, 1, 2], fn(a, b) { return a - b })
+let idx: int = find_index([1, 2, 3], fn(x) { return x == 2 })`)
+
+	expectTypeError(t, `input(123)`, `input() expects str, got int`)
+	expectTypeError(t, `read_all_stdin("extra")`, `read_all_stdin() takes 0 argument(s), got 1`)
+}

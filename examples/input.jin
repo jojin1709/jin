@@ -1,0 +1,32 @@
+# Reading interactive input and standard input in Jin.
+#
+# 'input(prompt)' prints a prompt and reads one line from stdin (stripping
+# the trailing newline). At EOF, it raises a catchable error "end of input".
+# 'read_all_stdin()' reads everything from stdin until EOF into a single string.
+
+# Example 1: Reading user input with a prompt
+print("--- Interactive input example ---")
+try {
+    let name = input("Enter your name: ")
+    print("Hello, {name}!")
+} catch e {
+    print("Could not read name: {e}")
+}
+
+# Example 2: Reading lines in a loop until EOF
+print("\n--- Reading lines until EOF ---")
+let count = 0
+while true {
+    try {
+        let line = input("line> ")
+        count = count + 1
+        print("Line #{count}: {line} (length {len(line)})")
+    } catch e {
+        if contains(e, "end of input") {
+            print("Reached end of input after {count} lines.")
+            break
+        }
+        print("Unexpected error: {e}")
+        break
+    }
+}

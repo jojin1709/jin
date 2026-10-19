@@ -166,6 +166,13 @@ func dumpNode(sb *strings.Builder, n Node, indent int) {
 		}
 		dumpNode(sb, node.Body, indent+1)
 
+	case *StructLiteral:
+		dumpLine(sb, indent, "StructLiteral %s", node.Struct.String())
+		for _, f := range node.Fields {
+			dumpLine(sb, indent+1, "%s:", f.Name.Value)
+			dumpNode(sb, f.Value, indent+2)
+		}
+
 	default:
 		dumpLine(sb, indent, "? %T", n)
 	}

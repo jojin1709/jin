@@ -379,3 +379,28 @@ func TestParseTryCatch(t *testing.T) {
 		t.Fatalf("want 1 catch statement, got %d", len(ts.CatchBody.Statements))
 	}
 }
+
+func TestParseStructLiteral(t *testing.T) {
+	src := `let p = Point{x: 1, y: 2}`
+	program := parse(t, src)
+	if len(program.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(program.Statements))
+	}
+	ls, ok := program.Statements[0].(*LetStatement)
+	if !ok {
+		t.Fatalf("want LetStatement, got %T", program.Statements[0])
+	}
+	lit, ok := ls.Value.(*StructLiteral)
+	if !ok {
+		t.Fatalf("want StructLiteral, got %T", ls.Value)
+	}
+	if lit.Struct.String() != "Point" {
+		t.Errorf("want Point, got %s", lit.Struct.String())
+	}
+	if len(lit.Fields) != 2 {
+		t.Fatalf("want 2 fields, got %d", len(lit.Fields))
+	}
+	if lit.Fields[0].Name.Value != "x" || lit.Fields[1].Name.Value != "y" {
+		t.Errorf("field names mismatch: %s, %s", lit.Fields[0].Name.Value, lit.Fields[1].Name.Value)
+	}
+}
