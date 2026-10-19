@@ -293,7 +293,10 @@ func (l *Lexer) readMultiLineString() (string, bool) {
 			l.readChar() // 2nd quote
 			l.readChar() // 3rd quote
 			l.readChar() // move past 3rd quote
-			return sb.String(), true
+			content := sb.String()
+			content = strings.ReplaceAll(content, "\r\n", "\n")
+			content = strings.TrimPrefix(content, "\n")
+			return content, true
 		}
 		sb.WriteRune(l.ch)
 		l.readChar()

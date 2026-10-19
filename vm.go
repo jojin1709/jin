@@ -183,7 +183,7 @@ func (vm *VM) runFrames(targetFrameTop int) (Object, error) {
 			}
 			vm.closeCells(h.sp)
 			vm.sp = h.sp
-			vm.push(&String{Value: e.Error()})
+			vm.push(&String{Value: e.Error(), IsError: true})
 			frame = vm.frames[vm.frameTop-1]
 			ins = frame.cl.Fn.Instructions
 			frame.ip = h.catchIP
@@ -776,12 +776,14 @@ func (vm *VM) setGlobal(index int, obj Object) {
 
 // errorf builds an error that points at the instruction being run.
 func (vm *VM) errorf(format string, args ...interface{}) error {
-	msg := fmt.Sprintf(format, args...)
-	if hasPositionPrefix(msg) {
-		return fmt.Errorf("%s", msg)
+	if len(args) == 1 && format == "%s" {
+		if le, ok := args[0].(*LocatedError); ok {
+			return le
+		}
 	}
+	msg := fmt.Sprintf(format, args...)
 	if vm.frameTop == 0 {
-		return fmt.Errorf("%s", msg)
+		return &LocatedError{Msg: msg}
 	}
 
 	frame := vm.frames[vm.frameTop-1]
@@ -790,12 +792,12 @@ func (vm *VM) errorf(format string, args ...interface{}) error {
 		pos := frame.cl.Fn.Positions[at]
 		if pos.Line > 0 {
 			if pos.File != "" {
-				return fmt.Errorf("%s:%d:%d: %s", pos.File, pos.Line, pos.Col, msg)
+				return &LocatedError{Msg: fmt.Sprintf("%s:%d:%d: %s", pos.File, pos.Line, pos.Col, msg)}
 			}
-			return fmt.Errorf("%d:%d: %s", pos.Line, pos.Col, msg)
+			return &LocatedError{Msg: fmt.Sprintf("%d:%d: %s", pos.Line, pos.Col, msg)}
 		}
 	}
-	return fmt.Errorf("%s", msg)
+	return &LocatedError{Msg: msg}
 }
 
 // ---------------------------------------------------------------- operators

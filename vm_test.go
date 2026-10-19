@@ -2092,7 +2092,7 @@ value: {val}
 line 3
 """
 print(s)`,
-			want: "\nline 1\nvalue: 42\nline 3\n\n",
+			want: "line 1\nvalue: 42\nline 3\n\n",
 		},
 		{
 			name: "multi-line string with quotes and braces",
@@ -2103,7 +2103,7 @@ let raw = """
 {title}
 """
 print(raw)`,
-			want: "\n\"quoted\"\n{literal}\nJin\n\n",
+			want: "\"quoted\"\n{literal}\nJin\n\n",
 		},
 		{
 			name: "named struct construction and access",
@@ -2319,4 +2319,236 @@ print("read {len(text)} bytes: {text}")`
 	if vmAll != "read 17 bytes: hello stdin world\n" {
 		t.Errorf("read_all_stdin unexpected output: %q", vmAll)
 	}
+}
+
+func TestStage10Hardening(t *testing.T) {
+	runVM := func(src string) (string, error) {
+		return runOnVM(t, src)
+	}
+	runInterp := func(src string) (string, error) {
+		return runOnInterpreter(t, src)
+	}
+
+	runVMWithInput := func(inputStr, src string) (string, error) {
+		p := NewParser(NewLexer(src))
+		program := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			t.Fatalf("syntax errors: %v", errs)
+		}
+		bc, err := compileProgram(program)
+		if err != nil {
+			return "", err
+		}
+		var out bytes.Buffer
+		vm := NewVMWithIO(strings.NewReader(inputStr), &out)
+		_, err = vm.Run(bc)
+		return out.String(), err
+	}
+
+	runInterpWithInput := func(inputStr, src string) (string, error) {
+		p := NewParser(NewLexer(src))
+		program := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			t.Fatalf("syntax errors: %v", errs)
+		}
+		var out bytes.Buffer
+		interp := NewInterpreterWithIO(strings.NewReader(inputStr), &out)
+		_, err := interp.Run(program, NewEnvironment())
+		return out.String(), err
+	}
+
+	assertAgree := func(t *testing.T, src string, want string) {
+		t.Helper()
+		vmOut, vmErr := runVM(src)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runInterp(src)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Fatalf("engines disagree:\n vm: %q\n interp: %q", vmOut, interpOut)
+		}
+		if want != "" && vmOut != want {
+			t.Fatalf("unexpected output:\n got:  %q\n want: %q", vmOut, want)
+		}
+	}
+
+	// 1. Closures created inside a callback that capture variables, then an error; check captured values
+	t.Run("closure inside callback captures variable then error", func(t *testing.T) {
+		source := `let captured = nil
+try {
+    map([10], fn(x) {
+        let local_val = 100 + x
+        captured = fn() { return local_val }
+        error("callback error")
+    })
+} catch e {
+    print("caught error")
+}
+print("captured val:", captured())`
+		assertAgree(t, source, "caught error\ncaptured val: 110\n")
+	})
+
+	// 2. Infinite recursion through callbacks: fn f(x) { return map([1], f) } inside try
+	t.Run("infinite recursion through callbacks inside try", func(t *testing.T) {
+		source := `fn f(x) { return map([1], f) }
+try {
+    f(0)
+} catch e {
+    print("recursion caught:", contains(e, "too many nested calls"))
+}`
+		assertAgree(t, source, "recursion caught: true\n")
+	})
+
+	// 3. Builtins and bound methods as callbacks: map(names, upper), map(points, p.method)
+	t.Run("builtins and bound methods as callbacks", func(t *testing.T) {
+		source := `let names = ["jin", "lang"]
+print(map(names, upper))
+
+struct Counter { count: int }
+fn (c: Counter) add(x: int) -> int {
+    c.count = c.count + x
+    return c.count
+}
+let ctr = Counter{count: 5}
+let results = map([10, 20, 30], ctr.add)
+print(results, ctr.count)`
+		assertAgree(t, source, "[\"JIN\", \"LANG\"]\n[15, 35, 65] 65\n")
+	})
+
+	// 4. Wrong arity callback and sort_by non-int comparator error messages
+	t.Run("wrong arity callback", func(t *testing.T) {
+		source := `try {
+    map([1, 2], fn(a, b) { return a + b })
+} catch e {
+    print("caught:", e)
+}`
+		assertAgree(t, source, "caught: 2:8: fn() expects 2 argument(s), got 1\n")
+	})
+
+	t.Run("sort_by non-int comparator error message", func(t *testing.T) {
+		source := `try {
+    sort_by([1, 2], fn(a, b) { return "not an int" })
+} catch e {
+    print("caught:", e)
+}`
+		assertAgree(t, source, "caught: 2:12: sort_by() comparator must return int, got str\n")
+	})
+
+	// 5. sort_by must be stable (same result on both engines for ties)
+	t.Run("sort_by is stable on ties", func(t *testing.T) {
+		source := `struct Pair { k: int, v: str }
+let pairs = [Pair{k: 2, v: "first_2"}, Pair{k: 1, v: "one"}, Pair{k: 2, v: "second_2"}, Pair{k: 2, v: "third_2"}]
+let sorted = sort_by(pairs, fn(a, b) { return a.k - b.k })
+for p in sorted {
+    print(p.k, p.v)
+}`
+		assertAgree(t, source, "1 one\n2 first_2\n2 second_2\n2 third_2\n")
+	})
+
+	// 6. Callback calls another higher-order builtin (map inside filter inside reduce)
+	t.Run("higher-order builtins 3 levels deep", func(t *testing.T) {
+		source := `let matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+let total = reduce(matrix, fn(acc, row) {
+    let odds = filter(row, fn(x) {
+        return any([x], fn(y) { return y % 2 == 1 })
+    })
+    let doubled = map(odds, fn(z) { return z * 2 })
+    return acc + reduce(doubled, fn(s, item) { return s + item }, 0)
+}, 0)
+print("total:", total)`
+		// Rows:
+		// [1, 2, 3] -> odds: [1, 3] -> doubled: [2, 6] -> sum: 8
+		// [4, 5, 6] -> odds: [5] -> doubled: [10] -> sum: 10
+		// [7, 8, 9] -> odds: [7, 9] -> doubled: [14, 18] -> sum: 32
+		// total = 8 + 10 + 32 = 50
+		assertAgree(t, source, "total: 50\n")
+	})
+
+	// 7. input() and read_all_stdin() share ONE buffered reader (no lost bytes)
+	t.Run("input and read_all_stdin share buffered reader", func(t *testing.T) {
+		inputContent := "line 1\r\nline 2\nline 3\nand the rest of the stream\n"
+		source := `let l1 = input()
+let l2 = input("prompt: ")
+let rem = read_all_stdin()
+print("l1: {l1}")
+print("l2: {l2}")
+print("remaining: {rem}")`
+
+		vmOut, vmErr := runVMWithInput(inputContent, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runInterpWithInput(inputContent, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Fatalf("engines disagree:\n vm: %q\n interp: %q", vmOut, interpOut)
+		}
+		want := "prompt: l1: line 1\nl2: line 2\nremaining: line 3\nand the rest of the stream\n\n"
+		if vmOut != want {
+			t.Errorf("got: %q\nwant: %q", vmOut, want)
+		}
+	})
+
+	// 8. Error on line after multi-line string reports correct line:col
+	t.Run("error on line after multi-line string reports correct line", func(t *testing.T) {
+		source := `let s = """
+line 1
+line 2
+"""
+1 / 0`
+		_, vmErr := runVM(source)
+		if vmErr == nil {
+			t.Fatal("expected vm error")
+		}
+		_, interpErr := runInterp(source)
+		if interpErr == nil {
+			t.Fatal("expected interp error")
+		}
+		if vmErr.Error() != interpErr.Error() {
+			t.Fatalf("engines disagree on error:\n vm: %v\n interp: %v", vmErr, interpErr)
+		}
+		if !strings.HasPrefix(vmErr.Error(), "5:3:") {
+			t.Errorf("expected error on line 5:3, got: %v", vmErr)
+		}
+	})
+
+	// 9. Interpolation containing quotes and nested braces inside """ strings
+	t.Run("interpolation with quotes and nested braces inside multiline string", func(t *testing.T) {
+		source := `struct Point { x: int, y: int }
+let s = """
+quote: {"hello } world"}
+nested: {Point{x: 1, y: 2}}
+call: {map([1, 2], fn(x) { return x * 10 })}
+"""
+print(s)`
+		assertAgree(t, source, "quote: hello } world\nnested: Point{x: 1, y: 2}\ncall: [10, 20]\n\n")
+	})
+
+	// 10. error("12:30: meeting") consistent prefix behavior
+	t.Run("error with time-like prefix keeps line and col", func(t *testing.T) {
+		source := `try {
+    error("12:30: meeting")
+} catch e {
+    print("caught:", e)
+}`
+		assertAgree(t, source, "caught: 2:10: 12:30: meeting\n")
+	})
+
+	t.Run("re-raise error with time-like prefix preserves exact text", func(t *testing.T) {
+		source := `try {
+    try {
+        error("12:30: meeting")
+    } catch e {
+        error(e)
+    }
+} catch e2 {
+    print("outer:", e2)
+}`
+		assertAgree(t, source, "outer: 3:14: 12:30: meeting\n")
+	})
 }

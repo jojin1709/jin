@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
-[![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-389%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -148,6 +148,10 @@ go build -o jin.exe .
 
 ./jin.exe examples/tour.jin         # run a program (bytecode VM)
 ./jin.exe examples/soak.jin         # a bigger program: closures, recursion, loops
+./jin.exe examples/records.jin      # user-defined structs, named constructors, methods
+./jin.exe examples/errors.jin       # error handling with try / catch and error()
+./jin.exe examples/functional.jin   # map, filter, reduce, any, all, sort_by
+./jin.exe examples/input.jin        # interactive input() and read_all_stdin()
 ./jin.exe examples/collections.jin  # maps, lists and the built-ins for them
 ./jin.exe examples/types.jin        # the type-checked demo
 ./jin.exe examples/files.jin        # reading and writing files
@@ -200,6 +204,14 @@ project under test has to produce byte-identical output on both back ends.
 - **Structs and methods.** User-defined record types declared with `struct`,
   constructor calls, dotted field access and mutation, and methods declared
   with receiver syntax (`fn (p: Point)`).
+- **Error handling with try / catch.** Catchable runtime errors, custom messages
+  via `error()`, and clean re-raising across handler frames.
+- **Terminal input and multi-line strings.** `input()` with optional prompt and
+  `read_all_stdin()` share a single buffered stream; multi-line strings (`"""..."""`)
+  support string interpolation with `{expr}`, stripped leading newline, and normalized CRLF.
+- **Higher-order built-ins.** `map`, `filter`, `reduce`, `any`, `all`, `sort_by`
+  (with stable ordering on ties), and `find_index` work cleanly with functions,
+  closures, built-ins, and bound methods.
 - **Fast ordered maps.** Ordered entries, `int` / `str` / `bool` keys, and
   a missing key that is an error rather than a silent `nil`.
 - **One obvious way to do things.** No decorators, no metaclasses, no dunder
@@ -264,6 +276,8 @@ print(person["name"], has(person, "job")) # Ada false
 for field in person { print(field) }      # maps loop over their keys
 ```
 
+Multi-line strings are delimited with `""" ... """`. Any immediate newline right after the opening `"""` is stripped, and Windows CRLF line endings (`\r\n`) are normalized to `\n` so multi-line text is byte-identical across platforms. String interpolation `{expr}` works inside triple-quoted strings, supporting nested braces and quotes.
+
 ### Built-ins
 
 | Group | Functions |
@@ -320,6 +334,21 @@ print(p)                # Point{x: 16, y: 11}
 Records can be nested, stored in arrays and maps, and even refer to their own
 type recursively (e.g., `struct Node { value: int, next: Node }`). See
 `examples/records.jin` and `examples/functional.jin` for runnable walkthroughs.
+
+### Struct literals in conditions
+
+Because Jin statements use unparenthesized conditions followed by a braced block (`if cond { ... }`, `while cond { ... }`), a struct literal directly inside a condition must be enclosed in parentheses to distinguish it from the block opening:
+
+```jin
+if (p == Point{x: 1, y: 2}) {
+    print("matched")
+}
+while (next_node != Point{x: 0, y: 0}) {
+    ...
+}
+```
+
+Struct literals inside arrays or parenthesized expressions (such as `for p in [Point{x: 1, y: 2}] { ... }`) do not require extra parentheses. If an unparenthesized struct literal is placed in a condition before the block brace, Jin reports: `struct literals in conditions must be enclosed in parentheses, e.g. (Point{...})`.
 
 ---
 
@@ -635,7 +664,7 @@ there is no separate artefact to keep in step with the source.
 
 ### The pipeline
 
-A language is built as a pipeline. Jin is through stage 9:
+A language is built as a pipeline. Jin is through stage 10:
 
 ```
 source text
@@ -731,11 +760,11 @@ same machine (Windows, Go 1.26, CPython 3.14):
 
 | Engine | Time |
 |---|---|
-| `jin run` (bytecode VM) | ~0.40 s |
-| `jin interpret` (tree walker) | ~2.4 s |
-| CPython 3.14, same program | ~0.34 s |
+| `jin run` (bytecode VM) | ~0.45 s |
+| `jin interpret` (tree walker) | ~3.5 s |
+| CPython 3.14, same program | ~0.20 s |
 
-So the VM is roughly six times faster than Jin's own tree-walking back end, and
+So the VM is roughly seven to eight times faster than Jin's own tree-walking back end, and
 in the same ballpark as CPython on a call-heavy benchmark. Getting clearly past
 CPython would need unboxed stack slots and inline caches, which are a later
 stage's work.
@@ -755,7 +784,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-375 test cases pass, covering the lexer, parser, type checker, compiler,
+389 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 

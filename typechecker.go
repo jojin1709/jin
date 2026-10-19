@@ -1757,10 +1757,11 @@ func newBuiltinSigs() map[string]*builtinSig {
 	}
 
 	sigs["input"] = &builtinSig{Check: func(c *Checker, args []*Type, tok Token) *Type {
-		if !c.expectArgs("input", args, 1, tok) {
+		if len(args) > 1 {
+			c.errorf(tok, "input() takes 0 or 1 argument(s), got %d", len(args))
 			return strT
 		}
-		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
+		if len(args) == 1 && args[0].Kind != TypeStr && args[0].Kind != TypeAny {
 			c.errorf(tok, "input() expects str, got %s", args[0])
 		}
 		return strT

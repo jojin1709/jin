@@ -653,6 +653,9 @@ func newBuiltins(in io.Reader, out io.Writer, programArgs []string, caller Calle
 		if err := arity("error", args, 1); err != nil {
 			return nil, err
 		}
+		if s, ok := args[0].(*String); ok && s.IsError {
+			return nil, &LocatedError{Msg: s.Value}
+		}
 		return nil, fmt.Errorf("%s", args[0].Inspect())
 	}}
 
@@ -727,15 +730,18 @@ func newBuiltins(in io.Reader, out io.Writer, programArgs []string, caller Calle
 	// ------------------------------------------------------------- stdin & io
 
 	b["input"] = &Builtin{Name: "input", Fn: func(args []Object) (Object, error) {
-		if err := arity("input", args, 1); err != nil {
-			return nil, err
+		var prompt string
+		if len(args) == 1 {
+			p, ok := args[0].(*String)
+			if !ok {
+				return nil, typeError("input", args[0], "str")
+			}
+			prompt = p.Value
+		} else if len(args) > 1 {
+			return nil, fmt.Errorf("input() takes 0 or 1 argument(s), got %d", len(args))
 		}
-		prompt, ok := args[0].(*String)
-		if !ok {
-			return nil, typeError("input", args[0], "str")
-		}
-		if out != nil {
-			fmt.Fprint(out, prompt.Value)
+		if prompt != "" && out != nil {
+			fmt.Fprint(out, prompt)
 			if f, ok := out.(interface{ Flush() error }); ok {
 				_ = f.Flush()
 			}

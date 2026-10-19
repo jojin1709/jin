@@ -174,6 +174,10 @@ func (p *Parser) ParseProgram() *Program {
 }
 
 func (p *Parser) parseStatement() Statement {
+	if (p.curTokenIs(IDENT) || p.curTokenIs(STRING)) && p.peekTokenIs(COLON) {
+		p.errorf("struct literals in conditions must be enclosed in parentheses, e.g. (Point{...})")
+		return nil
+	}
 	switch p.curToken.Type {
 	case IMPORT:
 		return p.parseImportStatement()
@@ -691,7 +695,10 @@ func (p *Parser) parseCallExpression(fn Expression) Expression {
 func (p *Parser) parseIndexExpression(left Expression) Expression {
 	exp := &IndexExpression{Token: p.curToken, Left: left}
 	p.nextToken()
+	saved := p.noStructLiteral
+	p.noStructLiteral = false
 	exp.Index = p.parseExpression(PREC_LOWEST)
+	p.noStructLiteral = saved
 	if !p.expectPeek(RBRACKET) {
 		return nil
 	}
@@ -725,6 +732,10 @@ func (p *Parser) parseMapLiteral() Expression {
 		p.nextToken() // move onto '}'
 		return lit
 	}
+
+	saved := p.noStructLiteral
+	p.noStructLiteral = false
+	defer func() { p.noStructLiteral = saved }()
 
 	p.nextToken() // move onto the first key
 	for {
@@ -789,6 +800,8 @@ func (p *Parser) parseExpressionList(end TokenType) []Expression {
 	}
 
 	p.nextToken()
+	saved := p.noStructLiteral
+	p.noStructLiteral = false
 	list = append(list, p.parseExpression(PREC_LOWEST))
 
 	for p.peekTokenIs(COMMA) {
@@ -796,6 +809,7 @@ func (p *Parser) parseExpressionList(end TokenType) []Expression {
 		p.nextToken()
 		list = append(list, p.parseExpression(PREC_LOWEST))
 	}
+	p.noStructLiteral = saved
 
 	if !p.expectPeek(end) {
 		return nil

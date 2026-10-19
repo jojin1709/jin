@@ -108,9 +108,22 @@ world"""`)
 		t.Fatalf("unexpected content: %q", got.Literal)
 	}
 
+	// Leading newline stripped, CRLF normalized to LF
+	crlfLex := NewLexer("\"\"\"\r\nfirst\r\nsecond\r\n\"\"\"")
+	got = crlfLex.NextToken()
+	if got.Type != STRING {
+		t.Fatalf("want STRING, got %s", got.Type)
+	}
+	if got.Literal != "first\nsecond\n" {
+		t.Fatalf("unexpected CRLF content: %q", got.Literal)
+	}
+
 	unterminated := NewLexer(`"""no closing quotes`)
 	got = unterminated.NextToken()
 	if got.Type != ILLEGAL {
 		t.Fatalf("want ILLEGAL for unterminated multi-line string, got %s", got.Type)
+	}
+	if got.Line != 1 || got.Column != 1 {
+		t.Fatalf("unterminated string position: want 1:1, got %d:%d", got.Line, got.Column)
 	}
 }

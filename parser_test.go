@@ -404,3 +404,47 @@ func TestParseStructLiteral(t *testing.T) {
 		t.Errorf("field names mismatch: %s, %s", lit.Fields[0].Name.Value, lit.Fields[1].Name.Value)
 	}
 }
+
+func TestConditionsWithStructLiterals(t *testing.T) {
+	// 1. Single identifier in if
+	p1 := parse(t, `if ready { print("yes") }`)
+	if len(p1.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(p1.Statements))
+	}
+
+	// 2. Parenthesized struct literal in if
+	p2 := parse(t, `if p == (Point{x: 1, y: 2}) { print("match") }`)
+	if len(p2.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(p2.Statements))
+	}
+
+	// 3. For loop with struct literal inside array
+	p3 := parse(t, `for p in [Point{x: 1, y: 2}] { print(p) }`)
+	if len(p3.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(p3.Statements))
+	}
+
+	// 4. Map literal in if condition
+	p4 := parse(t, `if m == {"a": 1} { print("map match") }`)
+	if len(p4.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(p4.Statements))
+	}
+
+	// 5. While loop with parenthesized condition
+	p5 := parse(t, `while (p == Point{x: 0, y: 0}) { break }`)
+	if len(p5.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(p5.Statements))
+	}
+
+	// 6. Unparenthesized struct literal in condition reports helpful error
+	p := NewParser(NewLexer(`if p == Point{x: 1, y: 2} { }`))
+	p.ParseProgram()
+	errs := p.Errors()
+	if len(errs) == 0 {
+		t.Fatalf("expected parser error for unparenthesized struct literal in condition")
+	}
+	joined := strings.Join(errs, "; ")
+	if !strings.Contains(joined, "struct literals in conditions must be enclosed in parentheses") {
+		t.Errorf("expected helpful error, got: %s", joined)
+	}
+}

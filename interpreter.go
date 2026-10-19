@@ -243,7 +243,7 @@ func (i *Interpreter) evalTry(node *TryStatement, env *Environment) (Object, err
 	res, err := i.evalBlock(node.TryBody, tryEnv)
 	if err != nil {
 		catchEnv := NewEnclosedEnvironment(env)
-		catchEnv.Set(node.CatchIdent.Value, &String{Value: err.Error()})
+		catchEnv.Set(node.CatchIdent.Value, &String{Value: err.Error(), IsError: true})
 		return i.evalBlock(node.CatchBody, catchEnv)
 	}
 	return res, nil
@@ -849,21 +849,26 @@ func (i *Interpreter) applyFunction(fn *Function, args []Object, tok Token) (Obj
 		if name == "" {
 			name = "fn"
 		}
+		if tok.Line == 0 {
+			return nil, fmt.Errorf("%s() expects %d argument(s), got %d", name, len(fn.Parameters), len(args))
+		}
 		return nil, at(tok, "%s() expects %d argument(s), got %d", name, len(fn.Parameters), len(args))
 	}
 
 	if i.callDepth >= maxFrames {
+		if tok.Line == 0 {
+			return nil, fmt.Errorf("too many nested calls (more than %d)", maxFrames)
+		}
 		return nil, at(tok, "too many nested calls (more than %d)", maxFrames)
 	}
 	i.callDepth++
-	defer func() { i.callDepth-- }()
-
 	callEnv := NewEnclosedEnvironment(fn.Env)
 	for idx, p := range fn.Parameters {
 		callEnv.Set(p.Name.Value, args[idx])
 	}
 
 	result, err := i.evalBlock(fn.Body, callEnv)
+	i.callDepth--
 	if err != nil {
 		return nil, err
 	}
@@ -881,8 +886,7 @@ func (i *Interpreter) applyFunction(fn *Function, args []Object, tok Token) (Obj
 func (i *Interpreter) Call(callee Object, args []Object) (Object, error) {
 	switch fn := callee.(type) {
 	case *Function:
-		dummyTok := Token{Type: IDENT, Literal: fn.Name, Line: 1, Column: 1}
-		return i.applyFunction(fn, args, dummyTok)
+		return i.applyFunction(fn, args, Token{})
 	case *Builtin:
 		return fn.Fn(args)
 	case *StructType:
@@ -891,8 +895,7 @@ func (i *Interpreter) Call(callee Object, args []Object) (Object, error) {
 		callArgs := append([]Object{fn.Receiver}, args...)
 		switch m := fn.Method.(type) {
 		case *Function:
-			dummyTok := Token{Type: IDENT, Literal: m.Name, Line: 1, Column: 1}
-			return i.applyFunction(m, callArgs, dummyTok)
+			return i.applyFunction(m, callArgs, Token{})
 		case *Builtin:
 			return m.Fn(callArgs)
 		}
@@ -966,11 +969,13 @@ func (i *Interpreter) evalInline(src string, env *Environment, tok Token) (Objec
 // file's name is included; the file that was run is left out, because there is
 // only one of it and the message stays shorter without it.
 func at(tok Token, format string, args ...any) error {
-	msg := fmt.Sprintf(format, args...)
-	if hasPositionPrefix(msg) {
-		return fmt.Errorf("%s", msg)
+	if len(args) == 1 && format == "%s" {
+		if le, ok := args[0].(*LocatedError); ok {
+			return le
+		}
 	}
-	return fmt.Errorf("%s: %s", tok.Position(), msg)
+	msg := fmt.Sprintf(format, args...)
+	return &LocatedError{Msg: fmt.Sprintf("%s: %s", tok.Position(), msg)}
 }
 
 func isNumber(o Object) bool {

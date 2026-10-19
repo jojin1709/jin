@@ -88,10 +88,21 @@ func (o *Float) Type() ObjectType { return FLOAT_OBJ }
 func (o *Float) Inspect() string  { return strconv.FormatFloat(o.Value, 'g', -1, 64) }
 
 // String is text.
-type String struct{ Value string }
+type String struct {
+	Value   string
+	IsError bool // set when this string originated from a caught runtime error
+}
 
 func (o *String) Type() ObjectType { return STRING_OBJ }
 func (o *String) Inspect() string  { return o.Value }
+
+// LocatedError wraps an error that already has a source position prefix,
+// preventing duplicate prefixes when errors propagate or are re-raised.
+type LocatedError struct {
+	Msg string
+}
+
+func (e *LocatedError) Error() string { return e.Msg }
 
 // Boolean is true or false.
 type Boolean struct{ Value bool }
