@@ -66,6 +66,8 @@ const (
 	TRUE     TokenType = "true"
 	FALSE    TokenType = "false"
 	NIL      TokenType = "nil"
+	TRY      TokenType = "try"
+	CATCH    TokenType = "catch"
 )
 
 // Token is a single lexical unit with its source position. File is empty for
@@ -105,6 +107,8 @@ var keywords = map[string]TokenType{
 	"true":     TRUE,
 	"false":    FALSE,
 	"nil":      NIL,
+	"try":      TRY,
+	"catch":    CATCH,
 }
 
 // LookupIdent turns an identifier into a keyword token when it matches one.

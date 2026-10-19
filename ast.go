@@ -309,6 +309,34 @@ func (s *ContinueStatement) statementNode()       {}
 func (s *ContinueStatement) TokenLiteral() string { return s.Token.Literal }
 func (s *ContinueStatement) String() string       { return "continue" }
 
+// TryStatement handles runtime errors:
+// try { ... } catch e { ... }
+type TryStatement struct {
+	Token      Token
+	TryBody    *BlockStatement
+	CatchIdent *Identifier
+	CatchBody  *BlockStatement
+}
+
+func (s *TryStatement) statementNode()       {}
+func (s *TryStatement) TokenLiteral() string { return s.Token.Literal }
+func (s *TryStatement) String() string {
+	var sb strings.Builder
+	sb.WriteString("try ")
+	if s.TryBody != nil {
+		sb.WriteString(s.TryBody.String())
+	}
+	sb.WriteString(" catch ")
+	if s.CatchIdent != nil {
+		sb.WriteString(s.CatchIdent.String())
+	}
+	sb.WriteString(" ")
+	if s.CatchBody != nil {
+		sb.WriteString(s.CatchBody.String())
+	}
+	return sb.String()
+}
+
 // ---------------------------------------------------------------- expressions
 
 // Identifier is a variable or function name.

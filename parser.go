@@ -188,6 +188,8 @@ func (p *Parser) parseStatement() Statement {
 		return p.parseBreakStatement()
 	case CONTINUE:
 		return p.parseContinueStatement()
+	case TRY:
+		return p.parseTryStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -488,6 +490,31 @@ func (p *Parser) parseContinueStatement() *ContinueStatement {
 	if p.peekTokenIs(SEMICOLON) {
 		p.nextToken()
 	}
+	return stmt
+}
+
+func (p *Parser) parseTryStatement() *TryStatement {
+	stmt := &TryStatement{Token: p.curToken}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	stmt.TryBody = p.parseBlockStatement()
+
+	if !p.expectPeek(CATCH) {
+		return nil
+	}
+
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	stmt.CatchIdent = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	stmt.CatchBody = p.parseBlockStatement()
+
 	return stmt
 }
 

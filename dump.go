@@ -88,6 +88,12 @@ func dumpNode(sb *strings.Builder, n Node, indent int) {
 	case *ContinueStatement:
 		dumpLine(sb, indent, "Continue")
 
+	case *TryStatement:
+		dumpLine(sb, indent, "Try")
+		dumpNode(sb, node.TryBody, indent+1)
+		dumpLine(sb, indent, "Catch %s", node.CatchIdent.Value)
+		dumpNode(sb, node.CatchBody, indent+1)
+
 	case *BlockStatement:
 		dumpLine(sb, indent, "Block")
 		for _, s := range node.Statements {

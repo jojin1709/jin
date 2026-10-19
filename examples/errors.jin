@@ -1,0 +1,94 @@
+# Error handling in Jin: try / catch statements.
+#
+# Everything that would otherwise stop the program can be caught:
+# error(), failed file built-ins, bad indices, missing map keys,
+# division by zero, and record field errors.
+#
+# The catch variable 'e' is a str holding the exact error message
+# that would have ended the program. Calling error(e) inside a catch
+# block re-raises the error to an outer handler.
+
+# 1. Catching division by zero
+try {
+    let result = 100 / 0
+    print("result:", result)
+} catch err {
+    print("caught math error:", err)
+}
+
+# 2. Catching missing map keys
+let user = {"name": "Alice"}
+try {
+    let email = user["email"]
+    print("email:", email)
+} catch err {
+    print("caught map lookup:", err)
+}
+
+# 3. Catching bad list indexing
+let items = ["first", "second"]
+try {
+    let item = items[10]
+    print("item:", item)
+} catch err {
+    print("caught index error:", err)
+}
+
+# 4. Raising and catching errors with error()
+fn divide(a: int, b: int) -> int {
+    if b == 0 {
+        error("denominator cannot be zero")
+    }
+    return a / b
+}
+
+try {
+    divide(10, 0)
+} catch err {
+    print("caught divide error:", err)
+}
+
+# 5. Nested try/catch and re-raising
+try {
+    try {
+        error("inner problem occurred")
+    } catch inner {
+        print("inner caught:", inner)
+        error(inner)
+    }
+} catch outer {
+    print("outer caught re-raised error:", outer)
+}
+
+# 6. Errors inside record methods
+struct Account {
+    balance: int
+}
+
+fn (a: Account) withdraw(amount: int) -> int {
+    if amount > a.balance {
+        error("insufficient funds")
+    }
+    a.balance = a.balance - amount
+    return a.balance
+}
+
+let acct = Account(50)
+try {
+    acct.withdraw(100)
+} catch err {
+    print("caught method error:", err)
+}
+
+# 7. Control flow: returning from try and catch
+fn safe_lookup(m: map, key: str, fallback: str) -> str {
+    try {
+        return m[key]
+    } catch err {
+        return fallback
+    }
+}
+
+let config = {"host": "localhost"}
+print("host:", safe_lookup(config, "host", "default"))
+print("port:", safe_lookup(config, "port", "8080"))

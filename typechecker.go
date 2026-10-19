@@ -649,6 +649,17 @@ func (c *Checker) checkStatement(stmt Statement) *Type {
 		}
 		return nilT
 
+	case *TryStatement:
+		tryType := c.checkBlock(node.TryBody)
+		if _, isBuiltin := c.builtins[node.CatchIdent.Value]; isBuiltin {
+			c.errorf(node.CatchIdent.Token, "catch variable %q cannot shadow a builtin", node.CatchIdent.Value)
+		}
+		c.pushScope()
+		c.declare(node.CatchIdent.Value, strT)
+		catchType := c.checkBlockNoScope(node.CatchBody)
+		c.popScope()
+		return unify(tryType, catchType)
+
 	case *BlockStatement:
 		return c.checkBlock(node)
 	}
@@ -713,6 +724,13 @@ func containsReturn(stmt Statement) bool {
 		return containsReturn(node.Body)
 	case *WhileStatement:
 		return containsReturn(node.Body)
+	case *TryStatement:
+		if containsReturn(node.TryBody) {
+			return true
+		}
+		if containsReturn(node.CatchBody) {
+			return true
+		}
 	}
 	return false
 }

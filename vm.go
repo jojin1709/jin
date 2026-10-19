@@ -15,6 +15,13 @@ const (
 	maxFrames = 1024
 )
 
+// exceptionHandler records what to restore when an error occurs inside a try block.
+type exceptionHandler struct {
+	catchIP    int
+	sp         int
+	frameDepth int
+}
+
 // VM runs bytecode. It keeps one value stack, a stack of call frames, and the
 // globals, which survive between REPL lines.
 type VM struct {
@@ -34,6 +41,9 @@ type VM struct {
 	// that captures the same slot shares the cell, which is what makes sibling
 	// closures see each other's writes.
 	openCells []*cell
+
+	// handlers tracks active try blocks for exception unwinding.
+	handlers []exceptionHandler
 }
 
 // NewVM prepares a virtual machine that writes program output to out.
@@ -81,6 +91,7 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 	vm.frameTop = 0
 	vm.sp = 0
 	vm.lastPopped = nilObject
+	vm.handlers = vm.handlers[:0]
 
 	// Every return closes the cells its frame opened, so the list should be
 	// empty already; resetting makes that a guarantee rather than a hope.
@@ -114,6 +125,32 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 	// refreshed whenever a call or a return changes the current frame.
 	frame := vm.frames[0]
 	ins := frame.cl.Fn.Instructions
+
+	raiseError := func(e error) error {
+		if len(vm.handlers) > 0 {
+			h := vm.handlers[len(vm.handlers)-1]
+			vm.handlers = vm.handlers[:len(vm.handlers)-1]
+
+			for vm.frameTop > h.frameDepth {
+				vm.closeCells(vm.frames[vm.frameTop-1].basePointer)
+				vm.popFrame()
+			}
+			vm.closeCells(h.sp)
+			vm.sp = h.sp
+			vm.push(&String{Value: e.Error()})
+			frame = vm.frames[vm.frameTop-1]
+			ins = frame.cl.Fn.Instructions
+			frame.ip = h.catchIP
+			return nil
+		}
+		return e
+	}
+	fail := func(e error) error {
+		return raiseError(e)
+	}
+	failf := func(format string, args ...any) error {
+		return raiseError(vm.errorf(format, args...))
+	}
 
 	for vm.frameTop > 0 {
 		if frame.ip >= len(ins) {
@@ -157,7 +194,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			}
 			// The types did not work out; redo it to get the exact message.
 			_, err := addValues(left, right, vm.tokenHere())
-			return nil, err
+			if err := fail(err); err != nil {
+				return nil, err
+			}
+			continue
 
 		case OpSub, OpMul, OpDiv, OpMod:
 			right := vm.pop()
@@ -167,7 +207,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 				break
 			}
 			_, err := arithValues(numericOpName(op), left, right, vm.tokenHere())
-			return nil, err
+			if err := fail(err); err != nil {
+				return nil, err
+			}
+			continue
 
 		case OpEqual:
 			right := vm.pop()
@@ -187,7 +230,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 				break
 			}
 			_, err := compareValues(orderOpName(op), left, right, vm.tokenHere())
-			return nil, err
+			if err := fail(err); err != nil {
+				return nil, err
+			}
+			continue
 
 		case OpMinus:
 			operand := vm.pop()
@@ -197,14 +243,20 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			case *Float:
 				vm.push(newFloat(-v.Value))
 			default:
-				return nil, vm.errorf("'-' expects a number, got %s", operand.Type())
+				if err := failf("'-' expects a number, got %s", operand.Type()); err != nil {
+					return nil, err
+				}
+				continue
 			}
 
 		case OpBang:
 			operand := vm.pop()
 			b, ok := operand.(*Boolean)
 			if !ok {
-				return nil, vm.errorf("'!' expects a bool, got %s", operand.Type())
+				if err := failf("'!' expects a bool, got %s", operand.Type()); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(newBoolean(!b.Value))
 
@@ -215,7 +267,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			operand := vm.pop()
 			n, err := lengthOf(operand)
 			if err != nil {
-				return nil, vm.errorf("%s", err)
+				if err := failf("%s", err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(newInteger(n))
 
@@ -223,12 +278,20 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			count := int(ReadUint16(ins[frame.ip:]))
 			frame.ip += 2
 			parts := make([]string, count)
+			failed := false
 			for i := count - 1; i >= 0; i-- {
 				s, ok := vm.pop().(*String)
 				if !ok {
-					return nil, vm.errorf("cannot build a string here")
+					failed = true
+				} else if !failed {
+					parts[i] = s.Value
 				}
-				parts[i] = s.Value
+			}
+			if failed {
+				if err := failf("cannot build a string here"); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(&String{Value: joinStrings(parts)})
 
@@ -297,7 +360,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 
 			fn, ok := vm.constants[constIndex].(*CompiledFunction)
 			if !ok {
-				return nil, vm.errorf("closure constant is not a function")
+				if err := failf("closure constant is not a function"); err != nil {
+					return nil, err
+				}
+				continue
 			}
 
 			free := make([]*cell, count)
@@ -336,17 +402,28 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 				pairs[i] = MapEntry{Key: vm.pop(), Value: value}
 			}
 			m := &Map{}
+			var mapErr error
 			for _, pair := range pairs {
 				if err := m.Set(pair.Key, pair.Value); err != nil {
-					return nil, vm.errorf("%s", err)
+					mapErr = err
+					break
 				}
+			}
+			if mapErr != nil {
+				if err := failf("%s", mapErr); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(m)
 
 		case OpIterate:
 			seq, err := iterateValues(vm.pop())
 			if err != nil {
-				return nil, vm.errorf("%s", err)
+				if err := failf("%s", err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(seq)
 
@@ -355,7 +432,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			container := vm.pop()
 			value, err := indexInto(container, index)
 			if err != nil {
-				return nil, vm.errorf("%s", err)
+				if err := failf("%s", err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(value)
 
@@ -364,7 +444,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			index := vm.pop()
 			container := vm.pop()
 			if err := setInto(container, index, value); err != nil {
-				return nil, vm.errorf("%s", err)
+				if err := failf("%s", err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			// Assignment is an expression, so the value stays on the stack.
 			vm.push(value)
@@ -374,7 +457,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			frame.ip += 2
 			value, err := getField(vm.pop(), fieldName(vm.constants[index]))
 			if err != nil {
-				return nil, vm.errorf("%s", err)
+				if err := failf("%s", err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			vm.push(value)
 
@@ -384,7 +470,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			value := vm.pop()
 			container := vm.pop()
 			if err := setField(container, fieldName(vm.constants[index]), value); err != nil {
-				return nil, vm.errorf("%s", err)
+				if err := failf("%s", err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			// Assignment is an expression, so the value stays on the stack.
 			vm.push(value)
@@ -394,7 +483,7 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			frame.ip += 2
 			nameIndex := int(ReadUint16(ins[frame.ip:]))
 			frame.ip += 2
-			method := vm.pop()
+			method := vm.peek()
 			st := vm.constants[typeIndex].(*StructType)
 			if st.Methods == nil {
 				st.Methods = make(map[string]Object)
@@ -405,7 +494,10 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			argc := int(ReadUint8(ins[frame.ip:]))
 			frame.ip++
 			if err := vm.call(argc); err != nil {
-				return nil, err
+				if err := fail(err); err != nil {
+					return nil, err
+				}
+				continue
 			}
 			// The call may have started a new frame.
 			frame = vm.frames[vm.frameTop-1]
@@ -421,6 +513,9 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			// The frame is about to go, so any variable a closure captured has
 			// to be copied off the stack before its slots are reused.
 			vm.closeCells(frame.basePointer)
+			for len(vm.handlers) > 0 && vm.handlers[len(vm.handlers)-1].frameDepth >= vm.frameTop {
+				vm.handlers = vm.handlers[:len(vm.handlers)-1]
+			}
 			done := vm.popFrame()
 			if vm.frameTop == 0 {
 				// The script has finished.
@@ -432,6 +527,20 @@ func (vm *VM) Run(bc *Bytecode) (result Object, err error) {
 			vm.push(result)
 			frame = vm.frames[vm.frameTop-1]
 			ins = frame.cl.Fn.Instructions
+
+		case OpPushHandler:
+			catchIP := int(ReadUint16(ins[frame.ip:]))
+			frame.ip += 2
+			vm.handlers = append(vm.handlers, exceptionHandler{
+				catchIP:    catchIP,
+				sp:         vm.sp,
+				frameDepth: vm.frameTop,
+			})
+
+		case OpPopHandler:
+			if len(vm.handlers) > 0 {
+				vm.handlers = vm.handlers[:len(vm.handlers)-1]
+			}
 
 		default:
 			return nil, fmt.Errorf("unknown opcode %d", op)

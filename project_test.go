@@ -1050,3 +1050,33 @@ func runModuleOnInterpreter(t *testing.T, m *Module, programArgs []string) (stri
 	_, err := interp.RunModules(m, NewEnvironment())
 	return out.String(), err
 }
+
+func TestImportedErrorCaughtByImporter(t *testing.T) {
+	dir := writeFiles(t, map[string]string{
+		"math.jin": `fn div(a, b) {
+    return a / b
+}`,
+		"main.jin": `import "math" as m
+try {
+    m.div(10, 0)
+} catch e {
+    print("caught error:", e)
+}`,
+	})
+
+	vmOut, vmErr := runFileOnVM(t, filepath.Join(dir, "main.jin"))
+	if vmErr != nil {
+		t.Fatalf("vm error: %v", vmErr)
+	}
+	interpOut, interpErr := runFileOnInterpreter(t, filepath.Join(dir, "main.jin"))
+	if interpErr != nil {
+		t.Fatalf("interp error: %v", interpErr)
+	}
+
+	if vmOut != interpOut {
+		t.Errorf("outputs differ:\n    vm: %q\ninterp: %q", vmOut, interpOut)
+	}
+	if !strings.Contains(vmOut, "math.jin:2:14: division by zero") {
+		t.Errorf("expected file:line:col prefix in error message, got %q", vmOut)
+	}
+}

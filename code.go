@@ -60,6 +60,8 @@ const (
 	OpCall           // call a function with n arguments
 	OpReturnValue    // return the top of the stack
 	OpCloseUpvalues  // copy the cells at and above a local slot off the stack
+	OpPushHandler    // push exception handler with 2-byte catch address
+	OpPopHandler     // pop exception handler
 )
 
 type definition struct {
@@ -114,6 +116,8 @@ var definitions = map[Opcode]*definition{
 	OpCall:           {"OpCall", []int{1}},
 	OpReturnValue:    {"OpReturnValue", nil},
 	OpCloseUpvalues:  {"OpCloseUpvalues", []int{2}},
+	OpPushHandler:    {"OpPushHandler", []int{2}},
+	OpPopHandler:     {"OpPopHandler", nil},
 }
 
 // Lookup returns an opcode's definition.

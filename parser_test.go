@@ -354,3 +354,28 @@ func TestParseMethodInsideBlockRejected(t *testing.T) {
 		t.Errorf("unexpected error message: %s", p.Errors()[0])
 	}
 }
+
+func TestParseTryCatch(t *testing.T) {
+	src := `try {
+    let x = 1
+} catch err {
+    print(err)
+}`
+	program := parse(t, src)
+	if len(program.Statements) != 1 {
+		t.Fatalf("want 1 statement, got %d", len(program.Statements))
+	}
+	ts, ok := program.Statements[0].(*TryStatement)
+	if !ok {
+		t.Fatalf("want TryStatement, got %T", program.Statements[0])
+	}
+	if len(ts.TryBody.Statements) != 1 {
+		t.Fatalf("want 1 try statement, got %d", len(ts.TryBody.Statements))
+	}
+	if ts.CatchIdent.Value != "err" {
+		t.Errorf("want catch ident err, got %s", ts.CatchIdent.Value)
+	}
+	if len(ts.CatchBody.Statements) != 1 {
+		t.Fatalf("want 1 catch statement, got %d", len(ts.CatchBody.Statements))
+	}
+}

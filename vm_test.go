@@ -1531,3 +1531,197 @@ print(len(items), items[3999])`
 		t.Errorf("output = %q, want %q", got, "4000 3999\n")
 	}
 }
+
+func TestTryCatchDifferential(t *testing.T) {
+	cases := []struct {
+		name         string
+		source       string
+		wantContains []string
+	}{
+		{
+			name: "error inside function called from try",
+			source: `fn fail() {
+    error("failure in function")
+}
+fn caller() {
+    try {
+        fail()
+    } catch e {
+        print("caught:", e)
+    }
+}
+caller()`,
+			wantContains: []string{"caught: 2:10: failure in function\n"},
+		},
+		{
+			name: "nested try/catch and re-raise",
+			source: `try {
+    try {
+        error("inner error")
+    } catch e {
+        print("inner caught:", e)
+        error(e)
+    }
+} catch outer {
+    print("outer caught:", outer)
+}`,
+			wantContains: []string{
+				"inner caught: 3:14: inner error\n",
+				"outer caught: 6:14: 3:14: inner error\n",
+			},
+		},
+		{
+			name: "return inside try and inside catch",
+			source: `fn test_ret(should_err) {
+    try {
+        if should_err { error("err") }
+        return "from try"
+    } catch e {
+        return "from catch"
+    }
+}
+print(test_ret(false))
+print(test_ret(true))`,
+			wantContains: []string{"from try\nfrom catch\n"},
+		},
+		{
+			name: "break and continue inside try and inside catch",
+			source: `let i = 0
+let res = []
+while i < 6 {
+    i = i + 1
+    try {
+        if i == 2 { continue }
+        if i == 5 { break }
+        if i == 3 { error("boom") }
+        res = push(res, i)
+    } catch e {
+        res = push(res, 99)
+    }
+}
+print(res)
+
+let j = 0
+let res2 = []
+while j < 6 {
+    j = j + 1
+    try {
+        if j == 2 || j == 4 { error("err") }
+        res2 = push(res2, j)
+    } catch e {
+        if j == 2 { continue }
+        if j == 4 { break }
+    }
+}
+print(res2)`,
+			wantContains: []string{
+				"[1, 99, 4]\n",
+				"[1, 3]\n",
+			},
+		},
+		{
+			name: "closure created in try capturing variable before error",
+			source: `fn make_f() {
+    let saved = nil
+    try {
+        let x = 42
+        saved = fn() { return x }
+        error("boom")
+    } catch e {
+        print("caught error")
+    }
+    return saved
+}
+let f = make_f()
+print("closure returned:", f())`,
+			wantContains: []string{
+				"caught error\n",
+				"closure returned: 42\n",
+			},
+		},
+		{
+			name: "error inside record method call",
+			source: `struct Calculator {
+    base: int
+}
+fn (c: Calculator) div(n: int) -> int {
+    return c.base / n
+}
+let calc = Calculator(100)
+try {
+    print(calc.div(0))
+} catch e {
+    print("method error caught:", e)
+}`,
+			wantContains: []string{
+				"method error caught: 5:19: division by zero\n",
+			},
+		},
+		{
+			name: "everything catchable",
+			source: `struct Pt { x: int }
+try {
+    read_file("nonexistent_file_xyz_123.txt")
+} catch e {
+    print("file error caught")
+}
+
+try {
+    let arr = [1, 2]
+    print(arr[5])
+} catch e {
+    print("index error caught")
+}
+
+try {
+    let m = {"key": 1}
+    print(m["missing"])
+} catch e {
+    print("map error caught")
+}
+
+try {
+    let p = Pt(1)
+    p.y = 2
+} catch e {
+    print("field error caught")
+}
+
+try {
+    let z = 0
+    print(10 / z)
+} catch e {
+    print("div0 error caught")
+}`,
+			wantContains: []string{
+				"file error caught\n",
+				"index error caught\n",
+				"map error caught\n",
+				"field error caught\n",
+				"div0 error caught\n",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			vmOut, vmErr := runOnVM(t, tc.source)
+			if vmErr != nil {
+				t.Fatalf("vm error: %v", vmErr)
+			}
+			interpOut, interpErr := runOnInterpreter(t, tc.source)
+			if interpErr != nil {
+				t.Fatalf("interpreter error: %v", interpErr)
+			}
+
+			if vmOut != interpOut {
+				t.Errorf("outputs differ:\n    vm: %q\ninterp: %q", vmOut, interpOut)
+			}
+			for _, sub := range tc.wantContains {
+				if !strings.Contains(vmOut, sub) {
+					t.Errorf("output %q does not contain %q", vmOut, sub)
+				}
+			}
+		})
+	}
+}

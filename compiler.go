@@ -39,6 +39,7 @@ func (p *constantPool) add(obj Object) int {
 type loopContext struct {
 	continueJumps []int
 	breaks        []int
+	tryDepth      int
 }
 
 // Compiler turns a syntax tree into bytecode. One compiler handles one
@@ -56,6 +57,7 @@ type Compiler struct {
 
 	functionName string
 	loops        []*loopContext
+	tryDepth     int
 
 	// The file being compiled, and the names it can reach other files by. A
 	// function inherits both from the file it was written in.
@@ -369,6 +371,8 @@ func statementToken(stmt Statement) Token {
 		return node.Token
 	case *ContinueStatement:
 		return node.Token
+	case *TryStatement:
+		return node.Token
 	}
 	return Token{}
 }
@@ -459,6 +463,9 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 		} else if err := c.compileExpression(node.Value); err != nil {
 			return err
 		}
+		for i := 0; i < c.tryDepth; i++ {
+			c.emit(OpPopHandler)
+		}
 		c.emit(OpReturnValue)
 		return nil
 
@@ -482,6 +489,9 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 			return c.fail(node.Token, "'break' is only allowed inside a loop")
 		}
 		loop := c.loops[len(c.loops)-1]
+		for i := 0; i < c.tryDepth-loop.tryDepth; i++ {
+			c.emit(OpPopHandler)
+		}
 		loop.breaks = append(loop.breaks, c.emit(OpJump, 0))
 		return nil
 
@@ -490,8 +500,14 @@ func (c *Compiler) compileStatement(stmt Statement) error {
 			return c.fail(node.Token, "'continue' is only allowed inside a loop")
 		}
 		loop := c.loops[len(c.loops)-1]
+		for i := 0; i < c.tryDepth-loop.tryDepth; i++ {
+			c.emit(OpPopHandler)
+		}
 		loop.continueJumps = append(loop.continueJumps, c.emit(OpJump, 0))
 		return nil
+
+	case *TryStatement:
+		return c.compileTry(node)
 	}
 
 	return fmt.Errorf("cannot compile %T", stmt)
@@ -571,8 +587,40 @@ func (c *Compiler) compileIf(node *IfStatement) error {
 	return nil
 }
 
+func (c *Compiler) compileTry(node *TryStatement) error {
+	c.at(node.Token)
+
+	pushHandlerPos := c.emit(OpPushHandler, 0)
+	c.tryDepth++
+
+	c.symbols.EnterBlock()
+	err := c.compileBlock(node.TryBody, true)
+	c.symbols.LeaveBlock()
+	c.tryDepth--
+	if err != nil {
+		return err
+	}
+
+	c.emit(OpPopHandler)
+	jumpToEnd := c.emit(OpJump, 0)
+
+	c.patchJump(pushHandlerPos)
+
+	c.symbols.EnterBlock()
+	catchVar := c.symbols.Define(node.CatchIdent.Value)
+	c.emitSet(catchVar)
+	err = c.compileBlock(node.CatchBody, true)
+	c.symbols.LeaveBlock()
+	if err != nil {
+		return err
+	}
+
+	c.patchJump(jumpToEnd)
+	return nil
+}
+
 func (c *Compiler) compileWhile(node *WhileStatement) error {
-	loop := &loopContext{}
+	loop := &loopContext{tryDepth: c.tryDepth}
 	c.loops = append(c.loops, loop)
 
 	c.at(node.Token)
@@ -634,7 +682,7 @@ func (c *Compiler) compileFor(node *ForStatement) error {
 	c.emit(OpConstant, c.addConstant(&Integer{Value: 0}))
 	c.emitSet(indexSym)
 
-	loop := &loopContext{}
+	loop := &loopContext{tryDepth: c.tryDepth}
 	c.loops = append(c.loops, loop)
 
 	// Everything the body binds lives above every slot already in use, so

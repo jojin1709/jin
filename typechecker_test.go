@@ -548,3 +548,52 @@ fn (p: Point) badReturn() -> int {
     return "not an int"
 }`, "cannot return str from a function declared to return int")
 }
+
+func TestTypeCheckTryCatch(t *testing.T) {
+	expectClean(t, `try {
+    let x: int = 10
+} catch e {
+    let msg: str = e
+    print(msg)
+}`)
+
+	expectTypeError(t, `try {
+    let x = 1
+} catch print {
+}`, `catch variable "print" cannot shadow a builtin`)
+
+	expectTypeError(t, `try {
+    let x = 1
+} catch len {
+}`, `catch variable "len" cannot shadow a builtin`)
+
+	expectTypeError(t, `try {
+    let x = 1
+} catch e {
+    let msg = e
+}
+print(e)`, `undefined variable "e"`)
+
+	expectTypeError(t, `try {
+    let x = 1
+} catch e {
+    let n: int = e
+}`, `cannot assign str to int variable "n"`)
+
+	expectTypeError(t, `try {
+    let n: int = "hello"
+} catch e {
+}`, `cannot assign str to int variable "n"`)
+
+	expectTypeError(t, `try {
+    let n = 1
+} catch e {
+    let m: int = "bad"
+}`, `cannot assign str to int variable "m"`)
+
+	expectClean(t, `try {
+    error("failed")
+} catch e {
+    error(e)
+}`)
+}

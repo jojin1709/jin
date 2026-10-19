@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const version = "0.8.0 (stage 8: records)"
+const version = "0.9.0 (stage 9: error handling)"
 
 func main() {
 	args := os.Args[1:]

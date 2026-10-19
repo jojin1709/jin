@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
-[![Tests](https://img.shields.io/badge/tests-330%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-342%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -37,6 +37,7 @@ manager — in pure Go, with no third-party dependencies.
 - [Records and methods](#records-and-methods)
 - [Maps](#maps)
 - [Files](#files)
+- [Error handling](#error-handling)
 - [Types are optional, but checked](#types-are-optional-but-checked)
 - [Closures](#closures)
 - [Projects and imports](#projects-and-imports)
@@ -368,8 +369,52 @@ delete_file("notes.txt")
 ```
 
 Every file function takes a path as a `str` and reports the operating system's
-own reason when it fails. Because Jin has no `try` yet, a failure stops the
-program, so `file_exists(path)` is how you ask first.
+own reason when it fails. Failures can be caught with `try / catch`, or avoided
+up front using `file_exists(path)`.
+
+---
+
+## Error handling
+
+Errors are handled with `try` and `catch` statements:
+
+```jin
+try {
+    let text = read_file("notes.txt")
+    print(text)
+} catch e {
+    print("failed: {e}")
+}
+```
+
+The catch variable `e` is a `str` holding the exact error message that would have
+ended the program. If you need to propagate an error upward, calling `error(e)`
+inside the catch block re-raises it to the enclosing handler:
+
+```jin
+try {
+    try {
+        let val = 1 / 0
+    } catch err {
+        print("logging error: {err}")
+        error(err)   # re-raise to outer catch
+    }
+} catch outer {
+    print("handled: {outer}")
+}
+```
+
+Everything that stops a running program can be caught:
+- Explicit calls to `error("msg")`
+- Failed file operations (`read_file`, `write_file`, etc.)
+- Out-of-bounds array indices
+- Missing map keys
+- Division by zero
+- Non-existent record field reads or writes
+
+Errors can be thrown and caught across function calls, methods, and imported
+modules. Type errors found by `jin check` remain strictly compile-time errors and
+cannot be caught at runtime.
 
 ---
 
@@ -580,7 +625,7 @@ there is no separate artefact to keep in step with the source.
 
 ### The pipeline
 
-A language is built as a pipeline. Jin is through stage 8:
+A language is built as a pipeline. Jin is through stage 9:
 
 ```
 source text
@@ -700,7 +745,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-330 test cases pass, covering the lexer, parser, type checker, compiler,
+342 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 
@@ -725,13 +770,14 @@ prints, and on where it fails when a module, an alias or an import path is wrong
 - [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
 - [x] Stage 7: package manager + CLI — imports, projects, `jin new` / `jin build`, `args()`
 - [x] Stage 8: records — user-defined struct types, constructors, receiver methods (`fn (p: Point)`), dotted field access and mutation
+- [x] Stage 9: error handling — try / catch statements, catchable runtime errors and error(), re-raising
 
-Current version: `0.8.0 (stage 8: records)` — see `jin --version`.
+Current version: `0.9.0 (stage 9: error handling)` — see `jin --version`.
 
 ### What is in, and what is not
 
-In: records, maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
-`error`, and file reading and writing. `examples/records.jin`, `examples/collections.jin` and
+In: records, try / catch error handling, maps, `sort` / `reverse` / `slice`, the string helpers, the number helpers,
+`error`, and file reading and writing. `examples/records.jin`, `examples/errors.jin`, `examples/collections.jin` and
 `examples/files.jin` exercise all of it. Multi-file programs are in too:
 `import "utils" as u` puts another file's top-level names behind an alias, a
 folder with a `jin.toml` is a project, and `jin new`, `jin build`, `jin check`
@@ -745,8 +791,8 @@ Not in, and honest about it:
 - No compiled output. `jin build` checks and compiles a project and reports what
   came out, but the result is not written to disk, because Jin runs from source
   and a stale binary is worse than no binary.
-- No `try` / `catch`, so `error(...)` and a failed `read_file` end the program.
-  `file_exists` and `has` are how you check before acting.
+- No `finally` blocks, no custom error types, and no `try` as an expression. Catch
+  blocks receive a `str` error message.
 - No default field values, no named construction (`Point{x: 1}`), no
   inheritance or interfaces. Fields must all be passed in declaration order
   when calling `Point(...)`.
@@ -757,7 +803,7 @@ Not in, and honest about it:
 
 ### Roadmap
 
-- **Stage 9 — remote packages:** a registry and a versioned lock file, so
+- **Stage 10 — remote packages:** a registry and a versioned lock file, so
   `import "json" as json` can pull a package instead of a folder. The loader in
   `module.go` is where that lands: it already decides what a path means, what a
   project is, and how files depend on each other.

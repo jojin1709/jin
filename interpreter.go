@@ -213,9 +213,23 @@ func (i *Interpreter) evalStatement(stmt Statement, env *Environment) (Object, e
 
 	case *ContinueStatement:
 		return &ContinueSignal{}, nil
+
+	case *TryStatement:
+		return i.evalTry(node, env)
 	}
 
 	return nil, fmt.Errorf("cannot execute %T", stmt)
+}
+
+func (i *Interpreter) evalTry(node *TryStatement, env *Environment) (Object, error) {
+	tryEnv := NewEnclosedEnvironment(env)
+	res, err := i.evalBlock(node.TryBody, tryEnv)
+	if err != nil {
+		catchEnv := NewEnclosedEnvironment(env)
+		catchEnv.Set(node.CatchIdent.Value, &String{Value: err.Error()})
+		return i.evalBlock(node.CatchBody, catchEnv)
+	}
+	return res, nil
 }
 
 // evalBlock runs statements in order, stopping early on return/break/continue.
