@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // TokenType identifies the kind of a token.
 type TokenType string
@@ -88,6 +91,43 @@ func (t Token) Position() string {
 		return fmt.Sprintf("%s:%d:%d", t.File, t.Line, t.Column)
 	}
 	return fmt.Sprintf("%d:%d", t.Line, t.Column)
+}
+
+// hasPositionPrefix reports whether msg starts with a "line:col: " or
+// "file:line:col: " location prefix.
+func hasPositionPrefix(msg string) bool {
+	colonSpace := strings.Index(msg, ": ")
+	if colonSpace == -1 {
+		return false
+	}
+	prefix := msg[:colonSpace]
+	lastColon := strings.LastIndex(prefix, ":")
+	if lastColon == -1 {
+		return false
+	}
+	colStr := prefix[lastColon+1:]
+	if !isAllDigits(colStr) {
+		return false
+	}
+	rem := prefix[:lastColon]
+	secondLastColon := strings.LastIndex(rem, ":")
+	lineStr := rem
+	if secondLastColon != -1 {
+		lineStr = rem[secondLastColon+1:]
+	}
+	return isAllDigits(lineStr)
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 var keywords = map[string]TokenType{

@@ -202,7 +202,7 @@ func TestCollectionBuiltinsAreChecked(t *testing.T) {
 	expectTypeError(t, `floor("x")`, "floor() expects int or float")
 	expectTypeError(t, `sqrt("x")`, "sqrt() expects int or float")
 	expectTypeError(t, `pow(1)`, "pow() takes 2 argument(s)")
-	expectTypeError(t, `error(1)`, "error() expects str")
+	expectTypeError(t, `error()`, "error() takes 1 argument(s)")
 	expectTypeError(t, `random(1, 2, 3)`, "random() takes 0, 1 or 2 argument(s)")
 }
 

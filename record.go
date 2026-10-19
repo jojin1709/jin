@@ -108,6 +108,9 @@ func getField(obj Object, name string) (Object, error) {
 // setField writes one field. Records are reference values, so this is seen
 // wherever the record is.
 func setField(obj Object, name string, value Object) error {
+	if obj == nil || obj == nilObject {
+		return fmt.Errorf("cannot assign a field of nil")
+	}
 	if s, ok := obj.(*Struct); ok {
 		if i, found := s.Def.index(name); found {
 			s.Fields[i] = value
@@ -129,6 +132,9 @@ func setField(obj Object, name string, value Object) error {
 // noFieldError explains why a dotted read cannot work on something that is not
 // a record. A map is the common case, so it is told what to write instead.
 func noFieldError(obj Object, name string) error {
+	if obj == nil || obj == nilObject {
+		return fmt.Errorf("cannot read a field of nil")
+	}
 	if t, ok := obj.(*StructType); ok {
 		return cannotReadFieldOfType(t.Name)
 	}

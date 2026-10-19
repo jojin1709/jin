@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
-[![Tests](https://img.shields.io/badge/tests-342%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-354%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -745,7 +745,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-342 test cases pass, covering the lexer, parser, type checker, compiler,
+354 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 

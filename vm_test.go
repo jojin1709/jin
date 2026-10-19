@@ -1567,7 +1567,7 @@ caller()`,
 }`,
 			wantContains: []string{
 				"inner caught: 3:14: inner error\n",
-				"outer caught: 6:14: 3:14: inner error\n",
+				"outer caught: 3:14: inner error\n",
 			},
 		},
 		{
@@ -1724,4 +1724,355 @@ try {
 			}
 		})
 	}
+}
+
+func TestTryCatchHardening(t *testing.T) {
+	// 1. Infinite recursion inside try: must produce catchable recursion limit on BOTH engines
+	t.Run("infinite recursion inside try", func(t *testing.T) {
+		source := `fn f(n) { return f(n + 1) }
+try {
+    f(0)
+} catch e {
+    print("caught recursion:", e)
+}`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm unexpected error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp unexpected error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "too many nested calls") {
+			t.Errorf("output does not mention recursion limit: %q", vmOut)
+		}
+	})
+
+	// 2. Re-raise message: in catch e, error(e) must NOT add the line:col prefix again
+	t.Run("re-raise message preserves exact text", func(t *testing.T) {
+		source := `try {
+    try {
+        1 / 0
+    } catch e {
+        print("inner:", e)
+        error(e)
+    }
+} catch outer {
+    print("outer:", outer)
+}`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm unexpected error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp unexpected error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		lines := strings.Split(strings.TrimSpace(vmOut), "\n")
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 lines, got %d: %q", len(lines), vmOut)
+		}
+		innerMsg := strings.TrimPrefix(lines[0], "inner: ")
+		outerMsg := strings.TrimPrefix(lines[1], "outer: ")
+		if innerMsg != outerMsg {
+			t.Errorf("re-raised message changed:\n  inner: %q\n  outer: %q", innerMsg, outerMsg)
+		}
+	})
+
+	// 3. Error thrown inside catch: with outer handler and with no outer handler (uncaught)
+	t.Run("error in catch with outer handler", func(t *testing.T) {
+		source := `try {
+    try {
+        error("first")
+    } catch e {
+        let x = 1 / 0
+    }
+} catch outer {
+    print("outer caught from catch:", outer)
+}`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "division by zero") {
+			t.Errorf("expected division by zero, got: %q", vmOut)
+		}
+	})
+
+	t.Run("error in catch with no outer handler uncaught", func(t *testing.T) {
+		source := `try {
+    error("first")
+} catch e {
+    let x = 1 / 0
+}`
+		_, vmErr := runOnVM(t, source)
+		if vmErr == nil {
+			t.Fatalf("expected uncaught error on VM")
+		}
+		_, interpErr := runOnInterpreter(t, source)
+		if interpErr == nil {
+			t.Fatalf("expected uncaught error on interpreter")
+		}
+		if vmErr.Error() != interpErr.Error() {
+			t.Errorf("errors differ:\n  vm: %q\n  interp: %q", vmErr.Error(), interpErr.Error())
+		}
+		if !strings.Contains(vmErr.Error(), "division by zero") {
+			t.Errorf("expected division by zero error, got: %q", vmErr.Error())
+		}
+	})
+
+	// 4. error() with non-str argument (error(5), error(nil)): defined, identical message
+	t.Run("error with non-str argument", func(t *testing.T) {
+		source := `try {
+    error(5)
+} catch e1 {
+    print("caught int:", e1)
+}
+try {
+    error(nil)
+} catch e2 {
+    print("caught nil:", e2)
+}`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, ": 5\n") || !strings.Contains(vmOut, ": nil\n") {
+			t.Errorf("unexpected output: %q", vmOut)
+		}
+	})
+
+	// 5. nil field access: struct Node { value: int, next: Node }, n.next.value catchable, same message
+	t.Run("nil field access", func(t *testing.T) {
+		source := `struct Node {
+    value: int,
+    next: Node
+}
+let n = Node(1, nil)
+try {
+    let v = n.next.value
+} catch e {
+    print("caught nil field:", e)
+}`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "cannot read a field of nil") {
+			t.Errorf("unexpected output: %q", vmOut)
+		}
+	})
+
+	// 6. try inside a loop where each pass creates a closure capturing loop variable then errors
+	t.Run("try inside loop closure capture with errors", func(t *testing.T) {
+		source := `let fns = []
+for x in [10, 20, 30] {
+    try {
+        let f = fn() { return x }
+        fns = push(fns, f)
+        error("loop error")
+    } catch e {
+        # caught
+    }
+}
+let res = []
+for f in fns {
+    res = push(res, f())
+}
+print("res:", res)`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "res: [10, 20, 30]") {
+			t.Errorf("unexpected output: %q", vmOut)
+		}
+	})
+
+	// 7. Error thrown 50 frames deep with open closure cells in several of those frames, caught at top
+	t.Run("error thrown 50 frames deep with open closure cells", func(t *testing.T) {
+		source := `let closures = []
+fn deep(n) {
+    let val = n * 10
+    if n % 10 == 0 {
+        closures = push(closures, fn() { return val })
+    }
+    if n >= 50 {
+        error("deep limit")
+    }
+    return deep(n + 1)
+}
+
+let top_local = 999
+try {
+    deep(1)
+} catch e {
+    print("caught deep:", e)
+}
+let collected = []
+for f in closures {
+    collected = push(collected, f())
+}
+print("collected:", collected)
+print("top:", top_local)`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "collected: [100, 200, 300, 400, 500]") {
+			t.Errorf("unexpected collected: %q", vmOut)
+		}
+		if !strings.Contains(vmOut, "top: 999") {
+			t.Errorf("unexpected top local: %q", vmOut)
+		}
+	})
+
+	// 8. try/catch as the last statement of a function whose return value is used in an expression
+	t.Run("try/catch as last statement in function used in expression", func(t *testing.T) {
+		source := `fn f(fail) {
+    try {
+        if fail { error("err") }
+        10
+    } catch e {
+        20
+    }
+}
+let r1 = f(false) + 1
+let r2 = f(true) + 1
+print("r1:", r1, "r2:", r2)`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "r1: 11 r2: 21") {
+			t.Errorf("unexpected output: %q", vmOut)
+		}
+	})
+
+	// 9. return inside try inside a for loop inside a method
+	t.Run("return inside try inside for loop inside method", func(t *testing.T) {
+		source := `struct Searcher {
+    base: int
+}
+fn (s: Searcher) find(items: array) -> int {
+    for x in items {
+        try {
+            if x == 0 {
+                error("zero")
+            }
+            if x == 42 {
+                return s.base + x
+            }
+        } catch e {
+            # ignore
+        }
+    }
+    return -1
+}
+let s = Searcher(100)
+print("found:", s.find([0, 1, 42, 3]))
+print("not found:", s.find([0, 5, 9]))`
+		vmOut, vmErr := runOnVM(t, source)
+		if vmErr != nil {
+			t.Fatalf("vm error: %v", vmErr)
+		}
+		interpOut, interpErr := runOnInterpreter(t, source)
+		if interpErr != nil {
+			t.Fatalf("interp error: %v", interpErr)
+		}
+		if vmOut != interpOut {
+			t.Errorf("outputs differ:\n  vm: %q\n  interp: %q", vmOut, interpOut)
+		}
+		if !strings.Contains(vmOut, "found: 142\nnot found: -1\n") {
+			t.Errorf("unexpected output: %q", vmOut)
+		}
+	})
+
+	// 10. Handler stack stays balanced: loop of 100000 try/catch iterations
+	t.Run("handler stack stays balanced 100000 iterations", func(t *testing.T) {
+		source := `let count = 0
+for i in range(100000) {
+    try {
+        if i % 2 == 0 {
+            error("even")
+        }
+        count = count + 1
+    } catch e {
+        count = count + 1
+    }
+}
+print("done:", count)`
+		p := NewParser(NewLexer(source))
+		program := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			t.Fatalf("syntax errors: %v", errs)
+		}
+		bc, err := compileProgram(program)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var vmOut bytes.Buffer
+		vm := NewVM(&vmOut)
+		_, err = vm.Run(bc)
+		if err != nil {
+			t.Fatalf("vm error: %v", err)
+		}
+		if vmOut.String() != "done: 100000\n" {
+			t.Errorf("unexpected output: %q", vmOut.String())
+		}
+		if len(vm.handlers) != 0 {
+			t.Errorf("handlers leaked: %d remain", len(vm.handlers))
+		}
+		if vm.sp != 0 {
+			t.Errorf("stack pointer leaked: sp=%d", vm.sp)
+		}
+	})
 }

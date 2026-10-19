@@ -1666,9 +1666,7 @@ func newBuiltinSigs() map[string]*builtinSig {
 		if !c.expectArgs("error", args, 1, tok) {
 			return anyT
 		}
-		if args[0].Kind != TypeStr && args[0].Kind != TypeAny {
-			c.errorf(tok, "error() expects str, got %s", args[0])
-		}
+		// error() accepts any value and inspects it as the error message.
 		// error() never returns, so nothing after it is reached.
 		return anyT
 	}}

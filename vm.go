@@ -723,6 +723,9 @@ func (vm *VM) setGlobal(index int, obj Object) {
 // errorf builds an error that points at the instruction being run.
 func (vm *VM) errorf(format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
+	if hasPositionPrefix(msg) {
+		return fmt.Errorf("%s", msg)
+	}
 	if vm.frameTop == 0 {
 		return fmt.Errorf("%s", msg)
 	}

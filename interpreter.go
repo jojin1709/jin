@@ -17,6 +17,7 @@ type Interpreter struct {
 	// usable on the next without running it again.
 	moduleEnvs map[*Module]*Environment
 	ran        map[*Module]bool
+	callDepth  int
 }
 
 // NewInterpreter creates an interpreter that writes program output to out.
@@ -800,6 +801,12 @@ func (i *Interpreter) applyFunction(fn *Function, args []Object, tok Token) (Obj
 		return nil, at(tok, "%s() expects %d argument(s), got %d", name, len(fn.Parameters), len(args))
 	}
 
+	if i.callDepth >= maxFrames {
+		return nil, at(tok, "too many nested calls (more than %d)", maxFrames)
+	}
+	i.callDepth++
+	defer func() { i.callDepth-- }()
+
 	callEnv := NewEnclosedEnvironment(fn.Env)
 	for idx, p := range fn.Parameters {
 		callEnv.Set(p.Name.Value, args[idx])
@@ -883,7 +890,11 @@ func (i *Interpreter) evalInline(src string, env *Environment, tok Token) (Objec
 // file's name is included; the file that was run is left out, because there is
 // only one of it and the message stays shorter without it.
 func at(tok Token, format string, args ...any) error {
-	return fmt.Errorf("%s: %s", tok.Position(), fmt.Sprintf(format, args...))
+	msg := fmt.Sprintf(format, args...)
+	if hasPositionPrefix(msg) {
+		return fmt.Errorf("%s", msg)
+	}
+	return fmt.Errorf("%s: %s", tok.Position(), msg)
 }
 
 func isNumber(o Object) bool {
