@@ -13,9 +13,9 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/types.html">
-<link rel="icon" href="../assets/img/favicon.png?v=20261021144320" type="image/png">
-<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021144320">
-<link rel="stylesheet" href="../assets/css/site.css?v=20261021144320">
+<link rel="icon" href="../assets/img/favicon.png?v=20261021151057" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021151057">
+<link rel="stylesheet" href="../assets/css/site.css?v=20261021151057">
 
 <script>
   // Set the theme before first paint so the page never flashes the wrong one.
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/icon.png?v=20261021144320" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021151057" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/icon.png?v=20261021144320" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021151057" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -181,13 +181,7 @@ print(f(1))</code></pre>
       <pre class="Code Code--out" data-lang="output"><code>text</code></pre>
 
       <h3>An unannotated <code>let</code> still takes the type of its value</h3>
-      <p>This is the one place where an unannotated name is not simply <code>any</code>. A <code>let</code> with no annotation takes the kind of the value it is given, so the name is still checked afterwards:</p>
-
-      <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 1
-x = "text"</code></pre>
-
-      <pre class="Code Code--out" data-lang="output"><code>jin: x.jin has type errors:
-  2:3: cannot assign str to int variable "x"</code></pre>
+      <p>This is the one place where an unannotated name is not simply <code>any</code>. A <code>let</code> with no annotation takes the kind of the value it is given, so the name is still checked afterwards. The rule itself, and every shape that follows from it, is on <a href="#the-type-of-a-name">The type of a name</a> below.</p>
 
       <p>Give the name the annotation <code>any</code> if you want it to hold anything later.</p>
 
@@ -196,6 +190,74 @@ x = "text"
 print(x)</code></pre>
 
       <pre class="Code Code--out" data-lang="output"><code>text</code></pre>
+    </section>
+
+    <section class="DocSection" id="the-type-of-a-name">
+      <h2>The type of a name</h2>
+      <p>
+        An unannotated name takes the type of its first value, and the checker
+        keeps watching it from then on. A name that starts as a number stays a
+        number:
+      </p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let count = 0
+count = count + 1
+count = "many"</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: count.jin has type errors:
+  3:7: cannot assign str to int variable "count"</code></pre>
+
+      <p>
+        A first value that says nothing about itself does not pin the name.
+        <code>nil</code> says nothing, so a name that starts as <code>nil</code>
+        is left open and takes whatever it is given later:
+      </p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let best = nil
+best = 5
+best = "x"
+print(best)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>x</code></pre>
+
+      <p>
+        An empty array and an empty map say what they are but not what they
+        hold, so they work the same way. The container is known; the contents
+        are not.
+      </p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let items = []
+items = [1, 2]
+items = ["a"]
+print(items)
+
+let m = {}
+m = {"a": 1}
+print(m)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>["a"]
+{"a": 1}</code></pre>
+
+      <p>
+        A name still has to be declared before it is used, and assigning to a
+        name that was never declared is an error wherever the assignment
+        happens:
+      </p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">if true {
+    later = 7
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: later.jin has type errors:
+  2:11: undefined variable "later"; use 'let' to declare it first</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p>
+          <strong>Note.</strong> A name written as <code>let best: nil = nil</code>
+          is a different thing. The annotation says the name can only ever hold
+          <code>nil</code>, so the checker keeps it to that.
+        </p>
+      </aside>
     </section>
 
     <section class="DocSection" id="check">
@@ -446,7 +508,7 @@ print(len(5))</code></pre>
     </div>
   </footer>
 
-<script src="../assets/js/site.js?v=20261021144320" defer></script>
+<script src="../assets/js/site.js?v=20261021151057" defer></script>
 
 </body>
 </html>

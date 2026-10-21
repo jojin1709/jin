@@ -560,6 +560,14 @@ func (c *Checker) checkStatement(stmt Statement) *Type {
 		}
 		if declared == nil {
 			declared = valueType
+			// A first value that says nothing about itself does not pin the
+			// name. nil says nothing, so the name is left open and takes
+			// whatever it is given later. An empty array or an empty map
+			// says what it is but not what it holds, and that is already how
+			// the checker reads them: array<any> and map<any>.
+			if valueType.Kind == TypeNil {
+				declared = anyT
+			}
 		}
 		c.declare(node.Name.Value, declared)
 		return declared

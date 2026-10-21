@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1059,6 +1060,112 @@ func TestProgramsAgreeAcrossEngines(t *testing.T) {
 			}
 			if interpOut != tc.want {
 				t.Errorf("interpreter output\n got: %q\nwant: %q", interpOut, tc.want)
+			}
+		})
+	}
+}
+
+// runCheckedOnEngine runs a program the way the command line does: the type
+// checker first, and the engine only if the check passed. It returns what the
+// program printed, or the error it was stopped with.
+func runCheckedOnEngine(t *testing.T, source string, engine string) (string, error) {
+	t.Helper()
+
+	p := NewParser(NewLexer(source))
+	program := p.ParseProgram()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("syntax errors in test program: %v", errs)
+	}
+
+	if errs := Check(program); len(errs) > 0 {
+		return "", errors.New(strings.Join(errs, "\n"))
+	}
+
+	if engine == "vm" {
+		return runOnVM(t, source)
+	}
+	return runOnInterpreter(t, source)
+}
+
+// The type checker runs before either back end, so a program it rejects is
+// rejected the same way whichever engine was asked for. These are the common
+// shapes of a name that takes the type of its first value.
+func TestNameTypingIsTheSameOnBothEngines(t *testing.T) {
+	cases := []struct {
+		name       string
+		source     string
+		wantErr    string
+		wantOutput string
+	}{
+		{
+			name:       "a name that starts as nil is not locked to nil",
+			source:     "let best = nil\nbest = 5\nbest = \"x\"\nprint(best)",
+			wantOutput: "x\n",
+		},
+		{
+			name:       "an empty array does not lock the element type",
+			source:     "let items = []\nitems = [1, 2]\nitems = [\"a\"]\nprint(items)",
+			wantOutput: "[\"a\"]\n",
+		},
+		{
+			name:       "an empty map does not lock the value type",
+			source:     "let m = {}\nm = {\"a\": 1}\nprint(m)",
+			wantOutput: "{\"a\": 1}\n",
+		},
+		{
+			name:    "a name that took a real value keeps it",
+			source:  "let n = 0\nn = 1.5",
+			wantErr: "cannot assign float to int variable \"n\"",
+		},
+		{
+			name:    "a name first given a value in a branch was never declared",
+			source:  "if true {\n    later = 7\n}",
+			wantErr: "undefined variable \"later\"; use 'let' to declare it first",
+		},
+		{
+			name:    "a name that took a real value keeps it",
+			source:  "let x = 0\nx = \"many\"",
+			wantErr: "cannot assign str to int variable \"x\"",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			vmOut, vmErr := runCheckedOnEngine(t, tc.source, "vm")
+			interpOut, interpErr := runCheckedOnEngine(t, tc.source, "interpreter")
+
+			if tc.wantErr == "" {
+				if vmErr != nil {
+					t.Fatalf("vm rejected a valid program: %v", vmErr)
+				}
+				if interpErr != nil {
+					t.Fatalf("interpreter rejected a valid program: %v", interpErr)
+				}
+				if vmOut != tc.wantOutput {
+					t.Errorf("vm output\n got: %q\nwant: %q", vmOut, tc.wantOutput)
+				}
+				if interpOut != tc.wantOutput {
+					t.Errorf("interpreter output\n got: %q\nwant: %q", interpOut, tc.wantOutput)
+				}
+				return
+			}
+
+			if vmErr == nil {
+				t.Fatalf("vm accepted a program that should fail")
+			}
+			if interpErr == nil {
+				t.Fatalf("interpreter accepted a program that should fail")
+			}
+			if !strings.Contains(vmErr.Error(), tc.wantErr) {
+				t.Errorf("vm error %q does not contain %q", vmErr, tc.wantErr)
+			}
+			if !strings.Contains(interpErr.Error(), tc.wantErr) {
+				t.Errorf("interpreter error %q does not contain %q", interpErr, tc.wantErr)
+			}
+			// Both should point at the same place, so users see the same
+			// message whichever engine runs their program.
+			if vmErr.Error() != interpErr.Error() {
+				t.Errorf("engines disagree on the message:\n vm: %v\n interp: %v", vmErr, interpErr)
 			}
 		})
 	}

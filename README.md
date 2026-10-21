@@ -525,6 +525,37 @@ let anything: any = 0
 anything = "now a string"
 ```
 
+A first value that says nothing about itself does not pin the name. `nil` says
+nothing, so a name that starts as `nil` is left open and takes whatever it is
+given later:
+
+```jin
+let best = nil
+best = 5                 # fine
+best = "x"               # fine
+```
+
+An empty array and an empty map say what they are but not what they hold, so
+they work the same way — the container is known, the contents are not:
+
+```jin
+let items = []
+items = [1, 2]           # fine
+items = ["a"]            # fine
+
+let m = {}
+m = {"a": 1}             # fine
+```
+
+A name still has to be declared before it is used, and assigning to a name
+that was never declared is an error, wherever the assignment happens:
+
+```jin
+if true {
+    later = 7             # error: undefined variable "later"; use 'let' to declare it first
+}
+```
+
 An unannotated function parameter is `any`, and an unannotated return is not
 checked, so plain scripts keep working exactly as before. The checker also
 covers `let` and assignment, function arguments and returns, loop bodies,

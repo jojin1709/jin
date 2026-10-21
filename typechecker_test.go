@@ -392,6 +392,33 @@ func TestConstantIndexIsChecked(t *testing.T) {
 	expectClean(t, `let i = 9`+"\n"+`print([1, 2, 3][i])`)
 }
 
+// An unannotated name takes the type of its first value, and a first value
+// that says nothing about itself does not pin it: nil, an empty array and an
+// empty map all leave the name open, so a real value can go in it later.
+func TestUnannotatedNamesTakeTheTypeOfTheirFirstValue(t *testing.T) {
+	// A name that starts as nil is not locked to nil.
+	expectClean(t, "let best = nil\nbest = 5\nbest = \"x\"")
+
+	// An empty array does not lock the element type.
+	expectClean(t, "let items = []\nitems = [1, 2]\nitems = [\"a\"]")
+
+	// An empty map does not lock the value type.
+	expectClean(t, "let m = {}\nm = {\"a\": 1}")
+
+	// A first value that does say something does lock the name.
+	expectTypeError(t, "let n = 0\nn = n + 1\nn = 1.5",
+		"cannot assign float to int variable \"n\"")
+
+	// A name that is first given a value inside a branch is still a name
+	// that was never declared.
+	expectTypeError(t, "if true {\n    later = 7\n}",
+		"undefined variable \"later\"")
+
+	// A name that was given a real value keeps it.
+	expectTypeError(t, "let x = 0\nx = \"many\"",
+		"cannot assign str to int variable \"x\"")
+}
+
 func TestArrayElementTypesAreUnified(t *testing.T) {
 	expectClean(t, `let mixed = [1, "two"]`)
 	// Annotated arrays are enforced through push.
