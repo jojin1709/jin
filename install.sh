@@ -72,7 +72,7 @@ if [ -z "$tag" ]; then
     die "there is no release to install yet. The releases are at https://github.com/$REPO/releases"
 fi
 
-name="jin_${tag}_${os}_${arch}"
+name="jin_${tag#v}_${os}_${arch}"
 if [ "$os" = "windows" ]; then
     archive="$name.zip"
 else

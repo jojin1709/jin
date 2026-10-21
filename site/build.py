@@ -96,6 +96,10 @@ NAV = [
              "Lexer, parser, type checker, compiler and VM"),
             ("Examples", REPO + "/tree/main/examples",
              "Runnable programs that ship with Jin"),
+            ("Contributing", REPO + "/blob/main/CONTRIBUTING.md",
+             "How to set up, and what the tests have to pass"),
+            ("Code of conduct", REPO + "/blob/main/CODE_OF_CONDUCT.md",
+             "How everyone taking part is expected to behave"),
             ("The author", "https://github.com/jojin1709",
              "JOJIN JOHN, who designed it"),
         ],
@@ -283,19 +287,22 @@ def footer_markup(home):
       <div class="Footer-bottom">
         <p class="Footer-copy">
           Jin is free and open source, released under the
-          <a href="%s/blob/main/LICENSE">MIT licence</a>.
-          Designed by <a href="https://github.com/jojin1709">JOJIN JOHN</a>
+          <a href="%s/blob/main/LICENSE">MIT licence</a> or the
+          <a href="%s/blob/main/LICENSE-APACHE">Apache Licence 2.0</a>, at your
+          option. Designed by <a href="https://github.com/jojin1709">JOJIN JOHN</a>
           and built in stages with AI coding agents. No parser generator, no
           third-party libraries.
         </p>
         <ul class="Footer-bottomList">
           <li><a href="%s">Source on GitHub</a></li>
           <li><a href="%s/issues">Report an issue</a></li>
+          <li><a href="%s/blob/main/CONTRIBUTING.md">Contributing</a></li>
+          <li><a href="%s/blob/main/CODE_OF_CONDUCT.md">Code of conduct</a></li>
           <li class="Footer-version">Version %s</li>
         </ul>
       </div>
     </div>
-  </footer>""" % ("".join(cols), REPO, REPO, REPO, VERSION)
+  </footer>""" % ("".join(cols), REPO, REPO, REPO, REPO, REPO, REPO, VERSION)
 
 
 def sidebar_markup(current):

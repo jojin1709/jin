@@ -74,7 +74,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          mkdir -p "dist/jin_${{ steps.version.outputs.tag }}_${{ matrix.os }}_${{ matrix.arch }}"
+          mkdir -p "dist/jin_${{ steps.version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}"
           binary="jin"
           if [ "${{ matrix.os }}" = "windows" ]; then
             binary="jin.exe"
@@ -82,14 +82,14 @@ jobs:
           CGO_ENABLED=0 GOOS="${{ matrix.os }}" GOARCH="${{ matrix.arch }}" \
             go build -trimpath \
             -ldflags "-s -w -X main.version=${{ steps.version.outputs.version }}" \
-            -o "dist/jin_${{ steps.version.outputs.tag }}_${{ matrix.os }}_${{ matrix.arch }}/$binary" .
-          cp LICENSE README.md CHANGELOG.md \
-            "dist/jin_${{ steps.version.outputs.tag }}_${{ matrix.os }}_${{ matrix.arch }}/"
+            -o "dist/jin_${{ steps.version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}/$binary" .
+          cp LICENSE LICENSE-APACHE README.md CHANGELOG.md \
+            "dist/jin_${{ steps.version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}/"
 
       - name: Check the binary runs
         shell: bash
         run: |
-          dir="dist/jin_${{ steps.version.outputs.tag }}_${{ matrix.os }}_${{ matrix.arch }}"
+          dir="dist/jin_${{ steps.version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}"
           if [ "${{ matrix.os }}" = "windows" ]; then
             "$dir/jin.exe" --version
           else
@@ -99,7 +99,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          dir="dist/jin_${{ steps.version.outputs.tag }}_${{ matrix.os }}_${{ matrix.arch }}"
+          dir="dist/jin_${{ steps.version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}"
           cd dist
           if [ "${{ matrix.os }}" = "windows" ]; then
             zip -r "$dir.zip" "$dir"
@@ -127,9 +127,9 @@ jobs:
       - name: Upload the archive
         uses: actions/upload-artifact@v4
         with:
-          name: "jin-${{ steps.version.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}"
+          name: "jin-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}"
           path: |
-            dist/jin_${{ steps.version.outputs.tag }}_${{ matrix.os }}_${{ matrix.arch }}.*
+            dist/jin_${{ steps.version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}.*
           if-no-files-found: error
 
   release:
@@ -165,6 +165,33 @@ jobs:
             sha256sum "$file" >> SHA256SUMS.txt
           done < files.txt
 
+      - name: Write the release notes
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # The notes are the section of the changelog for this version, so
+          # that the release says the same thing the changelog does.
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { inside = 1; next }
+            /^## \[/ { inside = 0 }
+            inside { print }
+          ' CHANGELOG.md > section.md
+
+          {
+            echo "The changes in this release:"
+            echo
+            if [ -s section.md ]; then
+              cat section.md
+            else
+              echo "See the changelog for the full list."
+            fi
+            echo
+            echo "The whole list is in [CHANGELOG.md](https://github.com/jojin1709/jin/blob/main/CHANGELOG.md)."
+          } > body.md
+
+          cat body.md
+
       - name: Publish the release
         shell: bash
         env:
@@ -173,7 +200,7 @@ jobs:
         run: |
           gh release create "$TAG" \
             --title "Jin $TAG" \
-            --generate-notes \
+            --notes-file body.md \
             artifacts/*.zip \
             artifacts/*.tar.gz \
             artifacts/SHA256SUMS.txt

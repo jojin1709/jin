@@ -13,7 +13,7 @@
 **A small programming language that is easy to write, checked before it runs, and as fast as CPython on call-heavy code.**
 
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
+[![License](https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
 [![Tests](https://img.shields.io/badge/tests-406%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
@@ -1005,11 +1005,21 @@ generator, no third-party libraries.
 The [FAQ](FAQ.md) has the short answers to the questions that come up most
 often: what Jin is, who it is for, and whether it is faster than Python.
 
+Want to help? The [contributing guide](CONTRIBUTING.md) says how to set up, what
+the tests have to pass, and how the two engines are kept in agreement. The
+[code of conduct](CODE_OF_CONDUCT.md) applies to everyone taking part.
+
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE) for the full text.
+Jin is available under either of two licences, at your option:
+
+- **MIT** — see [LICENSE](LICENSE)
+- **Apache Licence 2.0** — see [LICENSE-APACHE](LICENSE-APACHE)
+
+Both are permissive, and you can pick whichever suits the project you are
+putting it in. A contribution is accepted under the same terms.
 
 Copyright © 2026 JOJIN JOHN.
 

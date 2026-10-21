@@ -27,6 +27,9 @@ All notable changes to Jin are written down here. The format follows
 - The module is `github.com/jojin1709/jin`, so `go install` works.
 - The website: a landing page, a browser playground that runs real Jin, and
   the full documentation.
+- A code of conduct and a contributing guide.
+- The project is available under the MIT licence or the Apache Licence 2.0, at
+  your option.
 
 ### Changed
 - The README and the website no longer claim Jin is much faster than Python.

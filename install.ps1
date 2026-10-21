@@ -58,7 +58,7 @@ if (-not $Tag) {
     Fail "there is no release to install yet. The releases are at https://github.com/$Repo/releases"
 }
 
-$Name = "jin_${Tag}_windows_${Arch}"
+$Name = "jin_$($Tag.TrimStart('v'))_windows_${Arch}"
 $Base = "https://github.com/$Repo/releases/download/$Tag"
 
 # ---------------------------------------------------------------- download
