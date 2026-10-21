@@ -13,9 +13,9 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/tour.html">
-<link rel="icon" href="../assets/img/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
-<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/img/favicon.png?v=20261021142341" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021142341">
+<link rel="stylesheet" href="../assets/css/site.css?v=20261021142341">
 
 <script>
   // Set the theme before first paint so the page never flashes the wrong one.
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -98,7 +98,7 @@
       <p>Jin's values come from a small set of kinds. <code>type()</code> tells you which one you are holding.</p>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Kind</th><th>Written as</th><th>What it holds</th></tr>
           </thead>
@@ -111,7 +111,7 @@
             <tr><td><code>array</code></td><td><code>[1, 2, 3]</code></td><td>An ordered list of values.</td></tr>
             <tr><td><code>map</code></td><td><code>{"a": 1}</code></td><td>Key and value pairs, in the order they were added.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <pre class="Code" data-lang="jin"><code class="lang-jin">print(type(1), type(1.5), type("hi"), type(true), type(nil))
@@ -173,7 +173,7 @@ print(x)   # 5</code></pre>
       <p>Jin's operators are the familiar ones. What is unusual is that <code>==</code> is the only equality test, and that there is no truthiness: a condition has to be a <code>bool</code>.</p>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Operators</th><th>What they do</th></tr>
           </thead>
@@ -186,7 +186,7 @@ print(x)   # 5</code></pre>
             <tr><td><code>-</code> (in front)</td><td>Negation of a number.</td></tr>
             <tr><td><code>=</code></td><td>Assignment.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>From loosest to tightest, the order is:</p>
@@ -704,7 +704,7 @@ fib: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34</code></pre>
     </div>
   </footer>
 
-<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/site.js?v=20261021142341" defer></script>
 
 </body>
 </html>

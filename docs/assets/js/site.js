@@ -210,16 +210,19 @@
       }
 
       if (ch === '"') {
-        var buf = '"';
+        // The string is built as finished HTML, because an {interpolation}
+        // inside it becomes a span of its own. Escaping happens on the way
+        // in, not on the way out, or the span would be escaped as well.
+        var buf = "&quot;";
         i++;
         while (i < length) {
           if (source[i] === "\\" && i + 1 < length) {
-            buf += source[i] + source[i + 1];
+            buf += escapeHtml(source[i] + source[i + 1]);
             i += 2;
             continue;
           }
           if (source[i] === '"') {
-            buf += '"';
+            buf += "&quot;";
             i++;
             break;
           }
@@ -248,10 +251,10 @@
             buf += '<span class="tk-interp">' + escapeHtml(inner) + "</span>";
             continue;
           }
-          buf += source[i];
+          buf += escapeHtml(source[i]);
           i++;
         }
-        push("tk-str", buf);
+        out += '<span class="tk-str">' + buf + "</span>";
         continue;
       }
 

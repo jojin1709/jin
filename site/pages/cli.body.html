@@ -117,7 +117,7 @@ hello, Ada
 $ echo $?
 0</code></pre>
 
-      <p>The interpreter is slower — roughly seven to eight times slower on a call-heavy program — but it exists so that the two back ends can be checked against each other. The test suite runs every program in the differential corpus on both of them and requires byte-identical output, error text included.</p>
+      <p>The interpreter is slower — roughly six times slower on a call-heavy program — but it exists so that the two back ends can be checked against each other. The test suite runs every program in the differential corpus on both of them and requires byte-identical output, error text included.</p>
 
       <aside class="Callout Callout--note">
         <p><strong>Note.</strong> <code>interpret</code> type-checks the program first, exactly as <code>run</code> does. A type error stops it just the same.</p>

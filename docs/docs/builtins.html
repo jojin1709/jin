@@ -13,9 +13,9 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/builtins.html">
-<link rel="icon" href="../assets/img/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
-<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/img/favicon.png?v=20261021142341" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021142341">
+<link rel="stylesheet" href="../assets/css/site.css?v=20261021142341">
 
 <script>
   // Set the theme before first paint so the page never flashes the wrong one.
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -115,7 +115,7 @@ a, b</code></pre>
       <h2>I/O</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -124,7 +124,7 @@ a, b</code></pre>
             <tr><td><code>input</code></td><td><code>input()</code><br><code>input(prompt)</code></td><td><code>str</code></td><td>Reads one line from standard input, without its line ending. With a prompt, the prompt is written out first.</td></tr>
             <tr><td><code>read_all_stdin</code></td><td><code>read_all_stdin()</code></td><td><code>str</code></td><td>Reads everything left on standard input and returns it as one string.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p><code>input</code> and <code>read_all_stdin</code> share one buffered stream, so a program can mix them: read a name with <code>input</code>, then the rest with <code>read_all_stdin</code>.</p>
@@ -143,7 +143,7 @@ print("Hello, {name}!")</code></pre>
       <h2>Numbers</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -162,7 +162,7 @@ print("Hello, {name}!")</code></pre>
             <tr><td><code>str</code></td><td><code>str(x)</code></td><td><code>str</code></td><td>The text form of any value, the same form <code>print</code> uses.</td></tr>
             <tr><td><code>type</code></td><td><code>type(x)</code></td><td><code>str</code></td><td>The name of the value's type: <code>"int"</code>, <code>"float"</code>, <code>"str"</code>, <code>"bool"</code>, <code>"nil"</code>, <code>"array"</code>, <code>"map"</code>, <code>"fn"</code>, <code>"builtin"</code>, or a record's own name.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>Jin will not quietly mix <code>int</code> and <code>float</code> in arithmetic. <code>1 + 1.5</code> is a type error, and <code>int()</code> or <code>float()</code> is how you say which one you meant.</p>
@@ -210,7 +210,7 @@ array map</code></pre>
       <h2>Strings</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -230,7 +230,7 @@ array map</code></pre>
             <tr><td><code>chars</code></td><td><code>chars(s)</code></td><td><code>array</code> of <code>str</code></td><td>The string's characters, one string each.</td></tr>
             <tr><td><code>lines</code></td><td><code>lines(s)</code></td><td><code>array</code> of <code>str</code></td><td>The string's lines, without the line endings.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <pre class="Code" data-lang="jin"><code class="lang-jin">let name = "  Ada Lovelace  "
@@ -270,7 +270,7 @@ ababab
       <h2>Lists</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -281,7 +281,7 @@ ababab
             <tr><td><code>slice</code></td><td><code>slice(x, start, end)</code></td><td><code>array</code> or <code>str</code></td><td>A new array or string from index <code>start</code> up to, but not including, <code>end</code>.</td></tr>
             <tr><td><code>range</code></td><td><code>range(n)</code><br><code>range(start, end)</code></td><td><code>array</code> of <code>int</code></td><td>The integers from <code>0</code> up to <code>n</code>, or from <code>start</code> up to <code>end</code>.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <pre class="Code" data-lang="jin"><code class="lang-jin">let nums = [5, 3, 9, 1]
@@ -314,7 +314,7 @@ print(range(1, 5))</code></pre>
       <h2>Maps</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -325,7 +325,7 @@ print(range(1, 5))</code></pre>
             <tr><td><code>keys</code></td><td><code>keys(map)</code></td><td><code>array</code></td><td>The map's keys, in the order they were added.</td></tr>
             <tr><td><code>values</code></td><td><code>values(map)</code></td><td><code>array</code></td><td>The map's values, in the order they were added.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>A map's keys may be an <code>int</code>, a <code>str</code> or a <code>bool</code>. Entries keep the order they were added in, so printing a map and looping over one are both predictable.</p>
@@ -370,7 +370,7 @@ true</code></pre>
       <h2>Functional</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -383,7 +383,7 @@ true</code></pre>
             <tr><td><code>sort_by</code></td><td><code>sort_by(array, fn)</code></td><td><code>array</code></td><td>A new array ordered by <code>fn(a, b)</code>, which returns a negative number, zero, or a positive number.</td></tr>
             <tr><td><code>find_index</code></td><td><code>find_index(array, fn)</code></td><td><code>int</code></td><td>The index of the first element <code>fn</code> returned true for, or <code>-1</code>.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>The function you pass can be a named function, an anonymous function, a closure, or a built-in such as <code>str</code>. It is called with one element, except for <code>reduce</code>, which gets two, and <code>sort_by</code>, which gets two to compare.</p>
@@ -434,7 +434,7 @@ true
       <h2>Files</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
@@ -445,7 +445,7 @@ true
             <tr><td><code>file_exists</code></td><td><code>file_exists(path)</code></td><td><code>bool</code></td><td>True when there is a file at that path.</td></tr>
             <tr><td><code>delete_file</code></td><td><code>delete_file(path)</code></td><td><code>nil</code></td><td>Removes the file.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>Every file built-in takes its path as a <code>str</code> and reports the operating system's own reason when it fails.</p>
@@ -478,14 +478,14 @@ false</code></pre>
       <h2>Program</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
           <tbody>
             <tr><td><code>args</code></td><td><code>args()</code></td><td><code>array</code> of <code>str</code></td><td>The arguments the program was run with, in order.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>Whatever follows the file name on the command line reaches the program here, which is what makes a Jin file usable as a command.</p>
@@ -509,14 +509,14 @@ hello, Ada</code></pre>
       <h2>Control</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Name</th><th>Signature</th><th>Returns</th><th>What it does</th></tr>
           </thead>
           <tbody>
             <tr><td><code>error</code></td><td><code>error(message)</code></td><td>nothing</td><td>Stops the program with an error. The message is the text you give it.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p><code>error</code> inside a <code>catch</code> block re-raises the error to the enclosing handler, keeping the position the error came from.</p>
@@ -685,7 +685,7 @@ end: 1
     </div>
   </footer>
 
-<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/site.js?v=20261021142341" defer></script>
 
 </body>
 </html>

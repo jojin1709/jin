@@ -13,9 +13,9 @@
 <meta property="og:image" content="{{SITE_URL}}/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="{{SITE_URL}}/{{PAGE_PATH}}">
-<link rel="icon" href="{{ASSETS}}/img/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="{{ASSETS}}/img/apple-touch-icon.png">
-<link rel="stylesheet" href="{{ASSETS}}/css/site.css">
+<link rel="icon" href="{{ASSETS}}/img/favicon.png?v={{V}}" type="image/png">
+<link rel="apple-touch-icon" href="{{ASSETS}}/img/apple-touch-icon.png?v={{V}}">
+<link rel="stylesheet" href="{{ASSETS}}/css/site.css?v={{V}}">
 {{EXTRA_HEAD}}
 <script>
   // Set the theme before first paint so the page never flashes the wrong one.
@@ -40,7 +40,7 @@
 
 {{FOOTER}}
 
-<script src="{{ASSETS}}/js/site.js" defer></script>
+<script src="{{ASSETS}}/js/site.js?v={{V}}" defer></script>
 {{EXTRA_SCRIPT}}
 </body>
 </html>

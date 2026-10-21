@@ -16,6 +16,7 @@ sidebar are written once instead of twelve times.
 import os
 import re
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))     # site/
 ROOT = os.path.dirname(HERE)            # the repository
@@ -29,6 +30,11 @@ SITE_TAGLINE = "A small, fast programming language"
 REPO = "https://github.com/jojin1709/jin"
 SITE_URL = "https://jojin1709.github.io/jin"
 VERSION = "0.10.0"
+
+# Every build stamps its assets with a fresh number, so a browser that has
+# the last version cached fetches the new one instead of showing a page
+# that does not match the code.
+BUILD = time.strftime("%Y%m%d%H%M%S")
 
 # ---------------------------------------------------------------- nav model
 
@@ -178,7 +184,7 @@ def header_markup(active, home):
     return """  <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="{{HOME}}" aria-label="Jin home">
-        <img src="{{ASSETS}}/img/icon.png" alt="" width="32" height="32">
+        <img src="{{ASSETS}}/img/icon.png?v={{V}}" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -213,7 +219,7 @@ def header_markup(active, home):
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="{{HOME}}">
-        <img src="{{ASSETS}}/img/icon.png" alt="" width="32" height="32">
+        <img src="{{ASSETS}}/img/icon.png?v={{V}}" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -311,6 +317,17 @@ def read(path):
         return handle.read()
 
 
+def wrap_tables(body):
+    """A wide table needs somewhere to scroll on a narrow screen, or it
+    pushes the page sideways. Every table goes into a box that scrolls."""
+    return re.sub(
+        r"<table class=\"Table\">(.*?)</table>",
+        r'<div class="TableWrap"><table class="Table">\1</table></div>',
+        body,
+        flags=re.S,
+    )
+
+
 def build(name, body, out_path, title, description, active="",
           assets="assets", home="", extra_head="", extra_script="",
           extra_class="", sidebar="", page_path=""):
@@ -325,6 +342,7 @@ def build(name, body, out_path, title, description, active="",
             count=1,
         )
     template = read(os.path.join(TPL, "base.html"))
+    body = wrap_tables(body)
     # The header and the footer are inserted before the placeholders are
     # filled in, because they contain links of their own.
     template = sub(template, "NAVBAR", header_markup(active, home))
@@ -337,6 +355,7 @@ def build(name, body, out_path, title, description, active="",
     template = sub(template, "SIDEBAR", sidebar)
     template = sub(template, "SITE_URL", SITE_URL)
     template = sub(template, "PAGE_PATH", page_path)
+    template = sub(template, "V", BUILD)
     template = sub(template, "EXTRA_HEAD", extra_head)
     template = sub(template, "EXTRA_SCRIPT", extra_script)
     template = sub(template, "EXTRA_CLASS", extra_class)

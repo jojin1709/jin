@@ -16,3 +16,5 @@
 # Working notes from the site design process
 /replica
 __pycache__/
+shots/
+shot-*.png

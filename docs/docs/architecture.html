@@ -13,9 +13,9 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/architecture.html">
-<link rel="icon" href="../assets/img/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
-<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/img/favicon.png?v=20261021142341" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021142341">
+<link rel="stylesheet" href="../assets/css/site.css?v=20261021142341">
 
 <script>
   // Set the theme before first paint so the page never flashes the wrong one.
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -170,7 +170,7 @@ values                 (object.go, environment.go, builtins.go)</code></pre>
       <h2>Project layout</h2>
       <p>Every part of the implementation is one file with one job.</p>
 
-      <table class="Table">
+      <div class="TableWrap"><table class="Table">
         <thead>
           <tr><th>File</th><th>Role</th></tr>
         </thead>
@@ -195,11 +195,11 @@ values                 (object.go, environment.go, builtins.go)</code></pre>
           <tr><td><code>interpreter.go</code></td><td>Evaluates the tree, kept as a reference implementation.</td></tr>
           <tr><td><code>main.go</code></td><td>The command line and the REPL.</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <p>Beside them are the tests and the example programs:</p>
 
-      <table class="Table">
+      <div class="TableWrap"><table class="Table">
         <thead>
           <tr><th>Path</th><th>Role</th></tr>
         </thead>
@@ -213,7 +213,7 @@ values                 (object.go, environment.go, builtins.go)</code></pre>
           <tr><td><code>project_test.go</code></td><td>Imports, projects, <code>jin.toml</code>, <code>jin new</code> and <code>args()</code>.</td></tr>
           <tr><td><code>examples/</code></td><td>Programs that both engines must run identically, including the <code>greeting</code> project.</td></tr>
         </tbody>
-      </table>
+      </table></div>
     </section>
 
     <section id="names" class="DocSection">
@@ -222,7 +222,7 @@ values                 (object.go, environment.go, builtins.go)</code></pre>
 
       <p>There are four places a name can live, and each has its own pair of opcodes:</p>
 
-      <table class="Table">
+      <div class="TableWrap"><table class="Table">
         <thead>
           <tr><th>Where the name lives</th><th>Scope</th><th>Read</th><th>Write</th></tr>
         </thead>
@@ -232,7 +232,7 @@ values                 (object.go, environment.go, builtins.go)</code></pre>
           <tr><td>A captured variable, held by the enclosing function's closure</td><td><code>FreeScope</code></td><td><code>OpGetFree</code></td><td><code>OpSetFree</code></td></tr>
           <tr><td>A built-in function</td><td><code>BuiltinScope</code></td><td><code>OpGetBuiltin</code></td><td>—</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <p>The symbol table (<code>symboltable.go</code>) hands out those slots. A name at the top level of the file you ran is a global; a name anywhere else is a slot in the frame. Blocks nest: leaving a block puts back whatever it shadowed. Slots handed out inside a block are not reclaimed, because a frame is sized by the highest slot ever used, and keeping the counter high is what makes the size right.</p>
 
@@ -343,20 +343,20 @@ gofmt -l .</code></pre>
 
     <section id="performance" class="DocSection">
       <h2>Performance</h2>
-      <p>Naive <code>fib(30)</code>, wall clock including start-up, compile and type-check, measured on the machine the project describes (Windows, Go 1.26, CPython 3.14):</p>
+      <p>Naive <code>fib(30)</code>, wall clock including start-up, compile and type-check, measured on the machine the project describes (Windows, Go 1.26, CPython 3.14, prebuilt binary, median of five runs):</p>
 
-      <table class="Table">
+      <div class="TableWrap"><table class="Table">
         <thead>
           <tr><th>Engine</th><th>Time</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>jin run</code> (bytecode VM)</td><td>~0.45 s</td></tr>
-          <tr><td><code>jin interpret</code> (tree walker)</td><td>~3.5 s</td></tr>
-          <tr><td>CPython 3.14, same program</td><td>~0.20 s</td></tr>
+          <tr><td><code>jin run</code> (bytecode VM)</td><td>~0.15 s</td></tr>
+          <tr><td><code>jin interpret</code> (tree walker)</td><td>~0.93 s</td></tr>
+          <tr><td>CPython 3.14, same program</td><td>~0.14 s</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
-      <p>So the VM is roughly seven to eight times faster than Jin's own tree-walking back end, and in the same ballpark as CPython on a call-heavy benchmark. The exact figures depend on the machine; the ratio is the thing to take away.</p>
+      <p>So the VM is roughly six times faster than Jin's own tree-walking back end, and it is level with CPython on a call-heavy benchmark. The exact figures depend on the machine; the ratio is the thing to take away.</p>
 
       <p>The VM keeps that lead by doing the work before the program starts, and by not doing it again:</p>
 
@@ -398,7 +398,7 @@ gofmt -l .</code></pre>
     </div>
   </footer>
 
-<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/site.js?v=20261021142341" defer></script>
 
 </body>
 </html>

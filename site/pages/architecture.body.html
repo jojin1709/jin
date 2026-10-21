@@ -257,20 +257,20 @@ gofmt -l .</code></pre>
 
     <section id="performance" class="DocSection">
       <h2>Performance</h2>
-      <p>Naive <code>fib(30)</code>, wall clock including start-up, compile and type-check, measured on the machine the project describes (Windows, Go 1.26, CPython 3.14):</p>
+      <p>Naive <code>fib(30)</code>, wall clock including start-up, compile and type-check, measured on the machine the project describes (Windows, Go 1.26, CPython 3.14, prebuilt binary, median of five runs):</p>
 
       <table class="Table">
         <thead>
           <tr><th>Engine</th><th>Time</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>jin run</code> (bytecode VM)</td><td>~0.45 s</td></tr>
-          <tr><td><code>jin interpret</code> (tree walker)</td><td>~3.5 s</td></tr>
-          <tr><td>CPython 3.14, same program</td><td>~0.20 s</td></tr>
+          <tr><td><code>jin run</code> (bytecode VM)</td><td>~0.15 s</td></tr>
+          <tr><td><code>jin interpret</code> (tree walker)</td><td>~0.93 s</td></tr>
+          <tr><td>CPython 3.14, same program</td><td>~0.14 s</td></tr>
         </tbody>
       </table>
 
-      <p>So the VM is roughly seven to eight times faster than Jin's own tree-walking back end, and in the same ballpark as CPython on a call-heavy benchmark. The exact figures depend on the machine; the ratio is the thing to take away.</p>
+      <p>So the VM is roughly six times faster than Jin's own tree-walking back end, and it is level with CPython on a call-heavy benchmark. The exact figures depend on the machine; the ratio is the thing to take away.</p>
 
       <p>The VM keeps that lead by doing the work before the program starts, and by not doing it again:</p>
 

@@ -47,7 +47,14 @@ python site/build.py            # regenerate the HTML from the fragments
 python site/check-site.py       # every link and asset must exist
 python site/check-examples.py   # every documented example must run
 node site/test-interpreter.js   # run the playground examples
+node site/screenshot.js         # picture every page and look for faults
 ```
+
+`screenshot.js` needs Playwright, which is not a dependency of the project:
+`npm install playwright` in a scratch folder, then point `NODE_PATH` at it.
+It opens every page at a desktop and a phone width, saves a picture of each
+one, and reports a missing asset, a console error, an image in the wrong
+shape, or a page that scrolls sideways.
 
 `build.py` reads `site/templates/base.html` and the body fragments in
 `site/pages/`, and writes `docs/index.html` and `docs/docs/*.html`. The

@@ -13,9 +13,9 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/cli.html">
-<link rel="icon" href="../assets/img/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
-<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="icon" href="../assets/img/favicon.png?v=20261021142341" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021142341">
+<link rel="stylesheet" href="../assets/css/site.css?v=20261021142341">
 
 <script>
   // Set the theme before first paint so the page never flashes the wrong one.
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/icon.png" alt="" width="32" height="32">
+        <img src="../assets/img/icon.png?v=20261021142341" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -97,7 +97,7 @@
       <h2>The commands at a glance</h2>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Command</th><th>What it does</th></tr>
           </thead>
@@ -115,7 +115,7 @@
             <tr><td><code>jin --version</code></td><td>Print the version.</td></tr>
             <tr><td><code>jin --help</code></td><td>Print the usage text.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>Every pipeline stage is available on its own, so you can watch a program being translated one layer at a time: source text, tokens, syntax tree, checked program, bytecode, result.</p>
@@ -203,7 +203,7 @@ hello, Ada
 $ echo $?
 0</code></pre>
 
-      <p>The interpreter is slower — roughly seven to eight times slower on a call-heavy program — but it exists so that the two back ends can be checked against each other. The test suite runs every program in the differential corpus on both of them and requires byte-identical output, error text included.</p>
+      <p>The interpreter is slower — roughly six times slower on a call-heavy program — but it exists so that the two back ends can be checked against each other. The test suite runs every program in the differential corpus on both of them and requires byte-identical output, error text included.</p>
 
       <aside class="Callout Callout--note">
         <p><strong>Note.</strong> <code>interpret</code> type-checks the program first, exactly as <code>run</code> does. A type error stops it just the same.</p>
@@ -575,7 +575,7 @@ passed to the program, where args() returns it:
       <p>There are two, and nothing else.</p>
 
       <div class="TableWrap">
-        <table class="Table">
+        <div class="TableWrap"><table class="Table">
           <thead>
             <tr><th>Code</th><th>When</th></tr>
           </thead>
@@ -583,7 +583,7 @@ passed to the program, where args() returns it:
             <tr><td><code>0</code></td><td>The command did what it was asked to.</td></tr>
             <tr><td><code>1</code></td><td>Something went wrong: a type error, a syntax error, a runtime error, a file that is not there, a folder that is not a project, or a project name that cannot be used.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <p>Problems are written to standard error and the message starts with <code>jin:</code>, so a script can tell them apart from your program's own output.</p>
@@ -633,7 +633,7 @@ $ echo $?
     </div>
   </footer>
 
-<script src="../assets/js/site.js" defer></script>
+<script src="../assets/js/site.js?v=20261021142341" defer></script>
 
 </body>
 </html>

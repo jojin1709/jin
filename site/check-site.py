@@ -44,7 +44,7 @@ for page in sorted(pages):
     for target in LINK.findall(html):
         if target.startswith(("http://", "https://", "mailto:", "#", "data:")):
             continue
-        path = target.split("#")[0]
+        path = target.split("#")[0].split("?")[0]
         if not path:
             continue
         resolved = os.path.normpath(os.path.join(os.path.dirname(page), path))

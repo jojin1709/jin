@@ -696,7 +696,9 @@ table { border-collapse: collapse; }
   position: relative;
 }
 
-.Hero-art img {
+/* Only the picture itself fills the column. A descendant rule would also
+   catch the little icon inside the badge and blow it up to full size. */
+.Hero-art > img {
   width: 100%;
   border-radius: var(--r-lg);
   border: 1px solid var(--border);
@@ -704,9 +706,8 @@ table { border-collapse: collapse; }
 }
 
 .Hero-badge {
-  position: absolute;
-  bottom: -18px;
-  left: -14px;
+  position: relative;
+  margin: -22px 0 0 var(--s-4);
   display: flex;
   align-items: center;
   gap: var(--s-3);
@@ -716,13 +717,24 @@ table { border-collapse: collapse; }
   box-shadow: var(--shadow-pop);
   padding: var(--s-3) var(--s-4);
   font-size: 13px;
+  line-height: 1.45;
   color: var(--text-muted);
+  width: fit-content;
+  max-width: min(340px, 100%);
+}
+
+.Hero-badge img {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
 }
 
 .Hero-badge strong {
   display: block;
   color: var(--text);
   font-size: 14px;
+  white-space: nowrap;
 }
 
 /* ----------------------------------------------------------------- strip */
@@ -1394,6 +1406,13 @@ table { border-collapse: collapse; }
   h2 { font-size: 23px; }
   .Hero-title { font-size: 32px; }
   .Hero-lede { font-size: 17px; }
+  .Hero-eyebrow {
+    display: block;
+    text-align: left;
+    line-height: 1.8;
+  }
+  .Hero-eyebrow span { display: block; }
+  .Hero-eyebrow span[aria-hidden="true"] { display: none; }
   .Container { padding: 0 var(--s-4); }
   .Header-inner { padding: 0 var(--s-4); }
   .DocHeader { padding: var(--s-6) var(--s-4) var(--s-5); }
