@@ -23,6 +23,9 @@ type Lexer struct {
 // NewLexer primes a lexer for the given input.
 func NewLexer(input string) *Lexer {
 	l := &Lexer{input: input, line: 1, lineStart: 0}
+	// A byte order mark is not part of the program. Editors on Windows like
+	// to add one, and a file that starts with one should still run.
+	l.input = strings.TrimPrefix(input, "\ufeff")
 	l.readChar()
 	return l
 }
@@ -298,6 +301,22 @@ func (l *Lexer) readMultiLineString() (string, bool) {
 			content = strings.TrimPrefix(content, "\n")
 			return content, true
 		}
+		if l.ch == '{' {
+			// "{{" is a literal brace, and both braces are kept.
+			if l.peekChar() == '{' {
+				sb.WriteRune('{')
+				sb.WriteRune('{')
+				l.readChar()
+				l.readChar()
+				continue
+			}
+			// An {interpolation} is copied across verbatim, so a string
+			// inside it cannot close the string it sits in.
+			if !l.copyInterpolation(&sb) {
+				return sb.String(), false
+			}
+			continue
+		}
 		sb.WriteRune(l.ch)
 		l.readChar()
 	}
@@ -305,12 +324,17 @@ func (l *Lexer) readMultiLineString() (string, bool) {
 
 // readString reads a double-quoted string and resolves escape sequences.
 // It returns ok=false for an unterminated string.
+//
+// An {interpolation} is copied across verbatim, braces and all, so that a
+// string inside the expression — join(fibs, ", ") — does not end the string
+// it sits in. The expression is split out and lexed again later.
 func (l *Lexer) readString() (string, bool) {
 	var sb strings.Builder
 
-	for {
-		l.readChar()
+	// Step past the opening quote.
+	l.readChar()
 
+	for {
 		if l.ch == eof || l.ch == '\n' {
 			return sb.String(), false
 		}
@@ -336,6 +360,24 @@ func (l *Lexer) readString() (string, bool) {
 				sb.WriteRune('\\')
 				sb.WriteRune(l.ch)
 			}
+			l.readChar()
+			continue
+		}
+
+		if l.ch == '{' {
+			// "{{" is a literal brace, not the start of an expression. Both
+			// braces are kept: the split into text and expressions happens
+			// later, and it is the one that turns "{{" into "{".
+			if l.peekChar() == '{' {
+				sb.WriteRune('{')
+				sb.WriteRune('{')
+				l.readChar() // the second '{'
+				l.readChar() // past it
+				continue
+			}
+			if !l.copyInterpolation(&sb) {
+				return sb.String(), false
+			}
 			continue
 		}
 
@@ -344,6 +386,91 @@ func (l *Lexer) readString() (string, bool) {
 		}
 
 		sb.WriteRune(l.ch)
+		l.readChar()
+	}
+}
+
+// copyInterpolation copies one {expr} span into sb exactly as it was written,
+// braces included. On success the lexer sits just past the closing brace.
+//
+// The text inside is the expression, and the expression is lexed on its own
+// later, so an escape sequence is resolved here the same way the rest of the
+// string is resolved. A string inside the expression keeps its own escapes,
+// because those belong to that string and not to the expression around it.
+func (l *Lexer) copyInterpolation(sb *strings.Builder) bool {
+	depth := 0
+
+	for {
+		if l.ch == eof {
+			return false
+		}
+
+		if l.ch == '\\' {
+			l.readChar()
+			switch l.ch {
+			case 'n':
+				sb.WriteRune('\n')
+			case 't':
+				sb.WriteRune('\t')
+			case 'r':
+				sb.WriteRune('\r')
+			case '0':
+				sb.WriteRune(0)
+			case '\\':
+				sb.WriteRune('\\')
+			case '"':
+				sb.WriteRune('"')
+			case eof:
+				return false
+			default:
+				sb.WriteRune('\\')
+				sb.WriteRune(l.ch)
+			}
+			l.readChar()
+			continue
+		}
+
+		// A string inside the expression, quotes and all.
+		if l.ch == '"' {
+			sb.WriteRune(l.ch)
+			l.readChar()
+			for {
+				if l.ch == eof {
+					return false
+				}
+				if l.ch == '\\' {
+					sb.WriteRune(l.ch)
+					l.readChar()
+					if l.ch == eof {
+						return false
+					}
+					sb.WriteRune(l.ch)
+					l.readChar()
+					continue
+				}
+				sb.WriteRune(l.ch)
+				done := l.ch == '"'
+				l.readChar()
+				if done {
+					break
+				}
+			}
+			continue
+		}
+
+		if l.ch == '{' {
+			depth++
+		}
+		if l.ch == '}' {
+			depth--
+		}
+
+		sb.WriteRune(l.ch)
+		l.readChar()
+
+		if depth == 0 {
+			return true
+		}
 	}
 }
 

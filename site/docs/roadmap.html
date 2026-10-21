@@ -13,8 +13,8 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/roadmap.html">
-<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="icon" href="../assets/img/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/css/site.css">
 
 <script>
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <img src="../assets/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <img src="../assets/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -166,8 +166,11 @@
         <ul class="Bullets">
           <li><strong>No <code>switch</code> or <code>match</code>.</strong> <code>if</code> / <code>else if</code> is the only branching there is.</li>
           <li><strong>No overflow checking on integers.</strong> They are 64-bit and wrap around silently: <code>9223372036854775807 + 1</code> is <code>-9223372036854775808</code>, with no error.</li>
+          <li><strong>No <code>float</code> infinity or <code>NaN</code>.</strong> <code>1.0 / 0.0</code> is a division by zero error rather than an infinity.</li>
           <li><strong>No JSON, no regular expressions, and no date or time</strong> in the standard library.</li>
           <li><strong>No way out of the project folder.</strong> An import path cannot point outside the folder of the file that writes it, so a project cannot reach a shared library sitting next to it.</li>
+          <li><strong>No formatter, no test runner and no language server yet.</strong> <code>gofmt</code> has no Jin equivalent, and an editor cannot ask Jin what a name means.</li>
+          <li><strong>Calls stop at 1024 frames deep.</strong> A program that recurses further than that is stopped with an error rather than a crash.</li>
         </ul>
       </aside>
     </section>
@@ -178,8 +181,14 @@
       <h3>Stage 11 — remote packages</h3>
       <p>A registry and a versioned lock file, so <code>import "json" as json</code> can pull a package instead of a folder. The loader in <code>module.go</code> is where that lands: it already decides what a path means, what a project is, and how files depend on each other.</p>
 
+      <h3>A formatter</h3>
+      <p><code>jin fmt</code>, so that a Jin file can be brought into one shape the way <code>gofmt</code> brings a Go file into one. A language people write in needs a way to settle an argument about spacing without an argument.</p>
+
+      <h3>A test runner</h3>
+      <p><code>jin test</code>, so that a Jin program can test itself without leaving the language.</p>
+
       <h3>Later — a faster VM</h3>
-      <p>Unboxed stack slots and inline caches, to move clearly ahead of CPython rather than alongside it. Today the VM is roughly seven to eight times faster than Jin's own tree-walking back end and in the same ballpark as CPython on a call-heavy benchmark; those two changes are what would change that.</p>
+      <p>Unboxed stack slots and inline caches, to move clearly ahead of CPython rather than alongside it. Today the VM is roughly six times faster than Jin's own tree-walking back end and level with CPython on a call-heavy benchmark; those two changes are what would change that.</p>
 
       <p>That is the whole of the stated plan. Anything not listed above is not promised.</p>
     </section>

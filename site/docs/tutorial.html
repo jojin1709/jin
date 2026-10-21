@@ -13,8 +13,8 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/tutorial.html">
-<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="icon" href="../assets/img/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/css/site.css">
 
 <script>
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <img src="../assets/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <img src="../assets/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -126,7 +126,7 @@ Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named rec
   <pre class="Code" data-lang="shell"><code class="lang-shell">$ go test ./...
 ok  	jin	2.415s</code></pre>
 
-  <p>The number at the end is how long the suite took. There are 389 test cases in it.</p>
+  <p>The number at the end is how long the suite took. There are 396 test cases in it.</p>
 
   <p>The rest of this page writes the command as <code>jin</code>. On Windows that means <code>jin.exe</code>, unless you rename the file — putting the folder it is in on your <code>PATH</code> is the tidiest way to work.</p>
 
@@ -322,8 +322,8 @@ jin: extra.jin has syntax errors: 3:1: unexpected token "}"</code></pre>
 
   <p>Read these from the left. The first message is the one that usually explains the rest: once the parser loses the shape of the file, everything after it is nonsense.</p>
 
-  <aside class="Callout Callout--warning">
-    <p><strong>Careful.</strong> A block that is never closed is not reported. The parser closes an open <code>{</code> at the end of the file, so a missing brace quietly swallows the rest of the file into the block above it. If a program prints nothing at all and you expected output, look for a brace that never got closed.</p>
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> A block that is never closed is reported: <code>missing '}' at the end of the file</code>. A missing brace used to be accepted quietly, and it swallowed the rest of the file into the block above it.</p>
   </aside>
 
   <h3>Runtime errors — the program started and then stopped</h3>

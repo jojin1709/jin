@@ -39,7 +39,9 @@ site/
 ## Building
 
 ```sh
-python site/tools/build.py        # regenerate the HTML from the fragments
+python site/tools/build.py            # regenerate the HTML from the fragments
+python site/tools/check-site.py       # every link and asset must exist
+python site/tools/check-examples.py   # every documented example must run
 node site/tools/test-interpreter.js   # run the playground examples
 ```
 
@@ -47,6 +49,15 @@ node site/tools/test-interpreter.js   # run the playground examples
 `tools/pages/`, and writes `index.html` and `docs/*.html`. The header, the
 navigation, the footer and the documentation sidebar are written once, in the
 template and in `build.py`, instead of twelve times.
+
+`check-site.py` walks the built pages and makes sure every local link and
+every asset points at something that exists, and that every page has a title,
+a description and a main landmark.
+
+`check-examples.py` finds every program on the documentation pages, runs it
+with the real `jin` binary, and compares what it prints with the output the
+page says it prints. It skips the examples that need a second file, a
+command-line argument, or a name from an earlier block on the page.
 
 ## Publishing
 

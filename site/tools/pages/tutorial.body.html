@@ -40,7 +40,7 @@ Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named rec
   <pre class="Code" data-lang="shell"><code class="lang-shell">$ go test ./...
 ok  	jin	2.415s</code></pre>
 
-  <p>The number at the end is how long the suite took. There are 389 test cases in it.</p>
+  <p>The number at the end is how long the suite took. There are 396 test cases in it.</p>
 
   <p>The rest of this page writes the command as <code>jin</code>. On Windows that means <code>jin.exe</code>, unless you rename the file — putting the folder it is in on your <code>PATH</code> is the tidiest way to work.</p>
 
@@ -236,8 +236,8 @@ jin: extra.jin has syntax errors: 3:1: unexpected token "}"</code></pre>
 
   <p>Read these from the left. The first message is the one that usually explains the rest: once the parser loses the shape of the file, everything after it is nonsense.</p>
 
-  <aside class="Callout Callout--warning">
-    <p><strong>Careful.</strong> A block that is never closed is not reported. The parser closes an open <code>{</code> at the end of the file, so a missing brace quietly swallows the rest of the file into the block above it. If a program prints nothing at all and you expected output, look for a brace that never got closed.</p>
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> A block that is never closed is reported: <code>missing '}' at the end of the file</code>. A missing brace used to be accepted quietly, and it swallowed the rest of the file into the block above it.</p>
   </aside>
 
   <h3>Runtime errors — the program started and then stopped</h3>

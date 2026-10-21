@@ -127,3 +127,49 @@ world"""`)
 		t.Fatalf("unterminated string position: want 1:1, got %d:%d", got.Line, got.Column)
 	}
 }
+
+// A byte order mark is not part of the program, and a file that starts with
+// one should still run.
+func TestByteOrderMarkIsSkipped(t *testing.T) {
+	lex := NewLexer("\ufefflet x = 1")
+	got := lex.NextToken()
+	if got.Type != LET {
+		t.Fatalf("want LET after a byte order mark, got %s", got.Type)
+	}
+}
+
+// A string inside an {interpolation} must not end the string it sits in.
+func TestInterpolationCanHoldAString(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{`"fib: {join(fibs, ", ")}"`, `fib: {join(fibs, ", ")}`},
+		{`"fib: {join(fibs, \", \")}"`, `fib: {join(fibs, ", ")}`},
+		{`"x: {upper("abc")}"`, `x: {upper("abc")}`},
+	}
+
+	for _, c := range cases {
+		lex := NewLexer(c.input)
+		got := lex.NextToken()
+		if got.Type != STRING {
+			t.Fatalf("%s: want STRING, got %s", c.input, got.Type)
+		}
+		if got.Literal != c.want {
+			t.Fatalf("%s:\n want %q\n got  %q", c.input, c.want, got.Literal)
+		}
+	}
+}
+
+// "{{" is a literal brace, and both braces survive the lexer so that the
+// split into text and expressions can turn them into one.
+func TestDoubleBracesSurviveTheLexer(t *testing.T) {
+	lex := NewLexer(`"{{literal}}"`)
+	got := lex.NextToken()
+	if got.Type != STRING {
+		t.Fatalf("want STRING, got %s", got.Type)
+	}
+	if got.Literal != "{{literal}}" {
+		t.Fatalf("want the braces kept, got %q", got.Literal)
+	}
+}

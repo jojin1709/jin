@@ -1158,6 +1158,7 @@ func (c *Checker) checkIndex(node *IndexExpression) *Type {
 		if indexType.Kind != TypeAny && indexType.Kind != TypeInt {
 			c.errorf(node.Token, "index must be an int, got %s", indexType)
 		}
+		c.checkConstantIndex(node)
 		if containerType.Kind == TypeStr {
 			return strT
 		}
@@ -1173,6 +1174,43 @@ func (c *Checker) checkIndex(node *IndexExpression) *Type {
 
 	c.errorf(node.Token, "cannot index %s", containerType)
 	return anyT
+}
+
+// checkConstantIndex catches an index that is known to be out of range before
+// the program runs, which is only possible when both the array and the index
+// are written out in full.
+func (c *Checker) checkConstantIndex(node *IndexExpression) {
+	array, ok := node.Left.(*ArrayLiteral)
+	if !ok {
+		return
+	}
+	number, ok := constantIndex(node.Index)
+	if !ok {
+		return
+	}
+	if number < 0 || number >= int64(len(array.Elements)) {
+		c.errorf(node.Token, "index %d out of range (length %d)",
+			number, len(array.Elements))
+	}
+}
+
+// constantIndex reads an index that is written out in full, including one
+// that is written as a negative number.
+func constantIndex(expr Expression) (int64, bool) {
+	switch e := expr.(type) {
+	case *IntegerLiteral:
+		return e.Value, true
+	case *PrefixExpression:
+		if e.Operator != "-" {
+			return 0, false
+		}
+		number, ok := e.Right.(*IntegerLiteral)
+		if !ok {
+			return 0, false
+		}
+		return -number.Value, true
+	}
+	return 0, false
 }
 
 // checkMapKey makes sure a key is one of the values a map can be keyed by.

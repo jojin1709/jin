@@ -77,7 +77,8 @@ window.JIN_EXAMPLES = {
     '}',
     '',
     'try {',
-    '    print([1, 2][9])',
+    '    let items = [1, 2]',
+    '    print(items[9])',
     '} catch e {',
     '    print("failed: {e}")',
     '}'

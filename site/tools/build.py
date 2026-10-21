@@ -177,7 +177,7 @@ def header_markup(active, home):
     return """  <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="{{HOME}}" aria-label="Jin home">
-        <img src="{{ASSETS}}/img/logo.svg" alt="" width="30" height="30">
+        <img src="{{ASSETS}}/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -212,7 +212,7 @@ def header_markup(active, home):
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="{{HOME}}">
-        <img src="{{ASSETS}}/img/logo.svg" alt="" width="30" height="30">
+        <img src="{{ASSETS}}/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>

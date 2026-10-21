@@ -13,8 +13,8 @@
 <meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://jojin1709.github.io/jin/docs/tour.html">
-<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="icon" href="../assets/img/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/css/site.css">
 
 <script>
@@ -35,7 +35,7 @@
   <header class="Header js-header">
     <div class="Header-inner">
       <a class="Header-logo" href="../" aria-label="Jin home">
-        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <img src="../assets/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <nav class="Header-nav" aria-label="Main">
@@ -70,7 +70,7 @@
   <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
     <div class="Drawer-head">
       <a class="Header-logo" href="../">
-        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <img src="../assets/img/icon.png" alt="" width="32" height="32">
         <span class="Header-wordmark">Jin</span>
       </a>
       <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
@@ -430,19 +430,24 @@ print(classify(4), classify(7))</code></pre>
 
       <pre class="Code" data-lang="jin"><code class="lang-jin">let name = "Jin"
 let n = 3
+let fibs = [0, 1, 1, 2]
 
 print("name is {name}, n is {n}")
 print("use {{braces}} for literal braces")
 print("sum is {1 + 2}")
-print("nested braces: { [1, 2][0] }")</code></pre>
+print("nested braces: { [1, 2][0] }")
+print("a string inside: {join(fibs, ", ")}")
+print("an escaped one: {join(fibs, \", \")}")</code></pre>
 
       <pre class="Code Code--out" data-lang="output"><code>name is Jin, n is 3
 use {braces} for literal braces
 sum is 3
-nested braces: 1</code></pre>
+nested braces: 1
+a string inside: 0, 1, 1, 2
+an escaped one: 0, 1, 1, 2</code></pre>
 
       <aside class="Callout Callout--note">
-        <p><strong>Note.</strong> The expression inside <code>{ }</code> may not contain a double quote of its own in a single-quoted string. Use a multi-line string when you need one; see below.</p>
+        <p><strong>Note.</strong> A string may sit inside an interpolation, written either plainly (<code>{join(fibs, ", ")}</code>) or with its quotes escaped (<code>{join(fibs, \", \")}</code>). Both give the same result.</p>
       </aside>
 
       <p>Strings can be compared and added, and the string helpers are listed in <a href="builtins.html">Built-ins</a>.</p>

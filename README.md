@@ -15,7 +15,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
-[![Tests](https://img.shields.io/badge/tests-389%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-396%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -207,8 +207,9 @@ project under test has to produce byte-identical output on both back ends.
 ## Key capabilities
 
 - **Errors caught before the program starts.** Undeclared names, wrong argument
-  counts, mismatched types, non-`bool` conditions and bad indexing are all
-  reported by `jin check`, with the line and column they came from.
+  counts, mismatched types, non-`bool` conditions and an index that is written
+  out in full are all reported by `jin check`, with the line and column they
+  came from.
 - **A real compiler and VM.** Names resolve to slots before execution; small
   integers, booleans and `nil` are pooled; call frames are reused.
 - **Genuine closures with shared captures.** A captured variable is the
@@ -307,6 +308,20 @@ Multi-line strings are delimited with `""" ... """`. Any immediate newline right
 Multi-word built-ins use underscores, so `starts_with` is the shape to expect
 from anything added later. A local or global that reuses a built-in's name hides
 it, in the type checker as well as at run time.
+
+Four of them are worth reading twice, because the shape of the arguments is
+not what you would guess:
+
+```jin
+reduce(items, fn(total, item) { total + item.price }, 0)  # array, function, seed
+sort_by(items, fn(a, b) { a.price - b.price })           # a comparator, not a key
+min([3, 1, 2])                                           # one array, or two or more numbers
+random()                                                 # a float; random(n) gives an int
+```
+
+`sort_by` is a comparison function: it is handed the two things being
+compared and returns a negative number, zero or a positive number. Ties keep
+their original order.
 
 For user-defined records, `type(p)` returns the struct's declared name as a
 string (e.g. `"Point"`), rather than a generic `"struct"` or `"object"`.
@@ -492,11 +507,29 @@ if width { }                 # error: condition must be a bool, got int
 Run `jin check file.jin` to see the problems without executing anything. Running
 a file checks it first, so a program with type errors never starts.
 
-Whatever you leave unannotated is treated as `any` and left alone, so plain
-scripts keep working exactly as before. The checker also covers `let` and
-assignment, function arguments and returns, loop bodies, indexing, built-in
-calls, misplaced `break` / `continue` / `return`, and the expressions inside
-`{interpolation}`.
+An unannotated name takes the type of its first value, and the checker keeps
+watching it from then on. A `let` that starts as a number stays a number:
+
+```jin
+let count = 0
+count = count + 1        # fine
+count = "many"           # error: cannot assign str to int variable "count"
+```
+
+That is a deliberate choice: the type you can see is the type you get, and a
+mistake like the line above is found before the program runs. When a name
+really should hold anything, say so with `any`:
+
+```jin
+let anything: any = 0
+anything = "now a string"
+```
+
+An unannotated function parameter is `any`, and an unannotated return is not
+checked, so plain scripts keep working exactly as before. The checker also
+covers `let` and assignment, function arguments and returns, loop bodies,
+indexing, built-in calls, misplaced `break` / `continue` / `return`, and the
+expressions inside `{interpolation}`.
 
 The annotation names are `int`, `float`, `str`, `bool`, `nil`, `array`, `map`
 and `any`. A bare `array` or `map` leaves the elements alone, which is usually
@@ -506,6 +539,9 @@ what you want, because a map holding a name and an age at once is normal:
 let person: map = {"name": "Ada", "age": 36}
 let mixed: array = [1, "two"]
 ```
+
+`int` and `float` are different types and never mix. `1 + 1.5` is an error,
+and so is `float(1) + 2`; convert on both sides with `int()` or `float()`.
 
 ---
 
@@ -768,16 +804,17 @@ reached in the way each engine is built.
 ## Performance
 
 Naive `fib(30)`, wall clock including start-up, compile and type-check, on the
-same machine (Windows, Go 1.26, CPython 3.14):
+same machine (Windows, Go 1.26, CPython 3.14, prebuilt binary, median of five
+runs):
 
 | Engine | Time |
 |---|---|
-| `jin run` (bytecode VM) | ~0.45 s |
-| `jin interpret` (tree walker) | ~3.5 s |
-| CPython 3.14, same program | ~0.20 s |
+| `jin run` (bytecode VM) | ~0.15 s |
+| `jin interpret` (tree walker) | ~0.93 s |
+| CPython 3.14, same program | ~0.14 s |
 
-So the VM is roughly seven to eight times faster than Jin's own tree-walking back end, and
-in the same ballpark as CPython on a call-heavy benchmark. Getting clearly past
+So the VM is roughly six times faster than Jin's own tree-walking back end,
+and it is level with CPython on a call-heavy benchmark. Getting clearly past
 CPython would need unboxed stack slots and inline caches, which are a later
 stage's work.
 
@@ -796,7 +833,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-389 test cases pass, covering the lexer, parser, type checker, compiler,
+396 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 
@@ -849,6 +886,18 @@ Not in, and honest about it:
 - No `finally` blocks, no custom error types, and no `try` as an expression. Catch
   blocks receive a `str` error message.
 - No default field values, no inheritance or interfaces.
+- No `switch` or `match`, and no ternary: `if` / `else if` / `else` is the only
+  way to branch, and a branch that yields a value is written as a statement.
+- No integer overflow checking. An `int` that runs past its limit wraps round,
+  the way it does in Go.
+- No `float` infinity or `NaN`: `1.0 / 0.0` is a division by zero error
+  rather than an infinity.
+- No JSON, no regular expressions and no date or time in the standard library.
+- No importing from outside the folder a file is in.
+- No formatter, no test runner and no language server yet. `gofmt` has no Jin
+  equivalent, and an editor cannot ask Jin what a name means.
+- Calls are limited to 1024 frames deep, so a program that recurses further
+  than that is stopped with an error rather than a crash.
 
 ### Roadmap
 
@@ -856,6 +905,10 @@ Not in, and honest about it:
   `import "json" as json` can pull a package instead of a folder. The loader in
   `module.go` is where that lands: it already decides what a path means, what a
   project is, and how files depend on each other.
+- **A formatter:** `jin fmt`, so a Jin file can be brought into one shape the
+  way `gofmt` brings a Go file into one.
+- **A test runner:** `jin test`, so a Jin program can test itself without
+  leaving the language.
 - **Later — a faster VM:** unboxed stack slots and inline caches, to move clearly
   ahead of CPython rather than alongside it.
 

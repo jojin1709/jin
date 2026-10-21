@@ -376,8 +376,23 @@ func TestInterpolationIsTypeChecked(t *testing.T) {
 	expectClean(t, `let xs = [1, 2]`+"\n"+`"count {len(xs)}"`)
 }
 
+// 'nil' is a keyword, but it is also the name of a type.
+func TestNilIsAUsableAnnotation(t *testing.T) {
+	expectClean(t, `let x: nil = nil`)
+	expectClean(t, `fn nothing() -> nil { return nil }`)
+}
+
+// An index that is written out in full is checked before the program runs.
+func TestConstantIndexIsChecked(t *testing.T) {
+	expectClean(t, `print([1, 2, 3][0])`)
+	expectClean(t, `print([1, 2, 3][2])`)
+	expectTypeError(t, `print([1, 2, 3][3])`, "index 3 out of range (length 3)")
+	expectTypeError(t, `print([1, 2, 3][-1])`, "index -1 out of range (length 3)")
+	// An index that is not written out in full is a run-time check.
+	expectClean(t, `let i = 9`+"\n"+`print([1, 2, 3][i])`)
+}
+
 func TestArrayElementTypesAreUnified(t *testing.T) {
-	// [1, "two"] unifies to array<any>, so this is allowed.
 	expectClean(t, `let mixed = [1, "two"]`)
 	// Annotated arrays are enforced through push.
 	expectTypeError(t, `let xs: int = [1, 2]`, "cannot assign array<int> to int")

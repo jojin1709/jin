@@ -226,6 +226,28 @@ func TestParseErrorsAreReported(t *testing.T) {
 	}
 }
 
+// A block that is never closed is a mistake. It used to be accepted quietly,
+// which swallowed the rest of the file into the block above it.
+func TestUnclosedBlockIsAnError(t *testing.T) {
+	p := NewParser(NewLexer("fn greet(name) {\n    print(name)\n"))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Fatal("expected a parse error for an unclosed block")
+	}
+	if !strings.Contains(strings.Join(p.Errors(), "; "), "missing '}'") {
+		t.Errorf("unexpected error message: %s", strings.Join(p.Errors(), "; "))
+	}
+}
+
+// A closed block is still fine, and the file after it is still read.
+func TestClosedBlockIsNotAnError(t *testing.T) {
+	p := NewParser(NewLexer("fn greet(name) {\n    print(name)\n}\nprint(\"after\")\n"))
+	p.ParseProgram()
+	if len(p.Errors()) != 0 {
+		t.Fatalf("parser errors: %s", strings.Join(p.Errors(), "; "))
+	}
+}
+
 // A ';' separates statements wherever it appears, including after a statement
 // that ends in a brace, which is what lets a whole nested definition sit on one
 // line.

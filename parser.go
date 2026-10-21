@@ -127,6 +127,17 @@ func (p *Parser) expectPeek(t TokenType) bool {
 	return false
 }
 
+// expectPeekType moves onto the name of a type. Most type names are
+// identifiers, but 'nil' is a keyword and is a type name too.
+func (p *Parser) expectPeekType() bool {
+	if p.peekTokenIs(IDENT) || p.peekTokenIs(NIL) {
+		p.nextToken()
+		return true
+	}
+	p.errorf("expected a type name, got %s", p.peekToken.Type)
+	return false
+}
+
 func (p *Parser) peekPrecedence() int {
 	if p.peekToken.Type == LBRACE && p.noStructLiteral {
 		return PREC_LOWEST
@@ -264,7 +275,7 @@ func (p *Parser) parseStructStatement() *StructStatement {
 		if !p.expectPeek(COLON) {
 			return nil
 		}
-		if !p.expectPeek(IDENT) {
+		if !p.expectPeekType() {
 			return nil
 		}
 		field.Type = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
@@ -289,7 +300,7 @@ func (p *Parser) parseLetStatement() *LetStatement {
 
 	if p.peekTokenIs(COLON) {
 		p.nextToken() // move to ':'
-		if !p.expectPeek(IDENT) {
+		if !p.expectPeekType() {
 			return nil
 		}
 		stmt.Type = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
@@ -325,7 +336,7 @@ func (p *Parser) parseFunctionStatement() *FunctionStatement {
 		if !p.expectPeek(COLON) {
 			return nil
 		}
-		if !p.expectPeek(IDENT) {
+		if !p.expectPeekType() {
 			return nil
 		}
 		receiver.Type = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
@@ -347,7 +358,7 @@ func (p *Parser) parseFunctionStatement() *FunctionStatement {
 
 	if p.peekTokenIs(ARROW) {
 		p.nextToken() // move to '->'
-		if !p.expectPeek(IDENT) {
+		if !p.expectPeekType() {
 			return nil
 		}
 		stmt.ReturnType = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
@@ -383,7 +394,7 @@ func (p *Parser) parseFunctionParameters() []*Parameter {
 
 		if p.peekTokenIs(COLON) {
 			p.nextToken() // move to ':'
-			if !p.expectPeek(IDENT) {
+			if !p.expectPeekType() {
 				return nil
 			}
 			param.Type = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}
@@ -575,6 +586,13 @@ func (p *Parser) parseBlockStatement() *BlockStatement {
 		}
 		p.nextToken()
 	}
+
+	// A block that runs out of file without a '}' is a mistake, and it is a
+	// mistake that would otherwise swallow the rest of the program silently.
+	if p.curTokenIs(EOF) && !p.curTokenIs(RBRACE) {
+		p.errorf("missing '}' at the end of the file")
+	}
+
 	return block
 }
 
@@ -776,7 +794,7 @@ func (p *Parser) parseFunctionLiteral() Expression {
 
 	if p.peekTokenIs(ARROW) {
 		p.nextToken()
-		if !p.expectPeek(IDENT) {
+		if !p.expectPeekType() {
 			return nil
 		}
 		lit.ReturnType = &TypeAnnotation{Token: p.curToken, Name: p.curToken.Literal}

@@ -71,8 +71,8 @@ print(person)</code></pre>
 
       <p>The name of a record declared in the file also works as a type, so <code>let p: Point = Point(1, 2)</code> is checked against the record's own fields.</p>
 
-      <aside class="Callout Callout--warning">
-        <p><strong>Careful.</strong> The checker knows the name <code>nil</code>, but <code>nil</code> is a keyword in Jin, so the parser will not accept it as an annotation. Writing <code>let x: nil = nil</code> is a syntax error, not a type error: <code>expected IDENT, got nil</code>. Leave the annotation off and use <code>nil</code> as a value.</p>
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>nil</code> is a keyword in Jin, and it is also the name of a type, so the parser accepts it as an annotation: <code>let x: nil = nil</code> is a name that can only ever hold <code>nil</code>.</p>
       </aside>
     </section>
 
