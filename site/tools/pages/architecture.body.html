@@ -29,7 +29,7 @@ one whole program
 bytecode               (code.go)
    |  vm.go           -&gt; result
    v
-values                 (object.go, record.go, symboltable.go, builtins.go)
+values                 (object.go, record.go, builtins.go)
 
 alternate back end
 one whole program
@@ -158,7 +158,7 @@ values                 (object.go, environment.go, builtins.go)</code></pre>
   1:7: undefined variable "y"</code></pre>
 
       <aside class="Callout Callout--note">
-        <p><strong>Note.</strong> This is why <code>jin check</code> and <code>jin compile</code> catch different classes of mistake: the checker works on types, and the compiler works on names and slots.</p>
+        <p><strong>Note.</strong> This is why <code>jin check</code> and <code>jin compile</code> catch different classes of mistake: the checker works on types and on the names it can see statically, while the compiler works on slots, closures and the instructions themselves.</p>
       </aside>
     </section>
 
