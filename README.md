@@ -15,7 +15,7 @@
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Build](https://github.com/jojin1709/jin/actions/workflows/go.yml/badge.svg)](https://github.com/jojin1709/jin/actions/workflows/go.yml)
-[![Tests](https://img.shields.io/badge/tests-396%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-406%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
@@ -145,6 +145,36 @@ annotations, and a standard library small enough to keep in your head.
 ---
 
 ## Quick Start
+
+### Install
+
+**With Go**, if you have Go 1.21 or newer:
+
+```sh
+go install github.com/jojin1709/jin@latest
+```
+
+Go puts the binary in the folder `go env GOBIN` names — `$(go env GOPATH)/bin`
+unless you set `GOBIN` yourself — and that folder has to be on your `PATH`:
+
+```sh
+go env GOBIN        # where the binary went
+```
+
+`@latest` means the newest tagged release, so this needs a release to exist. A
+build from source always works.
+
+**From a release**, if you would rather not have Go on the machine: download
+the archive for your platform from
+[the releases page](https://github.com/jojin1709/jin/releases), unpack it, and
+put the `jin` binary on your `PATH`. Each archive holds the binary, the licence
+and this README, along with a checksum to check the download against.
+
+**From source**, with a checkout of this repository:
+
+```sh
+go build -o jin.exe .
+```
 
 ### Prerequisites
 
@@ -864,7 +894,7 @@ go vet ./...       # static checks
 gofmt -l .         # formatting (prints nothing when clean)
 ```
 
-396 test cases pass, covering the lexer, parser, type checker, compiler,
+406 test cases pass, covering the lexer, parser, type checker, compiler,
 interpreter, the VM, the runtime value model, modules and projects, and every
 example program.
 
@@ -892,7 +922,7 @@ prints, and on where it fails when a module, an alias or an import path is wrong
 - [x] Stage 9: error handling — try / catch statements, catchable runtime errors and error(), re-raising
 - [x] Stage 10: real programs — terminal input (`input`, `read_all_stdin`), multi-line strings (`"""`), higher-order built-ins (`map`, `filter`, `reduce`, `any`, `all`, `sort_by`, `find_index`), and named record construction (`Point{x: 1, y: 2}`)
 
-Current version: `0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)` — see `jin --version`.
+Current version: `0.10.1` — see `jin --version`. A build from source says `dev`.
 
 ### What is in, and what is not
 

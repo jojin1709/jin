@@ -20,27 +20,52 @@ go version go1.26.2 windows/amd64</code></pre>
   </aside>
 </section>
 
-<section class="DocSection" id="build">
-  <h2>Build the language</h2>
+<section class="DocSection" id="install">
+  <h2>Install it</h2>
+
+  <p>There are three ways to get <code>jin</code>, and they all give you the same binary.</p>
+
+  <h3>With Go</h3>
+
+  <p>If you have Go 1.21 or newer, one command installs it:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ go install github.com/jojin1709/jin@latest</code></pre>
+
+  <p>Go puts the binary in the folder <code>go env GOBIN</code> names, which is <code>$(go env GOPATH)/bin</code> unless you set <code>GOBIN</code> yourself. That folder has to be on your <code>PATH</code>:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ go env GOBIN
+/home/you/go/bin</code></pre>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> <code>@latest</code> means the newest tagged release, so this needs a release to exist. A build from source, below, always works.</p>
+  </aside>
+
+  <h3>From a release</h3>
+
+  <p>If you would rather not have Go on the machine, download the archive for your platform from <a href="https://github.com/jojin1709/jin/releases">the releases page</a>, unpack it, and put the <code>jin</code> binary on your <code>PATH</code>. Each archive holds the binary, the licence and the README, along with a checksum to check the download against.</p>
+
+  <h3>From source</h3>
 
   <p>Get the source and build the command-line tool. In the folder that holds the repository:</p>
 
   <pre class="Code" data-lang="shell"><code class="lang-shell">$ go build -o jin.exe .
 $ ./jin.exe --version
-Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)</code></pre>
+jin dev</code></pre>
 
   <p>On Linux and macOS the same command gives you <code>jin</code> instead of <code>jin.exe</code>:</p>
 
   <pre class="Code" data-lang="shell"><code class="lang-shell">$ go build -o jin .
 $ ./jin --version
-Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)</code></pre>
+jin dev</code></pre>
+
+  <p>A build from source says <code>dev</code>, because it has no version stamped into it. A released binary says the version it was built as, such as <code>jin 0.10.1</code>.</p>
 
   <p>The build prints nothing when it works. If you want to see that the tests pass as well, they run in a few seconds:</p>
 
   <pre class="Code" data-lang="shell"><code class="lang-shell">$ go test ./...
-ok  	jin	2.415s</code></pre>
+ok  	github.com/jojin1709/jin	2.478s</code></pre>
 
-  <p>The number at the end is how long the suite took. There are 396 test cases in it.</p>
+  <p>The number at the end is how long the suite took. There are 406 test cases in it.</p>
 
   <p>The rest of this page writes the command as <code>jin</code>. On Windows that means <code>jin.exe</code>, unless you rename the file — putting the folder it is in on your <code>PATH</code> is the tidiest way to work.</p>
 

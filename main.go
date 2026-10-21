@@ -1,3 +1,11 @@
+// Command jin is the Jin programming language: a small, statically checked,
+// bytecode-compiled language that runs on a virtual machine.
+//
+// The main commands are run, which runs a file or a whole project, interpret,
+// which runs it on the tree-walking reference engine, check, which type-checks
+// without running anything, and build, which checks and compiles a project.
+// With no arguments at all, jin runs the project in the current folder, or
+// starts a REPL.
 package main
 
 import (
@@ -9,7 +17,12 @@ import (
 	"strings"
 )
 
-const version = "0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)"
+// version is the version of this build. A release build sets it with
+//
+//	go build -ldflags "-X main.version=1.2.3"
+//
+// and a build from source says "dev".
+var version = "dev"
 
 func main() {
 	args := os.Args[1:]
@@ -26,7 +39,7 @@ func main() {
 
 	switch args[0] {
 	case "-v", "--version", "version":
-		fmt.Printf("Jin %s\n", version)
+		fmt.Printf("jin %s\n", version)
 		return
 	case "-h", "--help", "help":
 		usage()
@@ -365,7 +378,7 @@ func printTokens(path string) {
 // repl is an interactive session. State persists between lines, and an
 // incomplete line is buffered until it parses, so multi-line functions work.
 func repl() {
-	fmt.Printf("Jin %s\n", version)
+	fmt.Printf("jin %s\n", version)
 	fmt.Println("Type Jin code and press Enter. 'exit' or Ctrl+D quits.")
 	fmt.Println("'clear' discards a half-typed block.")
 
