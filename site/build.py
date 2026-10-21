@@ -83,6 +83,8 @@ NAV = [
              "Splitting a program across files"),
             ("Command line", "docs/cli.html",
              "Every jin subcommand"),
+            ("FAQ", "docs/faq.html",
+             "The questions that come up, and the short answers"),
         ],
     },
     {
@@ -95,7 +97,7 @@ NAV = [
             ("Examples", REPO + "/tree/main/examples",
              "Runnable programs that ship with Jin"),
             ("The author", "https://github.com/jojin1709",
-             "JOJIN JOHN, who wrote all of it by hand"),
+             "JOJIN JOHN, who designed it"),
         ],
     },
 ]
@@ -106,6 +108,7 @@ SIDEBAR = [
     ("Overview", [
         ("Documentation", "index.html"),
         ("Getting started", "tutorial.html"),
+        ("FAQ", "faq.html"),
     ]),
     ("Language", [
         ("Language tour", "tour.html"),
@@ -251,6 +254,7 @@ def footer_markup(home):
             ("Error handling", "docs/errors.html"),
             ("Projects & imports", "docs/modules.html"),
             ("Command line", "docs/cli.html"),
+            ("FAQ", "docs/faq.html"),
         ]),
         ("Project", [
             ("GitHub", REPO),
@@ -280,8 +284,9 @@ def footer_markup(home):
         <p class="Footer-copy">
           Jin is free and open source, released under the
           <a href="%s/blob/main/LICENSE">MIT licence</a>.
-          Written from scratch in Go by
-          <a href="https://github.com/jojin1709">JOJIN JOHN</a>.
+          Designed by <a href="https://github.com/jojin1709">JOJIN JOHN</a>
+          and built in stages with AI coding agents. No parser generator, no
+          third-party libraries.
         </p>
         <ul class="Footer-bottomList">
           <li><a href="%s">Source on GitHub</a></li>
@@ -377,6 +382,7 @@ DOC_PAGES = [
     ("cli", "cli", "Command Line", "cli.html", "cli.html"),
     ("architecture", "architecture", "Architecture", "architecture.html", "architecture.html"),
     ("roadmap", "roadmap", "Status and Roadmap", "roadmap.html", "roadmap.html"),
+    ("faq", "faq", "Frequently Asked Questions", "faq.html", "faq.html"),
 ]
 
 DESCRIPTIONS = {
@@ -391,7 +397,116 @@ DESCRIPTIONS = {
     "cli": "Every jin subcommand: run, interpret, check, build, new, compile, parse and tokens.",
     "architecture": "How a Jin program becomes running bytecode: the lexer, the parser, the type checker, the compiler and the VM.",
     "roadmap": "What Jin can do today, what it cannot do yet, and what comes next.",
+    "faq": "The questions that come up about Jin, and the short answers.",
 }
+
+# ------------------------------------------------------------------ markdown
+
+
+def escape_html(text):
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def inline_markdown(text):
+    """The inline markup the FAQ uses: code, bold and links."""
+    out = []
+    for part in re.split(r"(`[^`]+`)", text):
+        if len(part) > 1 and part.startswith("`") and part.endswith("`"):
+            out.append("<code>%s</code>" % escape_html(part[1:-1]))
+            continue
+        part = escape_html(part)
+        part = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", part)
+        part = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", r'<a href="\2">\1</a>', part)
+        out.append(part)
+    return "".join(out)
+
+
+def render_markdown(text):
+    """Renders the small set of markdown the FAQ uses: headings, paragraphs
+    and bullet lists. Anything it does not know about stops the build rather
+    than being quietly dropped, so the page cannot drift from its source."""
+    out = []
+    lines = text.split("\n")
+    i = 0
+
+    while i < len(lines):
+        line = lines[i].rstrip()
+
+        if not line.strip():
+            i += 1
+            continue
+
+        if line.startswith("### "):
+            out.append("<h3>%s</h3>" % inline_markdown(line[4:].strip()))
+            i += 1
+            continue
+
+        if line.startswith("## "):
+            out.append("<h2>%s</h2>" % inline_markdown(line[3:].strip()))
+            i += 1
+            continue
+
+        if line.startswith("# "):
+            # The title is the page title, not a heading in the page.
+            i += 1
+            continue
+
+        if line.startswith("- "):
+            items = []
+            while i < len(lines) and lines[i].startswith("- "):
+                items.append("<li>%s</li>" % inline_markdown(lines[i][2:].strip()))
+                i += 1
+            out.append('<ul class="Bullets">%s</ul>' % "".join(items))
+            continue
+
+        if re.match(r"^\d+\. ", line):
+            items = []
+            while i < len(lines) and re.match(r"^\d+\. ", lines[i]):
+                items.append("<li>%s</li>" % inline_markdown(re.sub(r"^\d+\. ", "", lines[i]).strip()))
+                i += 1
+            out.append('<ol class="Steps">%s</ol>' % "".join(items))
+            continue
+
+        if line.startswith((">", "|", "```", "    ", "\t", "---", "***")):
+            sys.exit("FAQ.md uses markdown the builder does not know: %r" % line)
+
+        # Anything else is a paragraph, which runs to the next blank line.
+        para = []
+        while i < len(lines) and lines[i].strip() and not re.match(
+            r"^(#|-\s|\d+\.\s|>|```|\|)", lines[i]
+        ):
+            para.append(lines[i].strip())
+            i += 1
+        if not para:
+            sys.exit("FAQ.md uses markdown the builder does not know: %r" % line)
+        out.append("<p>%s</p>" % inline_markdown(" ".join(para)))
+
+    return "\n".join(out)
+
+
+def faq_body():
+    """The FAQ page, rendered from FAQ.md so that there is one source."""
+    source = os.path.join(ROOT, "FAQ.md")
+    if not os.path.exists(source):
+        sys.exit("missing %s" % source)
+    with open(source, encoding="utf-8") as handle:
+        text = handle.read()
+    return (
+        '<div class="DocHeader">\n'
+        '  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / FAQ</p>\n'
+        '  <h1>Frequently Asked Questions</h1>\n'
+        "</div>\n\n"
+        '<div class="DocLayout">\n'
+        '  <div class="DocMain">\n\n'
+        + render_markdown(text) +
+        "\n  </div>\n</div>\n"
+    )
+
 
 
 def main():
@@ -423,11 +538,17 @@ def main():
     for stem, slug, title, filename, current in DOC_PAGES:
         if stem == "docs-index":
             continue
-        path = os.path.join(PAGES, stem + ".body.html")
-        if not os.path.exists(path):
-            print("skipped %s (not written yet)" % filename)
-            continue
-        body = read(path)
+        if stem == "faq":
+            # The FAQ page is rendered from FAQ.md, so that the file at the
+            # root of the repository and the page on the website are the
+            # same text.
+            body = faq_body()
+        else:
+            path = os.path.join(PAGES, stem + ".body.html")
+            if not os.path.exists(path):
+                print("skipped %s (not written yet)" % filename)
+                continue
+            body = read(path)
         build(
             stem, body,
             os.path.join(OUT_DOCS, filename),

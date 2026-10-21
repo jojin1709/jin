@@ -1,18 +1,26 @@
 """Checks the built site: every local link and asset must exist, every page
 must have a title and a description, and the code blocks must be balanced.
 
-    python site/tools/check-site.py
+It also checks that the FAQ page on the site carries every question from
+FAQ.md, so that the file at the root of the repository and the page cannot
+drift apart.
+
+    python site/check-site.py
 """
 
 import os
 import re
 import sys
 
-ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs")
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(os.path.dirname(HERE), "docs")
+FAQ_SOURCE = os.path.join(os.path.dirname(HERE), "FAQ.md")
+FAQ_PAGE = os.path.join(ROOT, "docs", "faq.html")
 
 LINK = re.compile(r'(?:href|src)="([^"]+)"')
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)
 DESC = re.compile(r'<meta name="description" content="(.*?)">', re.S)
+HEADING = re.compile(r"^##\s+(.*?)\s*$", re.M)
 
 problems = []
 pages = []
@@ -50,6 +58,26 @@ for page in sorted(pages):
         resolved = os.path.normpath(os.path.join(os.path.dirname(page), path))
         if not os.path.exists(resolved):
             problems.append("%s: missing %s" % (rel, target))
+
+# The FAQ page is rendered from FAQ.md, so every question in the file has to be
+# on the page. The answers are checked by the example checker; this is about
+# the questions themselves.
+if os.path.exists(FAQ_SOURCE) and os.path.exists(FAQ_PAGE):
+    with open(FAQ_SOURCE, encoding="utf-8") as handle:
+        source = handle.read()
+    with open(FAQ_PAGE, encoding="utf-8") as handle:
+        page = handle.read()
+
+    questions = HEADING.findall(source)
+    if not questions:
+        problems.append("FAQ.md: no questions found")
+    for question in questions:
+        if question not in page:
+            problems.append("docs/docs/faq.html: the question %r is not on the page" % question)
+    if "<h1>Frequently Asked Questions</h1>" not in page:
+        problems.append("docs/docs/faq.html: the page has no heading")
+else:
+    problems.append("FAQ.md or docs/docs/faq.html is missing")
 
 for problem in problems:
     print("  " + problem)

@@ -18,11 +18,11 @@
 [![Tests](https://img.shields.io/badge/tests-406%20passing-brightgreen)](#testing)
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
-A complete language implementation written from scratch — lexer, parser, type
-checker, bytecode compiler, stack virtual machine, standard library, projects
-and imports — in pure Go, with no third-party dependencies.
+A complete language implementation — lexer, parser, type checker, bytecode
+compiler, stack virtual machine, standard library, projects and imports — in
+pure Go, with no third-party dependencies.
 
-[Quick Start](#quick-start) · [Language Tour](#language-tour) · [Architecture](#architecture) · [Project Status](#project-status)
+[Quick Start](#quick-start) · [Language Tour](#language-tour) · [Architecture](#architecture) · [Project Status](#project-status) · [FAQ](FAQ.md)
 
 <p align="center">
   <a href="https://jojin1709.github.io/jin/"><strong>Read the documentation on the website &rarr;</strong></a>
@@ -39,6 +39,7 @@ and imports — in pure Go, with no third-party dependencies.
   - [Why "Jin"?](#why-jin)
 - [A first look](#a-first-look)
 - [Quick Start](#quick-start)
+  - [Install](#install)
   - [Prerequisites](#prerequisites)
   - [Build and run](#build-and-run)
   - [Command line reference](#command-line-reference)
@@ -65,6 +66,7 @@ and imports — in pure Go, with no third-party dependencies.
   - [What is in, and what is not](#what-is-in-and-what-is-not)
   - [Roadmap](#roadmap)
 - [Developer](#developer)
+- [FAQ](FAQ.md)
 - [License](#license)
 
 ---
@@ -169,6 +171,21 @@ the archive for your platform from
 [the releases page](https://github.com/jojin1709/jin/releases), unpack it, and
 put the `jin` binary on your `PATH`. Each archive holds the binary, the licence
 and this README, along with a checksum to check the download against.
+
+There is a script for that as well. On macOS or Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jojin1709/jin/main/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/jojin1709/jin/main/install.ps1 | iex
+```
+
+Both work out the platform, download the newest release, check it against the
+published checksum, and put `jin` where your `PATH` can find it.
 
 **From source**, with a checkout of this repository:
 
@@ -977,15 +994,16 @@ Not in, and honest about it:
 
 ## Developer
 
-**JOJIN JOHN** — designed and written from scratch.
+**JOJIN JOHN** — designed the language and directed the build.
 
 - GitHub: [@jojin1709](https://github.com/jojin1709)
 - Repository: [jojin1709/jin](https://github.com/jojin1709/jin)
 
-Every stage of this project — the lexer, the parser, the type checker, the
-bytecode compiler, the virtual machine, the standard library, the package
-manager and CLI, and the test suite — was implemented by hand in Go, without a
-parser generator or a third-party library.
+Designed by JOJIN JOHN and built in stages with AI coding agents. No parser
+generator, no third-party libraries.
+
+The [FAQ](FAQ.md) has the short answers to the questions that come up most
+often: what Jin is, who it is for, and whether it is faster than Python.
 
 ---
 

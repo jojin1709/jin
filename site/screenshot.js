@@ -26,6 +26,7 @@ const PAGES = [
   ["docs/cli.html", "cli"],
   ["docs/architecture.html", "architecture"],
   ["docs/roadmap.html", "roadmap"],
+  ["docs/faq.html", "faq"],
 ];
 
 (async () => {

@@ -44,6 +44,16 @@ go version go1.26.2 windows/amd64</code></pre>
 
   <p>If you would rather not have Go on the machine, download the archive for your platform from <a href="https://github.com/jojin1709/jin/releases">the releases page</a>, unpack it, and put the <code>jin</code> binary on your <code>PATH</code>. Each archive holds the binary, the licence and the README, along with a checksum to check the download against.</p>
 
+  <p>There is a script for that as well. On macOS or Linux:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ curl -fsSL https://raw.githubusercontent.com/jojin1709/jin/main/install.sh | sh</code></pre>
+
+  <p>On Windows, in PowerShell:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ irm https://raw.githubusercontent.com/jojin1709/jin/main/install.ps1 | iex</code></pre>
+
+  <p>Both work out the platform, download the newest release, check it against the published checksum, and put <code>jin</code> where your <code>PATH</code> can find it. If the platform is not one of the released ones, or there is no release yet, they say so and stop rather than installing something that will not work.</p>
+
   <h3>From source</h3>
 
   <p>Get the source and build the command-line tool. In the folder that holds the repository:</p>
@@ -155,7 +165,7 @@ Hello, Alan!</code></pre>
   <p>Run <code>jin</code> with no arguments outside a project and you get an interactive session. State persists between lines, and the value of the last expression on a line is printed back to you.</p>
 
   <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin
-Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)
+jin dev
 Type Jin code and press Enter. 'exit' or Ctrl+D quits.
 'clear' discards a half-typed block.
 jin&gt; let x = 5

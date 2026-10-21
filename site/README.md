@@ -23,6 +23,7 @@ docs/                   the published site
     cli.html            the command line
     architecture.html   how it all works
     roadmap.html        status and roadmap
+    faq.html            the frequently asked questions
   assets/
     css/site.css        the whole stylesheet
     js/site.js          theme, nav, code blocks, the playground
@@ -60,6 +61,11 @@ shape, or a page that scrolls sideways.
 `site/pages/`, and writes `docs/index.html` and `docs/docs/*.html`. The
 header, the navigation, the footer and the documentation sidebar are written
 once, in the template and in `build.py`, instead of twelve times.
+
+The FAQ page is the exception: it is rendered from `FAQ.md` at the root of the
+repository, so that the file and the page are the same text and cannot drift
+apart. `build.py` has a small markdown renderer for it, and `check-site.py`
+makes sure every question in `FAQ.md` is on the page.
 
 `check-site.py` walks the built pages and makes sure every local link and
 every asset points at something that exists, and that every page has a title,

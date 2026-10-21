@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Frequently Asked Questions — The Jin Programming Language</title>
+<meta name="description" content="The questions that come up about Jin, and the short answers.">
+<meta property="og:title" content="Frequently Asked Questions — The Jin Programming Language">
+<meta property="og:description" content="The questions that come up about Jin, and the short answers.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jojin1709.github.io/jin/docs/faq.html">
+<meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://jojin1709.github.io/jin/docs/faq.html">
+<link rel="icon" href="../assets/img/favicon.png?v=20261021154653" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png?v=20261021154653">
+<link rel="stylesheet" href="../assets/css/site.css?v=20261021154653">
+
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var stored = localStorage.getItem("jin-theme") || "auto";
+      var dark = stored === "dark" ||
+        (stored === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) { /* private mode: light is fine */ }
+  })();
+</script>
+</head>
+<body class="Page">
+<a class="SkipLink" href="#main-content">Skip to main content</a>
+
+  <header class="Header js-header">
+    <div class="Header-inner">
+      <a class="Header-logo" href="../" aria-label="Jin home">
+        <img src="../assets/img/icon.png?v=20261021154653" alt="" width="32" height="32">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <nav class="Header-nav" aria-label="Main">
+        <ul class="Header-menu"><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-why">Why Jin<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-why" hidden><li class="Header-submenuItem"><a href="../docs/roadmap.html#design-rules">Design rules</a><p>The nine rules the language is built around</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html#what-is-in">What is in</a><p>Everything Jin can do today, honestly listed</p></li><li class="Header-submenuItem"><a href="../docs/architecture.html">Architecture</a><p>How a Jin program becomes running bytecode</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html">Roadmap</a><p>What comes after stage 10</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-learn">Learn<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-learn" hidden><li class="Header-submenuItem"><a href="../docs/tutorial.html">Getting started</a><p>Install Jin and run your first program</p></li><li class="Header-submenuItem"><a href="../docs/tour.html">Language tour</a><p>Every construct in the language, in one page</p></li><li class="Header-submenuItem"><a href="../#playground">Try Jin</a><p>Run Jin in your browser, no install needed</p></li></ul></li><li class="Header-menuItem Header-menuItem--active"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-docs">Docs<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-docs" hidden><li class="Header-submenuItem"><a href="../docs/index.html">Documentation</a><p>The index of everything written down</p></li><li class="Header-submenuItem"><a href="../docs/types.html">Type system</a><p>Optional annotations, enforced before the program runs</p></li><li class="Header-submenuItem"><a href="../docs/builtins.html">Built-ins</a><p>The standard library, function by function</p></li><li class="Header-submenuItem"><a href="../docs/records.html">Records & methods</a><p>User-defined types with fields and methods</p></li><li class="Header-submenuItem"><a href="../docs/errors.html">Error handling</a><p>try, catch and error()</p></li><li class="Header-submenuItem"><a href="../docs/modules.html">Projects & imports</a><p>Splitting a program across files</p></li><li class="Header-submenuItem"><a href="../docs/cli.html">Command line</a><p>Every jin subcommand</p></li><li class="Header-submenuItem"><a href="../docs/faq.html">FAQ</a><p>The questions that come up, and the short answers</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-community">Community<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-community" hidden><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin">GitHub</a><p>The source, the issues and the releases</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main">Source code</a><p>Lexer, parser, type checker, compiler and VM</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a><p>Runnable programs that ship with Jin</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709">The author</a><p>JOJIN JOHN, who designed it</p></li></ul></li></ul>
+      </nav>
+      <div class="Header-actions">
+        <a class="Header-github" href="https://github.com/jojin1709/jin" aria-label="Jin on GitHub" title="Jin on GitHub">
+          <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <button class="Header-theme js-theme-toggle" type="button" aria-label="Change colour theme" title="Change colour theme">
+          <svg class="Header-themeIcon Header-themeIcon--auto" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 3a9 9 0 1 0 0 18V3z"/>
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M12 3a9 9 0 0 1 0 18"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--light" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-13a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 1 1zm16 0a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 1 2zM6.3 6.3a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zm12.4 12.4a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zM6.3 17.7a1 1 0 0 1-1.4 0l-.7-.7a1 1 0 1 1 1.4-1.4l.7.7a1 1 0 0 1 0 1.4zm10.8-9.8a1 1 0 0 1 0-1.4l.7-.7a1 1 0 1 1 1.4 1.4l-.7.7a1 1 0 0 1-1.4 0z"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--dark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <button class="Header-burger js-drawer-open" type="button" aria-label="Open navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="Drawer-scrim js-drawer-scrim" hidden></div>
+  <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
+    <div class="Drawer-head">
+      <a class="Header-logo" href="../">
+        <img src="../assets/img/icon.png?v=20261021154653" alt="" width="32" height="32">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
+    </div>
+    <nav class="Drawer-nav">
+      <ul class="Drawer-list">
+        <li><details class="Drawer-group"><summary>Why Jin</summary><ul class="Drawer-sublist"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></details></li><li><details class="Drawer-group"><summary>Learn</summary><ul class="Drawer-sublist"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../#playground">Try Jin</a></li></ul></details></li><li><details class="Drawer-group"><summary>Docs</summary><ul class="Drawer-sublist"><li><a href="../docs/index.html">Documentation</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li><li><a href="../docs/faq.html">FAQ</a></li></ul></details></li><li><details class="Drawer-group"><summary>Community</summary><ul class="Drawer-sublist"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709">The author</a></li></ul></details></li>
+      </ul>
+    </nav>
+  </aside>
+
+<main id="main-content" class="Main">
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / FAQ</p>
+  <h1>Frequently Asked Questions</h1>
+</div>
+
+<div class="DocLayout">
+  <aside class="Sidebar"><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Overview</h2><ul class="Sidebar-list"><li><a href="index.html">Documentation</a></li><li><a href="tutorial.html">Getting started</a></li><li><a href="faq.html" aria-current="page">FAQ</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Language</h2><ul class="Sidebar-list"><li><a href="tour.html">Language tour</a></li><li><a href="types.html">Type system</a></li><li><a href="records.html">Records & methods</a></li><li><a href="errors.html">Error handling</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Reference</h2><ul class="Sidebar-list"><li><a href="builtins.html">Built-ins</a></li><li><a href="cli.html">Command line</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Project</h2><ul class="Sidebar-list"><li><a href="modules.html">Projects & imports</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="roadmap.html">Status & roadmap</a></li></ul></div></aside>
+  <div class="DocMain">
+
+<h2>What is Jin?</h2>
+<p>Jin is a small programming language written from scratch in Go. Programs are type-checked before they run, compiled to bytecode, and executed on Jin's own stack virtual machine. It has closures, structs with methods, try/catch and multi-file projects.</p>
+<h2>Why build another programming language?</h2>
+<p>Mostly to learn how languages work from the inside, and to build something big enough to be a real engineering project: a lexer, parser, type checker, compiler, virtual machine, tests, documentation and a website. Honestly, nobody needs Jin today. Go, Python and other languages already do everything it does, with far larger libraries and years of testing.</p>
+<h2>Why not just use Go or Python?</h2>
+<p>For almost anything serious, you should. Jin is written in Go, so it is not a competitor to Go; they do different jobs. Go is compiled to machine code and wants types everywhere. Jin is a scripting-style language: you run a file, and types are optional but checked when you write them. The idea is Python's feel with fewer silent mistakes: a missing dictionary key, a truthy integer in an if, or a typo that creates a global are all errors, reported before the program runs. Python's libraries are far beyond Jin's, and Jin does not try to compete there.</p>
+<h2>Who is Jin for, and what is it useful for?</h2>
+<p>Today: learning (a small language with readable source, every stage in one repository), small scripts and command-line tools, and anyone curious about how a language is built. One direction being explored is a small embeddable scripting language for Go programs. That does not exist yet: Jin is currently a command-line program, not a Go package you can import.</p>
+<h2>Is Jin faster than Python?</h2>
+<p>Not clearly. On the one benchmark in this repository (naive fib(30)) the Jin VM and CPython take about the same time; the README Performance section has the current numbers and how they were measured. One benchmark is not a verdict, and a faster VM is on the roadmap.</p>
+<h2>How does it work?</h2>
+<p>Source text goes through a lexer (tokens), a parser (syntax tree), the module loader (imports), the type checker, the bytecode compiler, and finally the stack VM. Each stage is its own file. See the Architecture section of the README or the Architecture page on the website.</p>
+<h2>Why does Jin have two engines?</h2>
+<p>Besides the bytecode VM there is a slower, simpler tree-walking interpreter. It acts as a reference: the tests run every program on both engines and require identical output, including error messages. If they ever disagree, one of them has a bug.</p>
+<h2>How is it tested?</h2>
+<p>With a differential test suite: programs, error cases, every file in examples/ and multi-file projects are run on both engines and the results must match exactly. The README Testing section has the current test count.</p>
+<h2>How was Jin built?</h2>
+<p>I designed the language, chose the stages and features, and directed the build one stage at a time. Much of the implementation was written with AI coding agents. The test suite, and the rule that two independent engines must agree, is what keeps it honest. There is no parser generator and there are no third-party libraries.</p>
+<h2>What is missing?</h2>
+<ul class="Bullets"><li>No remote packages. Imports are files beside the one that imports them; there is no registry, no download step, and no lock file, because there is nothing to fetch yet. A project is a folder and nothing else.</li><li>No compiled output. <code>jin build</code> checks and compiles a project and reports what came out, but the result is not written to disk, because Jin runs from source and a stale binary is worse than no binary.</li><li>No <code>finally</code> blocks, no custom error types, and no <code>try</code> as an expression. Catch blocks receive a <code>str</code> error message.</li><li>No default field values, no inheritance or interfaces.</li><li>No <code>switch</code> or <code>match</code>, and no ternary: <code>if</code> / <code>else if</code> / <code>else</code> is the only way to branch, and a branch that yields a value is written as a statement.</li><li>No integer overflow checking. An <code>int</code> that runs past its limit wraps round, the way it does in Go.</li><li>No <code>float</code> infinity or <code>NaN</code>: <code>1.0 / 0.0</code> is a division by zero error rather than an infinity.</li><li>No JSON, no regular expressions and no date or time in the standard library.</li><li>No importing from outside the folder a file is in.</li><li>No formatter, no test runner and no language server yet. <code>gofmt</code> has no Jin equivalent, and an editor cannot ask Jin what a name means.</li><li>Calls are limited to 1024 frames deep, so a program that recurses further than that is stopped with an error rather than a crash.</li></ul>
+<p>The README roadmap shows what is planned.</p>
+<h2>Is Jin production-ready?</h2>
+<p>No. It is a working language with documented limits and a solid test suite, but it has few users, no stability promise yet and a small standard library. Do not run anything important on it.</p>
+<h2>How do I install it?</h2>
+<p>See the Install section of the README (or the Getting started page on the website).</p>
+<h2>Can I use Jin from inside a Go program?</h2>
+<p>Not yet. It is a possible future direction; see the answer above about who Jin is for.</p>
+<h2>How can I report a bug or help?</h2>
+<p>Open an issue on GitHub with the program, the output you got and the output you expected. Pull requests for small fixes are welcome; for bigger changes please open an issue first.</p>
+<h2>Why is it called Jin?</h2>
+<p>Short, easy to type, and not already taken by a language you would confuse it with. It is also two letters away from &quot;Jin&quot; being the only thing the compiler needs to know about you.</p>
+  </div>
+</div>
+
+</main>
+
+  <footer class="Footer">
+    <div class="Container">
+      <div class="Footer-cols"><div class="Footer-col"><h2 class="Footer-colTitle">Why Jin</h2><ul class="Footer-list"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Learn</h2><ul class="Footer-list"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Reference</h2><ul class="Footer-list"><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li><li><a href="../docs/faq.html">FAQ</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Project</h2><ul class="Footer-list"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709/jin/issues">Issues</a></li></ul></div></div>
+    </div>
+    <div class="Container">
+      <div class="Footer-bottom">
+        <p class="Footer-copy">
+          Jin is free and open source, released under the
+          <a href="https://github.com/jojin1709/jin/blob/main/LICENSE">MIT licence</a>.
+          Designed by <a href="https://github.com/jojin1709">JOJIN JOHN</a>
+          and built in stages with AI coding agents. No parser generator, no
+          third-party libraries.
+        </p>
+        <ul class="Footer-bottomList">
+          <li><a href="https://github.com/jojin1709/jin">Source on GitHub</a></li>
+          <li><a href="https://github.com/jojin1709/jin/issues">Report an issue</a></li>
+          <li class="Footer-version">Version 0.10.0</li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+<script src="../assets/js/site.js?v=20261021154653" defer></script>
+
+</body>
+</html>
