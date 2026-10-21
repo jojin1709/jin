@@ -1,0 +1,293 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Error Handling</p>
+  <h1>Error Handling</h1>
+  <p class="DocHeader-lede">Catching runtime errors in Jin with <code>try</code> and <code>catch</code>, raising your own with <code>error()</code>, and re-raising one you have already caught.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+<section class="DocSection" id="try-catch">
+  <h2><code>try</code> and <code>catch</code></h2>
+
+  <p>Some things in a program cannot be known until it runs: a file that is not there, a division by zero, a key that is not in a map. <code>try</code> runs a block and hands any error to a handler:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let text = read_file("notes.txt")
+    print(text)
+} catch e {
+    print("failed: {e}")
+}</code></pre>
+
+  <p>Without the <code>try</code>, the same program would stop with a message and an exit code of 1. With it, the error is handled and the program carries on:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin notes.jin
+failed: 2:25: read_file() could not read notes.txt: The system cannot find the file specified.</code></pre>
+
+  <p>The block after <code>catch</code> runs only when the block after <code>try</code> raised something. If it did not, the <code>catch</code> block is skipped and the program continues after the whole statement.</p>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> The catch variable cannot be named after a built-in. <code>catch error { ... }</code> is a type error: <code>catch variable "error" cannot shadow a builtin</code>. Use <code>e</code>, or <code>err</code>, or anything else that is not a built-in name.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="the-message">
+  <h2>The catch variable is a <code>str</code></h2>
+
+  <p>Whatever you call it, the catch variable holds the error message as a plain string — the same text the program would have printed if nothing had caught it:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    error("boom")
+} catch e {
+    print(type(e))
+    print(e)
+    print(len(e))
+    print(e + " (added)")
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>str
+2:10: boom
+10
+2:10: boom (added)</code></pre>
+
+  <p>It is a <code>str</code> like any other, so it can be printed, measured, concatenated or put in a map. The message includes the line and column it came from, because that is the same text the program would have ended with.</p>
+
+  <aside class="Callout Callout--warning">
+    <p><strong>Careful.</strong> The message is text, not a structured error. There is no error type, no error code and no stack to look at — just a string. If you need to react to a particular failure, raise it yourself with <code>error()</code> and match on your own wording.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="raising">
+  <h2>Raising your own error</h2>
+
+  <p><code>error()</code> stops the program with a message you choose. It takes one argument and never returns:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn divide(a: int, b: int) -&gt; int {
+    if b == 0 {
+        error("denominator cannot be zero")
+    }
+    return a / b
+}
+
+try {
+    print(divide(10, 0))
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 3:14: denominator cannot be zero</code></pre>
+
+  <p>The argument does not have to be a string. Whatever it is, its printed form becomes the message, so <code>error("bad input: {value}")</code> is a good way to put the details in. <code>error(42)</code> raises the message <code>42</code>.</p>
+</section>
+
+<section class="DocSection" id="reraising">
+  <h2>Re-raising</h2>
+
+  <p>Calling <code>error(e)</code> inside a <code>catch</code> block hands the error on to the next handler out. That is how you log a failure in one place and handle it in another:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    try {
+        error("disk is full")
+    } catch inner {
+        print("logging:", inner)
+        error(inner)
+    }
+} catch outer {
+    print("handled:", outer)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>logging: 3:14: disk is full
+handled: 3:14: disk is full</code></pre>
+
+  <p>The outer handler sees the same message, not a new one, so the original place it came from is not lost.</p>
+</section>
+
+<section class="DocSection" id="catchable">
+  <h2>What can be caught</h2>
+
+  <p>Everything that stops a running program can be caught. These are the six kinds of thing, and the message each one produces:</p>
+
+  <table class="Table">
+    <thead>
+      <tr><th>What goes wrong</th><th>The message</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>You called <code>error()</code></td><td>The text you gave it.</td></tr>
+      <tr><td>A file operation failed</td><td><code>read_file() could not read notes.txt: The system cannot find the file specified.</code></td></tr>
+      <tr><td>An array index was out of range</td><td><code>index 10 out of range (length 2)</code></td></tr>
+      <tr><td>A map key was not there</td><td><code>key "email" is not in the map</code></td></tr>
+      <tr><td>A division by zero</td><td><code>division by zero</code></td></tr>
+      <tr><td>A record field was read or written that does not exist</td><td><code>Point has no field "z"</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>One program that catches one of each:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># 1. An error you raise yourself.
+try {
+    error("something went wrong")
+} catch e {
+    print("caught:", e)
+}
+
+# 2. Division by zero.
+try {
+    let x = 100 / 0
+    print(x)
+} catch e {
+    print("caught:", e)
+}
+
+# 3. An index past the end of an array.
+let items = ["first", "second"]
+try {
+    print(items[10])
+} catch e {
+    print("caught:", e)
+}
+
+# 4. A key that is not in the map.
+let user = {"name": "Alice"}
+try {
+    print(user["email"])
+} catch e {
+    print("caught:", e)
+}
+
+# 5. A file that is not there.
+try {
+    print(read_file("no-such-file.txt"))
+} catch e {
+    print("caught:", e)
+}
+
+# 6. A record field that is not there.
+struct Point {
+    x: int,
+    y: int
+}
+
+fn make() -&gt; any {
+    return Point(1, 2)
+}
+
+let r = make()
+try {
+    print(r.z)
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 3:10: something went wrong
+caught: 10:17: division by zero
+caught: 19:16: index 10 out of range (length 2)
+caught: 27:15: key "email" is not in the map
+caught: 34:20: read_file() could not read no-such-file.txt: The system cannot find the file specified.
+caught: 51:12: Point has no field "z"</code></pre>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> Built-ins that fail at run time are catchable too, not just the six above. <code>int("abc")</code>, <code>float("x")</code> and <code>slice()</code> with an end past the length all raise errors you can catch, because they are all the same kind of thing.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="boundaries">
+  <h2>Errors cross function calls</h2>
+
+  <p>An error raised deep inside a function travels back up to whichever <code>try</code> is waiting for it. The frames in between are unwound as it goes:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn divide(a: int, b: int) -&gt; int {
+    if b == 0 {
+        error("denominator cannot be zero")
+    }
+    return a / b
+}
+
+fn outer() -&gt; int {
+    return divide(10, 0)
+}
+
+try {
+    print(outer())
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 3:14: denominator cannot be zero</code></pre>
+
+  <p>The same is true for a method:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Account {
+    balance: int
+}
+
+fn (a: Account) withdraw(amount: int) -&gt; int {
+    if amount &gt; a.balance {
+        error("insufficient funds")
+    }
+    a.balance = a.balance - amount
+    return a.balance
+}
+
+let acct = Account(50)
+try {
+    acct.withdraw(100)
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 7:14: insufficient funds</code></pre>
+
+  <p>And the same for an imported file. The message names the file the error came from, so you can tell where it was raised:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># util.jin
+fn half(n: int) -&gt; int {
+    if n &lt; 0 {
+        error("negative input")
+    }
+    return n / 2
+}</code></pre>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "util" as util
+
+try {
+    print(util.half(-1))
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: util.jin:3:14: negative input</code></pre>
+</section>
+
+<section class="DocSection" id="compile-time">
+  <h2>Type errors cannot be caught</h2>
+
+  <p>Everything above is a runtime error: it happened while the program was running, and the program was still there to catch it. A type error is different — it is found before the program starts, so there is nothing running to catch it.</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x: int = "abc"
+    print(x)
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin err_type.jin
+jin: err_type.jin has type errors:
+  2:5: cannot assign str to int variable "x"</code></pre>
+
+  <p>The <code>catch</code> block is never reached. The type checker runs first, and if it finds anything it reports it and the program never begins.</p>
+
+  <aside class="Callout Callout--error">
+    <p><strong>Error.</strong> <code>try</code> catches runtime errors only. It is not a way to make a type error go away — if a program does not type-check, it does not run, and no amount of <code>try</code> will change that. Put the annotation on the right, or leave it off.</p>
+  </aside>
+
+  <p>The same is true of syntax errors: the file has to be readable before anything can run. The <a href="types.html">Type System</a> page lists every check that happens before the program starts.</p>
+</section>
+
+<a class="NextLink" href="builtins.html">
+  <span>Next</span>
+  <strong>Built-ins &rarr;</strong>
+</a>
+
+  </div>
+</div>

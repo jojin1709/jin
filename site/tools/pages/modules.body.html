@@ -1,0 +1,367 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Projects and Imports</p>
+  <h1>Projects and Imports</h1>
+  <p class="DocHeader-lede">How a Jin program is split across files, how one file reaches another's names, and how a folder becomes a project with a <code>jin.toml</code>.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+    <section id="import" class="DocSection">
+      <h2>Importing a file</h2>
+      <p>An import statement names another Jin file and gives it a name of its own:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">import "utils" as u</code></pre>
+
+      <p>The alias is not optional. <code>import "utils"</code> without <code>as</code> is a syntax error, and so is <code>import "utils" as</code> with no name after it:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: noalias.jin has syntax errors: 1:8: expected as, got EOF</code></pre>
+
+      <p>The alias is required because a bare name from another file is exactly the sort of surprise Jin exists to avoid. <code>u.helper(x)</code> says where <code>helper</code> came from; a plain <code>helper(x)</code> would not.</p>
+
+      <p>An import is a top-level statement. Putting one inside a function, an <code>if</code>, a <code>while</code> or a <code>for</code> is a syntax error:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: nested.jin has syntax errors: 2:5: 'import' is only allowed at the top level of a file</code></pre>
+
+      <p>The path is the file's name without the <code>.jin</code> ending, and it is relative to the file doing the importing:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">import "utils" as u             # utils.jin, beside this file
+import "lib/math" as math       # lib/math.jin</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> Importing <code>"lib/math"</code> reaches <code>lib/math.jin</code>. Writing <code>"lib/math.jin"</code> is an error: <code>import "u.jin": leave the .jin off, because a path names a file without it</code>.</p>
+      </aside>
+    </section>
+
+    <section id="what-an-import-brings" class="DocSection">
+      <h2>What an import brings</h2>
+      <p>Everything at the top level of the imported file is reachable through the alias, and nothing else is.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># utils.jin
+let name = "utils"
+
+fn double(n: int) -&gt; int {
+    return n * 2
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "utils" as u
+
+print(u.double(21))        # 42
+print(u.name)              # utils</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>42
+utils</code></pre>
+
+      <p>Both a <code>let</code> and a <code>fn</code> at the top level of a file are part of that file's exports, and so is a <code>struct</code> — <code>u.Point</code> is a type you can construct and pass around like any other value.</p>
+
+      <p>Names inside a function, or inside any block, stay where they were written. A file's exports <em>are</em> its top-level names, so there is no <code>export</code> keyword to write and nothing to keep in sync.</p>
+
+      <p>If the importing file asks for a name the imported file does not have at the top level, the type checker says so before the program runs:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  2:8: u has no name "hidden"</code></pre>
+
+      <p>An alias is a way to reach names, not a value. Printing one is an error:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  2:7: "u" is a module; write u.&lt;name&gt; to use a name from it</code></pre>
+    </section>
+
+    <section id="order" class="DocSection">
+      <h2>When files run</h2>
+      <p>An import runs the file it names, once, before the importing file's own statements. Files run in dependency order, so a file that imports two files sees both of them ready.</p>
+
+      <p>The loader reads each file once and remembers it, so importing the same file from two places — or twice from the same place — still runs it once.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "a" as a
+import "shared" as s1
+import "shared" as s2
+
+print("main")
+print(s1.x, s2.x)</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># a.jin
+import "shared" as s
+print("a")</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># shared.jin
+print("shared")
+let x = 7</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>shared
+a
+main
+7 7</code></pre>
+
+      <p><code>shared</code> printed once even though three files import it, and it printed before <code>a</code>, which printed before <code>main</code>. The bytecode VM and the tree-walking interpreter produce exactly this output.</p>
+
+      <p>A file's own top-level statements run before the file that imports it gets to its own statements. So a failure inside an imported file — even one raised by a function the importing file calls — is what the program reports:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>before
+jin: boommod.jin:3:15: division by zero</code></pre>
+    </section>
+
+    <section id="cycles" class="DocSection">
+      <h2>Import cycles</h2>
+      <p>A cycle is reported rather than hung on. The loader keeps a stack of the files it is reading, and when a file reaches itself it names the whole chain:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: import cycle: a.jin -&gt; b.jin -&gt; a.jin</code></pre>
+
+      <p>A file that imports itself is a cycle too, with one name in it:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: import cycle: selfimp.jin -&gt; selfimp.jin</code></pre>
+    </section>
+
+    <section id="paths" class="DocSection">
+      <h2>Import paths</h2>
+      <p>An import path is relative to the file doing the importing, uses <code>/</code> between folders, and cannot leave the folder the importing file is in.</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Path</th><th>What happens</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>"utils"</code></td><td>Looks for <code>utils.jin</code> beside the importing file.</td></tr>
+          <tr><td><code>"lib/math"</code></td><td>Looks for <code>lib/math.jin</code> beside the importing file.</td></tr>
+          <tr><td><code>"utils.jin"</code></td><td>Rejected: <code>leave the .jin off</code>.</td></tr>
+          <tr><td><code>"lib\math"</code></td><td>Rejected: <code>use / between folders</code>.</td></tr>
+          <tr><td><code>"./utils"</code></td><td>Rejected: <code>drop the leading ./</code>.</td></tr>
+          <tr><td><code>"../utils"</code></td><td>Rejected: <code>an import cannot point outside this file's folder</code>.</td></tr>
+          <tr><td><code>"/utils"</code></td><td>Rejected: <code>an import path is relative to this file</code>.</td></tr>
+          <tr><td><code>"lib//math"</code></td><td>Rejected: <code>empty path segment</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <p>A file that cannot be found is reported at the import that caused it:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 1:1: cannot find module "nope"; there is no nope.jin to import</code></pre>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> An import cannot reach out of its own folder, so a file in <code>lib/</code> cannot import the project's top-level files. Every file can only reach the folder it sits in and the folders below it.</p>
+      </aside>
+    </section>
+
+    <section id="read-only" class="DocSection">
+      <h2>Another file's names are read-only</h2>
+      <p>A file's names belong to that file. From outside, they can be read and called, but not written:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  2:2: cannot assign to u.a; another file's names are read-only</code></pre>
+
+      <p>The file that owns the name can still change it. A counter that lives in another file still counts:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># counter.jin
+let count = 0
+
+fn bump() {
+    count = count + 1
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "counter" as c
+c.bump()
+c.bump()
+print(c.count)          # 2</code></pre>
+    </section>
+
+    <section id="aliases" class="DocSection">
+      <h2>Alias rules</h2>
+      <p>Because every file's names are kept apart, an alias has to be a name of its own. Three rules are checked before the program runs, at the import that caused the problem.</p>
+
+      <h3>An alias may not be a name the importing file already declares</h3>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 1:1: this file also defines "u", so the name would be ambiguous</code></pre>
+
+      <p>This applies to a <code>let</code>, a <code>fn</code> and a <code>struct</code> alike.</p>
+
+      <h3>An alias may not shadow a built-in</h3>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 1:1: "print" is a built-in function; pick another name for the import</code></pre>
+
+      <h3>An alias may not be reused</h3>
+
+      <p>Two imports in one file cannot share an alias:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 2:1: "u" is already the name for another import (line 1)</code></pre>
+
+      <p>Two different files may use the same alias, though. The alias belongs to the file that wrote it.</p>
+    </section>
+
+    <section id="projects" class="DocSection">
+      <h2>A project and its manifest</h2>
+      <p>A folder holding a <code>jin.toml</code> is a project. The manifest is deliberately small — a name, a version, and the file to start from:</p>
+
+      <pre class="Code" data-lang="toml"><code class="lang-text"># jin.toml
+name = "greeting"
+version = "1.0.0"
+entry = "main.jin"</code></pre>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Setting</th><th>What it means</th><th>Default</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>The project's name, used in messages.</td><td>The folder's name.</td></tr>
+          <tr><td><code>version</code></td><td>The project's version, used in messages.</td><td><code>0.1.0</code></td></tr>
+          <tr><td><code>entry</code></td><td>The file to run, relative to the project folder.</td><td><code>main.jin</code></td></tr>
+        </tbody>
+      </table>
+
+      <p>Only those three settings are accepted. An unknown one is an error, and so is an entry that does not name a <code>.jin</code> file inside the project folder:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: jin.toml:1: unknown setting "deps"
+jin: jin.toml:1: expected name = "value"
+jin: jin.toml: entry "app.txt": a Jin file ends in .jin
+jin: jin.toml: entry "../app.jin": the entry file is inside the project folder</code></pre>
+
+      <p>An empty value keeps the default, so a manifest can be as small as a comment.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> The entry file is a file <em>inside</em> the project folder. A manifest cannot point outside it.</p>
+      </aside>
+    </section>
+
+    <section id="new" class="DocSection">
+      <h2>Starting a project</h2>
+      <p><code>jin new</code> writes a working project into a new folder:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">go build -o jin.exe .
+./jin.exe new hello</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>created hello/
+  jin.toml
+  main.jin
+  greeting.jin
+
+next: cd hello &amp;&amp; jin run</code></pre>
+
+      <p>The project it writes has two files, joined by an import, so it shows the shape of a project from the first minute:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># hello/main.jin
+# Run this with 'jin run' and check it with 'jin check'.
+
+import "greeting" as greeting
+
+let who = args()
+if len(who) == 0 {
+    print(greeting.hello("world"))
+} else {
+    print(greeting.hello(who[0]))
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># hello/greeting.jin
+# Names in this file are reached as greeting.&lt;name&gt;.
+
+fn hello(who: str) -&gt; str {
+    return "Hello, {who}!"
+}</code></pre>
+
+      <p>The name has to be usable as a folder name — letters, digits, <code>-</code> and <code>_</code> — and <code>jin new</code> refuses to write over a folder that already exists.</p>
+    </section>
+
+    <section id="commands" class="DocSection">
+      <h2>Running a project</h2>
+      <p>A project can be run by naming its folder, or from anywhere inside it, the way a build tool works. The command walks up from the current folder until it finds a <code>jin.toml</code>.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run examples/greeting
+./jin.exe run examples/greeting Jin
+cd examples/greeting
+../../jin.exe run
+../../jin.exe check</code></pre>
+
+      <p>Three commands work on a project:</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Command</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>jin run</code></td><td>Checks the project, compiles it, and runs it on the bytecode VM.</td></tr>
+          <tr><td><code>jin check</code></td><td>Type-checks every file the project reaches, and runs nothing.</td></tr>
+          <tr><td><code>jin build</code></td><td>Checks and compiles the whole project, and reports what came out.</td></tr>
+        </tbody>
+      </table>
+
+      <p>The shipped <code>examples/greeting</code> project has exactly this shape — two files, joined by an import:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># examples/greeting/main.jin
+# A project made of two files, joined by an import.
+#
+#   jin run examples/greeting
+#   jin run examples/greeting -- Jin Jo
+
+import "words" as words
+
+let who = args()
+if len(who) == 0 {
+    who = ["world"]
+}
+
+for name in who {
+    print(words.greet(name))
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># examples/greeting/words.jin
+# A file's names are reached as words.&lt;name&gt;, so nothing here can clash with
+# a name in the file that imports it.
+
+let greeting = "Hello"
+
+fn greet(name: str) -&gt; str {
+    return "{greeting}, {name}!"
+}</code></pre>
+
+      <p>Running it, and checking it:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run examples/greeting
+./jin.exe run examples/greeting Jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Hello, world!
+Hello, Jin!</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe check examples/greeting
+./jin.exe build examples/greeting</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>greeting 1.0.0: no type errors in 2 file(s)
+jin build: greeting 1.0.0
+  entry: main.jin
+  files: main.jin, words.jin
+  code:  116 bytes of bytecode, 8 constants, 3 locals
+  ok</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>jin build</code> is a check-and-compile step, not a step that writes a binary. Jin runs from source, so there is no artefact to keep in step with the source — and no stale binary to go wrong.</p>
+      </aside>
+    </section>
+
+    <section id="arguments" class="DocSection">
+      <h2>Program arguments</h2>
+      <p><code>args()</code> returns the arguments the program was run with, as an <code>array</code> of strings. Anything after the file or folder name reaches the program:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let who = args()
+if len(who) == 0 {
+    print("no arguments given")
+} else {
+    print("hello, {who[0]}")
+}</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run greet.jin Ada Bo</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>hello, Ada</code></pre>
+
+      <p>A <code>--</code> before the arguments is allowed and ignored, so a program can be given arguments that look like Jin's own:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run examples/greeting -- Jin Jo</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Hello, Jin!
+Hello, Jo!</code></pre>
+
+      <p>Inside a project, <code>args()</code> works the same way — the arguments come after the project, not before it.</p>
+    </section>
+
+    <a class="NextLink" href="cli.html">Next: Command line <span>Every jin subcommand, and what each one does</span></a>
+
+  </div>
+</div>

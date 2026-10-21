@@ -9,3 +9,10 @@
 
 # Scratch files written by examples/files.jin
 /jin_demo_notes.txt
+
+# Scratch folder used while checking examples
+/tmpcheck
+
+# Working notes from the site design process
+/replica
+__pycache__/

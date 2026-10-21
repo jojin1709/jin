@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Projects and Imports — The Jin Programming Language</title>
+<meta name="description" content="Splitting a Jin program across files, importing them under an alias, and building a project.">
+<meta property="og:title" content="Projects and Imports — The Jin Programming Language">
+<meta property="og:description" content="Splitting a Jin program across files, importing them under an alias, and building a project.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jojin1709.github.io/jin/docs/modules.html">
+<meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://jojin1709.github.io/jin/docs/modules.html">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="stylesheet" href="../assets/css/site.css">
+
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var stored = localStorage.getItem("jin-theme") || "auto";
+      var dark = stored === "dark" ||
+        (stored === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) { /* private mode: light is fine */ }
+  })();
+</script>
+</head>
+<body class="Page">
+<a class="SkipLink" href="#main-content">Skip to main content</a>
+
+  <header class="Header js-header">
+    <div class="Header-inner">
+      <a class="Header-logo" href="../" aria-label="Jin home">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <nav class="Header-nav" aria-label="Main">
+        <ul class="Header-menu"><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-why">Why Jin<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-why" hidden><li class="Header-submenuItem"><a href="../docs/roadmap.html#design-rules">Design rules</a><p>The nine rules the language is built around</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html#what-is-in">What is in</a><p>Everything Jin can do today, honestly listed</p></li><li class="Header-submenuItem"><a href="../docs/architecture.html">Architecture</a><p>How a Jin program becomes running bytecode</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html">Roadmap</a><p>What comes after stage 10</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-learn">Learn<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-learn" hidden><li class="Header-submenuItem"><a href="../docs/tutorial.html">Getting started</a><p>Install Jin and run your first program</p></li><li class="Header-submenuItem"><a href="../docs/tour.html">Language tour</a><p>Every construct in the language, in one page</p></li><li class="Header-submenuItem"><a href="../#playground">Try Jin</a><p>Run Jin in your browser, no install needed</p></li></ul></li><li class="Header-menuItem Header-menuItem--active"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-docs">Docs<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-docs" hidden><li class="Header-submenuItem"><a href="../docs/index.html">Documentation</a><p>The index of everything written down</p></li><li class="Header-submenuItem"><a href="../docs/types.html">Type system</a><p>Optional annotations, enforced before the program runs</p></li><li class="Header-submenuItem"><a href="../docs/builtins.html">Built-ins</a><p>The standard library, function by function</p></li><li class="Header-submenuItem"><a href="../docs/records.html">Records & methods</a><p>User-defined types with fields and methods</p></li><li class="Header-submenuItem"><a href="../docs/errors.html">Error handling</a><p>try, catch and error()</p></li><li class="Header-submenuItem"><a href="../docs/modules.html">Projects & imports</a><p>Splitting a program across files</p></li><li class="Header-submenuItem"><a href="../docs/cli.html">Command line</a><p>Every jin subcommand</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-community">Community<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-community" hidden><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin">GitHub</a><p>The source, the issues and the releases</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main">Source code</a><p>Lexer, parser, type checker, compiler and VM</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a><p>Runnable programs that ship with Jin</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709">The author</a><p>JOJIN JOHN, who wrote all of it by hand</p></li></ul></li></ul>
+      </nav>
+      <div class="Header-actions">
+        <a class="Header-github" href="https://github.com/jojin1709/jin" aria-label="Jin on GitHub" title="Jin on GitHub">
+          <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <button class="Header-theme js-theme-toggle" type="button" aria-label="Change colour theme" title="Change colour theme">
+          <svg class="Header-themeIcon Header-themeIcon--auto" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 3a9 9 0 1 0 0 18V3z"/>
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M12 3a9 9 0 0 1 0 18"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--light" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-13a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 1 1zm16 0a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 1 2zM6.3 6.3a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zm12.4 12.4a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zM6.3 17.7a1 1 0 0 1-1.4 0l-.7-.7a1 1 0 1 1 1.4-1.4l.7.7a1 1 0 0 1 0 1.4zm10.8-9.8a1 1 0 0 1 0-1.4l.7-.7a1 1 0 1 1 1.4 1.4l-.7.7a1 1 0 0 1-1.4 0z"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--dark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <button class="Header-burger js-drawer-open" type="button" aria-label="Open navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="Drawer-scrim js-drawer-scrim" hidden></div>
+  <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
+    <div class="Drawer-head">
+      <a class="Header-logo" href="../">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
+    </div>
+    <nav class="Drawer-nav">
+      <ul class="Drawer-list">
+        <li><details class="Drawer-group"><summary>Why Jin</summary><ul class="Drawer-sublist"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></details></li><li><details class="Drawer-group"><summary>Learn</summary><ul class="Drawer-sublist"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../#playground">Try Jin</a></li></ul></details></li><li><details class="Drawer-group"><summary>Docs</summary><ul class="Drawer-sublist"><li><a href="../docs/index.html">Documentation</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></details></li><li><details class="Drawer-group"><summary>Community</summary><ul class="Drawer-sublist"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709">The author</a></li></ul></details></li>
+      </ul>
+    </nav>
+  </aside>
+
+<main id="main-content" class="Main">
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Projects and Imports</p>
+  <h1>Projects and Imports</h1>
+  <p class="DocHeader-lede">How a Jin program is split across files, how one file reaches another's names, and how a folder becomes a project with a <code>jin.toml</code>.</p>
+</div>
+
+<div class="DocLayout">
+  <aside class="Sidebar"><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Overview</h2><ul class="Sidebar-list"><li><a href="index.html">Documentation</a></li><li><a href="tutorial.html">Getting started</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Language</h2><ul class="Sidebar-list"><li><a href="tour.html">Language tour</a></li><li><a href="types.html">Type system</a></li><li><a href="records.html">Records & methods</a></li><li><a href="errors.html">Error handling</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Reference</h2><ul class="Sidebar-list"><li><a href="builtins.html">Built-ins</a></li><li><a href="cli.html">Command line</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Project</h2><ul class="Sidebar-list"><li><a href="modules.html" aria-current="page">Projects & imports</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="roadmap.html">Status & roadmap</a></li></ul></div></aside>
+  <div class="DocMain">
+
+    <section id="import" class="DocSection">
+      <h2>Importing a file</h2>
+      <p>An import statement names another Jin file and gives it a name of its own:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">import "utils" as u</code></pre>
+
+      <p>The alias is not optional. <code>import "utils"</code> without <code>as</code> is a syntax error, and so is <code>import "utils" as</code> with no name after it:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: noalias.jin has syntax errors: 1:8: expected as, got EOF</code></pre>
+
+      <p>The alias is required because a bare name from another file is exactly the sort of surprise Jin exists to avoid. <code>u.helper(x)</code> says where <code>helper</code> came from; a plain <code>helper(x)</code> would not.</p>
+
+      <p>An import is a top-level statement. Putting one inside a function, an <code>if</code>, a <code>while</code> or a <code>for</code> is a syntax error:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: nested.jin has syntax errors: 2:5: 'import' is only allowed at the top level of a file</code></pre>
+
+      <p>The path is the file's name without the <code>.jin</code> ending, and it is relative to the file doing the importing:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">import "utils" as u             # utils.jin, beside this file
+import "lib/math" as math       # lib/math.jin</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> Importing <code>"lib/math"</code> reaches <code>lib/math.jin</code>. Writing <code>"lib/math.jin"</code> is an error: <code>import "u.jin": leave the .jin off, because a path names a file without it</code>.</p>
+      </aside>
+    </section>
+
+    <section id="what-an-import-brings" class="DocSection">
+      <h2>What an import brings</h2>
+      <p>Everything at the top level of the imported file is reachable through the alias, and nothing else is.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># utils.jin
+let name = "utils"
+
+fn double(n: int) -&gt; int {
+    return n * 2
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "utils" as u
+
+print(u.double(21))        # 42
+print(u.name)              # utils</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>42
+utils</code></pre>
+
+      <p>Both a <code>let</code> and a <code>fn</code> at the top level of a file are part of that file's exports, and so is a <code>struct</code> — <code>u.Point</code> is a type you can construct and pass around like any other value.</p>
+
+      <p>Names inside a function, or inside any block, stay where they were written. A file's exports <em>are</em> its top-level names, so there is no <code>export</code> keyword to write and nothing to keep in sync.</p>
+
+      <p>If the importing file asks for a name the imported file does not have at the top level, the type checker says so before the program runs:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  2:8: u has no name "hidden"</code></pre>
+
+      <p>An alias is a way to reach names, not a value. Printing one is an error:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  2:7: "u" is a module; write u.&lt;name&gt; to use a name from it</code></pre>
+    </section>
+
+    <section id="order" class="DocSection">
+      <h2>When files run</h2>
+      <p>An import runs the file it names, once, before the importing file's own statements. Files run in dependency order, so a file that imports two files sees both of them ready.</p>
+
+      <p>The loader reads each file once and remembers it, so importing the same file from two places — or twice from the same place — still runs it once.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "a" as a
+import "shared" as s1
+import "shared" as s2
+
+print("main")
+print(s1.x, s2.x)</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># a.jin
+import "shared" as s
+print("a")</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># shared.jin
+print("shared")
+let x = 7</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>shared
+a
+main
+7 7</code></pre>
+
+      <p><code>shared</code> printed once even though three files import it, and it printed before <code>a</code>, which printed before <code>main</code>. The bytecode VM and the tree-walking interpreter produce exactly this output.</p>
+
+      <p>A file's own top-level statements run before the file that imports it gets to its own statements. So a failure inside an imported file — even one raised by a function the importing file calls — is what the program reports:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>before
+jin: boommod.jin:3:15: division by zero</code></pre>
+    </section>
+
+    <section id="cycles" class="DocSection">
+      <h2>Import cycles</h2>
+      <p>A cycle is reported rather than hung on. The loader keeps a stack of the files it is reading, and when a file reaches itself it names the whole chain:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: import cycle: a.jin -&gt; b.jin -&gt; a.jin</code></pre>
+
+      <p>A file that imports itself is a cycle too, with one name in it:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: import cycle: selfimp.jin -&gt; selfimp.jin</code></pre>
+    </section>
+
+    <section id="paths" class="DocSection">
+      <h2>Import paths</h2>
+      <p>An import path is relative to the file doing the importing, uses <code>/</code> between folders, and cannot leave the folder the importing file is in.</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Path</th><th>What happens</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>"utils"</code></td><td>Looks for <code>utils.jin</code> beside the importing file.</td></tr>
+          <tr><td><code>"lib/math"</code></td><td>Looks for <code>lib/math.jin</code> beside the importing file.</td></tr>
+          <tr><td><code>"utils.jin"</code></td><td>Rejected: <code>leave the .jin off</code>.</td></tr>
+          <tr><td><code>"lib\math"</code></td><td>Rejected: <code>use / between folders</code>.</td></tr>
+          <tr><td><code>"./utils"</code></td><td>Rejected: <code>drop the leading ./</code>.</td></tr>
+          <tr><td><code>"../utils"</code></td><td>Rejected: <code>an import cannot point outside this file's folder</code>.</td></tr>
+          <tr><td><code>"/utils"</code></td><td>Rejected: <code>an import path is relative to this file</code>.</td></tr>
+          <tr><td><code>"lib//math"</code></td><td>Rejected: <code>empty path segment</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <p>A file that cannot be found is reported at the import that caused it:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 1:1: cannot find module "nope"; there is no nope.jin to import</code></pre>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> An import cannot reach out of its own folder, so a file in <code>lib/</code> cannot import the project's top-level files. Every file can only reach the folder it sits in and the folders below it.</p>
+      </aside>
+    </section>
+
+    <section id="read-only" class="DocSection">
+      <h2>Another file's names are read-only</h2>
+      <p>A file's names belong to that file. From outside, they can be read and called, but not written:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  2:2: cannot assign to u.a; another file's names are read-only</code></pre>
+
+      <p>The file that owns the name can still change it. A counter that lives in another file still counts:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># counter.jin
+let count = 0
+
+fn bump() {
+    count = count + 1
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "counter" as c
+c.bump()
+c.bump()
+print(c.count)          # 2</code></pre>
+    </section>
+
+    <section id="aliases" class="DocSection">
+      <h2>Alias rules</h2>
+      <p>Because every file's names are kept apart, an alias has to be a name of its own. Three rules are checked before the program runs, at the import that caused the problem.</p>
+
+      <h3>An alias may not be a name the importing file already declares</h3>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 1:1: this file also defines "u", so the name would be ambiguous</code></pre>
+
+      <p>This applies to a <code>let</code>, a <code>fn</code> and a <code>struct</code> alike.</p>
+
+      <h3>An alias may not shadow a built-in</h3>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 1:1: "print" is a built-in function; pick another name for the import</code></pre>
+
+      <h3>An alias may not be reused</h3>
+
+      <p>Two imports in one file cannot share an alias:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 2:1: "u" is already the name for another import (line 1)</code></pre>
+
+      <p>Two different files may use the same alias, though. The alias belongs to the file that wrote it.</p>
+    </section>
+
+    <section id="projects" class="DocSection">
+      <h2>A project and its manifest</h2>
+      <p>A folder holding a <code>jin.toml</code> is a project. The manifest is deliberately small — a name, a version, and the file to start from:</p>
+
+      <pre class="Code" data-lang="toml"><code class="lang-text"># jin.toml
+name = "greeting"
+version = "1.0.0"
+entry = "main.jin"</code></pre>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Setting</th><th>What it means</th><th>Default</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>The project's name, used in messages.</td><td>The folder's name.</td></tr>
+          <tr><td><code>version</code></td><td>The project's version, used in messages.</td><td><code>0.1.0</code></td></tr>
+          <tr><td><code>entry</code></td><td>The file to run, relative to the project folder.</td><td><code>main.jin</code></td></tr>
+        </tbody>
+      </table>
+
+      <p>Only those three settings are accepted. An unknown one is an error, and so is an entry that does not name a <code>.jin</code> file inside the project folder:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: jin.toml:1: unknown setting "deps"
+jin: jin.toml:1: expected name = "value"
+jin: jin.toml: entry "app.txt": a Jin file ends in .jin
+jin: jin.toml: entry "../app.jin": the entry file is inside the project folder</code></pre>
+
+      <p>An empty value keeps the default, so a manifest can be as small as a comment.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> The entry file is a file <em>inside</em> the project folder. A manifest cannot point outside it.</p>
+      </aside>
+    </section>
+
+    <section id="new" class="DocSection">
+      <h2>Starting a project</h2>
+      <p><code>jin new</code> writes a working project into a new folder:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">go build -o jin.exe .
+./jin.exe new hello</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>created hello/
+  jin.toml
+  main.jin
+  greeting.jin
+
+next: cd hello &amp;&amp; jin run</code></pre>
+
+      <p>The project it writes has two files, joined by an import, so it shows the shape of a project from the first minute:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># hello/main.jin
+# Run this with 'jin run' and check it with 'jin check'.
+
+import "greeting" as greeting
+
+let who = args()
+if len(who) == 0 {
+    print(greeting.hello("world"))
+} else {
+    print(greeting.hello(who[0]))
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># hello/greeting.jin
+# Names in this file are reached as greeting.&lt;name&gt;.
+
+fn hello(who: str) -&gt; str {
+    return "Hello, {who}!"
+}</code></pre>
+
+      <p>The name has to be usable as a folder name — letters, digits, <code>-</code> and <code>_</code> — and <code>jin new</code> refuses to write over a folder that already exists.</p>
+    </section>
+
+    <section id="commands" class="DocSection">
+      <h2>Running a project</h2>
+      <p>A project can be run by naming its folder, or from anywhere inside it, the way a build tool works. The command walks up from the current folder until it finds a <code>jin.toml</code>.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run examples/greeting
+./jin.exe run examples/greeting Jin
+cd examples/greeting
+../../jin.exe run
+../../jin.exe check</code></pre>
+
+      <p>Three commands work on a project:</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Command</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>jin run</code></td><td>Checks the project, compiles it, and runs it on the bytecode VM.</td></tr>
+          <tr><td><code>jin check</code></td><td>Type-checks every file the project reaches, and runs nothing.</td></tr>
+          <tr><td><code>jin build</code></td><td>Checks and compiles the whole project, and reports what came out.</td></tr>
+        </tbody>
+      </table>
+
+      <p>The shipped <code>examples/greeting</code> project has exactly this shape — two files, joined by an import:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># examples/greeting/main.jin
+# A project made of two files, joined by an import.
+#
+#   jin run examples/greeting
+#   jin run examples/greeting -- Jin Jo
+
+import "words" as words
+
+let who = args()
+if len(who) == 0 {
+    who = ["world"]
+}
+
+for name in who {
+    print(words.greet(name))
+}</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># examples/greeting/words.jin
+# A file's names are reached as words.&lt;name&gt;, so nothing here can clash with
+# a name in the file that imports it.
+
+let greeting = "Hello"
+
+fn greet(name: str) -&gt; str {
+    return "{greeting}, {name}!"
+}</code></pre>
+
+      <p>Running it, and checking it:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run examples/greeting
+./jin.exe run examples/greeting Jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Hello, world!
+Hello, Jin!</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe check examples/greeting
+./jin.exe build examples/greeting</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>greeting 1.0.0: no type errors in 2 file(s)
+jin build: greeting 1.0.0
+  entry: main.jin
+  files: main.jin, words.jin
+  code:  116 bytes of bytecode, 8 constants, 3 locals
+  ok</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>jin build</code> is a check-and-compile step, not a step that writes a binary. Jin runs from source, so there is no artefact to keep in step with the source — and no stale binary to go wrong.</p>
+      </aside>
+    </section>
+
+    <section id="arguments" class="DocSection">
+      <h2>Program arguments</h2>
+      <p><code>args()</code> returns the arguments the program was run with, as an <code>array</code> of strings. Anything after the file or folder name reaches the program:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let who = args()
+if len(who) == 0 {
+    print("no arguments given")
+} else {
+    print("hello, {who[0]}")
+}</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run greet.jin Ada Bo</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>hello, Ada</code></pre>
+
+      <p>A <code>--</code> before the arguments is allowed and ignored, so a program can be given arguments that look like Jin's own:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run examples/greeting -- Jin Jo</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Hello, Jin!
+Hello, Jo!</code></pre>
+
+      <p>Inside a project, <code>args()</code> works the same way — the arguments come after the project, not before it.</p>
+    </section>
+
+    <a class="NextLink" href="cli.html">Next: Command line <span>Every jin subcommand, and what each one does</span></a>
+
+  </div>
+</div>
+
+</main>
+
+  <footer class="Footer">
+    <div class="Container">
+      <div class="Footer-cols"><div class="Footer-col"><h2 class="Footer-colTitle">Why Jin</h2><ul class="Footer-list"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Learn</h2><ul class="Footer-list"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Reference</h2><ul class="Footer-list"><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Project</h2><ul class="Footer-list"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709/jin/issues">Issues</a></li></ul></div></div>
+    </div>
+    <div class="Container">
+      <div class="Footer-bottom">
+        <p class="Footer-copy">
+          Jin is free and open source, released under the
+          <a href="https://github.com/jojin1709/jin/blob/main/LICENSE">MIT licence</a>.
+          Written from scratch in Go by
+          <a href="https://github.com/jojin1709">JOJIN JOHN</a>.
+        </p>
+        <ul class="Footer-bottomList">
+          <li><a href="https://github.com/jojin1709/jin">Source on GitHub</a></li>
+          <li><a href="https://github.com/jojin1709/jin/issues">Report an issue</a></li>
+          <li class="Footer-version">Version 0.10.0</li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+<script src="../assets/js/site.js" defer></script>
+
+</body>
+</html>

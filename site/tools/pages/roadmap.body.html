@@ -1,0 +1,104 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Status and Roadmap</p>
+  <h1>Status and Roadmap</h1>
+  <p class="DocHeader-lede">What Jin can do today, what it cannot do yet, the nine rules it is built around, and what comes after stage 10.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+    <section id="stages" class="DocSection">
+      <h2>The stages so far</h2>
+      <p>Jin was built one stage at a time, and each stage was proved against the ones around it. All ten stages are finished, together with the work on closures that went with them.</p>
+
+      <ul class="Bullets">
+        <li><strong>Stage 1: lexer.</strong> Source text to tokens, with the line and column of every token tracked so errors can point at the right place.</li>
+        <li><strong>Stage 2: parser.</strong> Tokens to a syntax tree, using a precedence table, with every syntax error reported with a position.</li>
+        <li><strong>Stage 3: interpreter.</strong> A tree-walking interpreter, kept ever since as the reference implementation the VM is checked against.</li>
+        <li><strong>Stage 4: type checker.</strong> Optional annotations, enforced before the program runs: argument counts, mismatched types, non-<code>bool</code> conditions, bad indexing, misplaced <code>break</code> and <code>return</code>.</li>
+        <li><strong>Stage 5: bytecode compiler and VM.</strong> A stack machine with a pooled constant table, pre-allocated frame slots and reused call frames, running names resolved to slots.</li>
+        <li><strong>Stage 6: standard library.</strong> The built-in functions: strings, numbers, lists, maps, files and the functional ones, shared by both back ends.</li>
+        <li><strong>Closures.</strong> Shared captures, a fresh binding on every pass of a loop, and mutual recursion between nested functions.</li>
+        <li><strong>Stage 7: package manager and CLI.</strong> Imports, projects, <code>jin new</code>, <code>jin build</code> and <code>args()</code>.</li>
+        <li><strong>Stage 8: records.</strong> User-defined struct types, constructors, receiver methods (<code>fn (p: Point)</code>), dotted field access and mutation.</li>
+        <li><strong>Stage 9: error handling.</strong> <code>try</code> / <code>catch</code> statements, catchable runtime errors and <code>error()</code>, and re-raising across handler frames.</li>
+        <li><strong>Stage 10: real programs.</strong> Terminal input (<code>input</code>, <code>read_all_stdin</code>), multi-line strings (<code>"""</code>), higher-order built-ins (<code>map</code>, <code>filter</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>sort_by</code>, <code>find_index</code>), and named record construction (<code>Point{x: 1, y: 2}</code>).</li>
+      </ul>
+
+      <p>The version string says which stage the build is at:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe --version</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)</code></pre>
+    </section>
+
+    <section id="design-rules" class="DocSection">
+      <h2>The design rules</h2>
+      <p>Nine rules decide what Jin does and does not do. They are the reason the language looks the way it does.</p>
+
+      <ol class="Steps">
+        <li><strong>Braces, not invisible whitespace.</strong> No broken programs because of a stray tab.</li>
+        <li><strong>One obvious way to do things.</strong> No decorators, no metaclasses, no dunder magic.</li>
+        <li><strong>No silent type mixing.</strong> <code>1 + 1.5</code> is an error, not a surprise. Convert with <code>int()</code> or <code>float()</code>.</li>
+        <li><strong>Conditions must be <code>bool</code>.</strong> <code>if 1 { }</code> is rejected instead of quietly being truthy.</li>
+        <li><strong>No accidental globals.</strong> Assigning to a name that was never declared is an error.</li>
+        <li><strong>A missing key is an error.</strong> <code>m["nope"]</code> is not quietly <code>nil</code>; ask with <code>has(m, "nope")</code>.</li>
+        <li><strong>A captured variable is shared, not copied.</strong> Two functions written side by side see each other's writes to it, and each pass of a loop gets its own binding rather than the last value the loop reached.</li>
+        <li><strong>Fast by default.</strong> Source compiles to bytecode and runs on a stack VM. The tree-walking interpreter is still there for cross-checking, but it is not what <code>run</code> uses.</li>
+        <li><strong>A file's names belong to that file.</strong> Nothing in another file is in scope until you import it and name it through the alias, and another file's names are read-only from the outside.</li>
+      </ol>
+    </section>
+
+    <section id="what-is-in" class="DocSection">
+      <h2>What is in</h2>
+      <p>Everything Jin can do today, listed honestly.</p>
+
+      <p>Records, with named and positional construction. Try / catch error handling. Terminal input (<code>input</code>, <code>read_all_stdin</code>). Multi-line strings (<code>"""</code>). Higher-order functions (<code>map</code>, <code>filter</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>sort_by</code>, <code>find_index</code>). Maps. <code>sort</code>, <code>reverse</code> and <code>slice</code>. String and number helpers. <code>error</code>. File I/O.</p>
+
+      <p><code>examples/records.jin</code>, <code>examples/errors.jin</code>, <code>examples/functional.jin</code>, <code>examples/input.jin</code>, <code>examples/collections.jin</code> and <code>examples/files.jin</code> exercise all of it.</p>
+
+      <p>Multi-file programs are in too. <code>import "utils" as u</code> puts another file's top-level names behind an alias, a folder with a <code>jin.toml</code> is a project, and <code>jin new</code>, <code>jin build</code>, <code>jin check</code> and <code>jin run</code> work on one. <code>examples/greeting</code> is a two-file project.</p>
+
+      <p>And the whole thing runs on two engines — a bytecode VM and a tree-walking interpreter — which the test suite forces to agree, byte for byte, on every program, every error message and every project.</p>
+
+      <p>The rest of the language is written down on the other pages: the <a href="tour.html">language tour</a> for the syntax, <a href="types.html">type system</a> for the checks that run before your program starts, <a href="records.html">records and methods</a>, <a href="errors.html">error handling</a>, <a href="builtins.html">built-ins</a>, <a href="modules.html">projects and imports</a> and the <a href="cli.html">command line</a>.</p>
+    </section>
+
+    <section id="what-is-not-in" class="DocSection">
+      <h2>What is not in</h2>
+      <p>Stated plainly, because a list of what a language cannot do yet is worth more than a list of what it can.</p>
+
+      <ul class="Bullets">
+        <li><strong>No remote packages.</strong> Imports are files beside the one that imports them; there is no registry, no download step, and no lock file, because there is nothing to fetch yet. A project is a folder and nothing else.</li>
+        <li><strong>No compiled output.</strong> <code>jin build</code> checks and compiles a project and reports what came out, but the result is not written to disk, because Jin runs from source and a stale binary is worse than no binary.</li>
+        <li><strong>No <code>finally</code> blocks, no custom error types, and no <code>try</code> as an expression.</strong> Catch blocks receive a <code>str</code> error message.</li>
+        <li><strong>No default field values, no inheritance or interfaces.</strong></li>
+      </ul>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> That list is honest, but it is not exhaustive. A few more things the language genuinely does not have today:</p>
+        <ul class="Bullets">
+          <li><strong>No <code>switch</code> or <code>match</code>.</strong> <code>if</code> / <code>else if</code> is the only branching there is.</li>
+          <li><strong>No overflow checking on integers.</strong> They are 64-bit and wrap around silently: <code>9223372036854775807 + 1</code> is <code>-9223372036854775808</code>, with no error.</li>
+          <li><strong>No JSON, no regular expressions, and no date or time</strong> in the standard library.</li>
+          <li><strong>No way out of the project folder.</strong> An import path cannot point outside the folder of the file that writes it, so a project cannot reach a shared library sitting next to it.</li>
+        </ul>
+      </aside>
+    </section>
+
+    <section id="roadmap" class="DocSection">
+      <h2>The roadmap</h2>
+
+      <h3>Stage 11 — remote packages</h3>
+      <p>A registry and a versioned lock file, so <code>import "json" as json</code> can pull a package instead of a folder. The loader in <code>module.go</code> is where that lands: it already decides what a path means, what a project is, and how files depend on each other.</p>
+
+      <h3>Later — a faster VM</h3>
+      <p>Unboxed stack slots and inline caches, to move clearly ahead of CPython rather than alongside it. Today the VM is roughly seven to eight times faster than Jin's own tree-walking back end and in the same ballpark as CPython on a call-heavy benchmark; those two changes are what would change that.</p>
+
+      <p>That is the whole of the stated plan. Anything not listed above is not promised.</p>
+    </section>
+
+    <a class="NextLink" href="index.html">Next: Documentation index <span>Everything written down about Jin, in one list</span></a>
+
+  </div>
+</div>

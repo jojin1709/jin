@@ -24,6 +24,10 @@ manager — in pure Go, with no third-party dependencies.
 
 [Quick Start](#quick-start) · [Language Tour](#language-tour) · [Architecture](#architecture) · [Project Status](#project-status)
 
+<p align="center">
+  <a href="https://jojin1709.github.io/jin/"><strong>Read the documentation on the website &rarr;</strong></a>
+</p>
+
 </div>
 
 ---

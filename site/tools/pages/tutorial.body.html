@@ -1,0 +1,309 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Getting Started</p>
+  <h1>Getting Started</h1>
+  <p class="DocHeader-lede">Build the Jin compiler, run your first program in four steps, and learn how to read the errors Jin gives you before your program ever starts.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+<section class="DocSection" id="requirements">
+  <h2>What you need</h2>
+
+  <p>Jin needs exactly one thing: <strong>Go 1.21 or newer</strong>. Jin itself is written in Go, has no third-party dependencies, and builds offline on a fresh checkout. The CLI, the virtual machine and the standard library are platform-independent, so Windows, Linux and macOS all work.</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ go version
+go version go1.26.2 windows/amd64</code></pre>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> The Go version is the version of the <em>compiler</em> you build Jin with. It is not something a Jin program needs at run time. Once you have built the binary, you can copy that one file to any machine with the same operating system and architecture and it will run there on its own.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="build">
+  <h2>Build the language</h2>
+
+  <p>Get the source and build the command-line tool. In the folder that holds the repository:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ go build -o jin.exe .
+$ ./jin.exe --version
+Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)</code></pre>
+
+  <p>On Linux and macOS the same command gives you <code>jin</code> instead of <code>jin.exe</code>:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ go build -o jin .
+$ ./jin --version
+Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)</code></pre>
+
+  <p>The build prints nothing when it works. If you want to see that the tests pass as well, they run in a few seconds:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ go test ./...
+ok  	jin	2.415s</code></pre>
+
+  <p>The number at the end is how long the suite took. There are 389 test cases in it.</p>
+
+  <p>The rest of this page writes the command as <code>jin</code>. On Windows that means <code>jin.exe</code>, unless you rename the file — putting the folder it is in on your <code>PATH</code> is the tidiest way to work.</p>
+
+  <p>Every other <code>jin</code> subcommand — <code>run</code>, <code>check</code>, <code>build</code>, <code>new</code>, <code>compile</code>, <code>parse</code>, <code>tokens</code> — is described on the <a href="cli.html">Command Line</a> page.</p>
+</section>
+
+<section class="DocSection" id="run">
+  <h2>Run a program</h2>
+
+  <p>Make a file called <code>hello.jin</code>:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">print("Hello, world!")</code></pre>
+
+  <p>Then run it:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin hello.jin
+Hello, world!</code></pre>
+
+  <p>There is no <code>main</code> function and no boilerplate. A Jin file is the program: the statements at the top level run from top to bottom, and then it ends.</p>
+
+  <p>Anything you write after the file name is passed to the program, where <code>args()</code> returns it as an array of strings:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin hello.jin Ada
+Hello, world!</code></pre>
+</section>
+
+<section class="DocSection" id="first-program">
+  <h2>Your first program, in four steps</h2>
+
+  <h3>Step 1 — say something</h3>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">print("Hello, world!")</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Hello, world!</code></pre>
+
+  <p><code>print</code> writes its arguments separated by a space, then a newline. It returns nothing, so there is no <code>return</code> to write.</p>
+
+  <h3>Step 2 — hold a value</h3>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">let name = "Jin"
+let count = 3
+
+print("Hello, {name}!")
+print("You have {count} new messages.")</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Hello, Jin!
+You have 3 new messages.</code></pre>
+
+  <p><code>let</code> declares a name. The <code>{name}</code> inside a string is an interpolation: the value of <code>name</code> is put into the text. Write <code>{{</code> if you want a literal brace.</p>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> A name that has not been declared cannot be assigned to. <code>count = 4</code> works once <code>count</code> exists; <code>counter = 4</code> on its own is a type error, not a new global. That is on purpose — a typo should stop you, not quietly create a variable.</p>
+  </aside>
+
+  <h3>Step 3 — do it again</h3>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn greet(who: str) -&gt; str {
+    return "Hello, {who}!"
+}
+
+print(greet("Jin"))</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Hello, Jin!</code></pre>
+
+  <p><code>fn</code> declares a function. The names in the brackets are its parameters, the type after the bracket is what it returns, and the body is a braced block. Type annotations are optional — leaving them off changes nothing — but writing them means the mistake is found before the program runs.</p>
+
+  <h3>Step 4 — repeat it</h3>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn greet(who: str) -&gt; str {
+    return "Hello, {who}!"
+}
+
+for name in ["Ada", "Grace", "Alan"] {
+    print(greet(name))
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Hello, Ada!
+Hello, Grace!
+Hello, Alan!</code></pre>
+
+  <p><code>for</code> walks over an array, a string or a range. The name after <code>for</code> is a fresh binding on every pass, so a function made inside the loop keeps that pass's value.</p>
+</section>
+
+<section class="DocSection" id="repl">
+  <h2>The REPL</h2>
+
+  <p>Run <code>jin</code> with no arguments outside a project and you get an interactive session. State persists between lines, and the value of the last expression on a line is printed back to you.</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin
+Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)
+Type Jin code and press Enter. 'exit' or Ctrl+D quits.
+'clear' discards a half-typed block.
+jin&gt; let x = 5
+5
+jin&gt; x + 1
+6
+jin&gt; print("hello from the repl")
+hello from the repl
+jin&gt; fn double(n) { n * 2 }
+jin&gt; double(21)
+42
+jin&gt; exit</code></pre>
+
+  <p>Type <code>exit</code>, or press Ctrl+D, to leave. A line that does not type-check is reported and the session carries on, so a mistake does not cost you the whole session.</p>
+</section>
+
+<section class="DocSection" id="projects">
+  <h2>Running a project</h2>
+
+  <p>A folder holding a <code>jin.toml</code> is a project, and a folder can be run the same way a file can:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin run examples/greeting
+Hello, world!
+$ jin run examples/greeting -- Jin Jo
+Hello, Jin!
+Hello, Jo!</code></pre>
+
+  <p>You do not have to write the folder by hand. <code>jin new</code> starts one for you:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin new hello
+created hello/
+  jin.toml
+  main.jin
+  greeting.jin
+
+next: cd hello &amp;&amp; jin run</code></pre>
+
+  <p>From inside that folder, <code>jin run</code> runs the project and <code>jin check</code> type-checks every file it reaches:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ cd hello
+$ jin run
+Hello, world!
+$ jin check
+hello 0.1.0: no type errors in 2 file(s)</code></pre>
+
+  <p>Splitting a program across files, and what an import alias does, is covered on the <a href="modules.html">Projects and Imports</a> page.</p>
+</section>
+
+<section class="DocSection" id="reading-errors">
+  <h2>Reading Jin's error messages</h2>
+
+  <p>Jin checks a program before it runs it, so most mistakes are reported up front with the line and column they came from. There are three kinds of message, and each one has its own shape.</p>
+
+  <h3>Type errors — the program never starts</h3>
+
+  <p>These are found by the type checker. Every one of them is listed at once, so one run tells you about all of them. Given this file:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 3
+let height = "4"
+
+print(area(width, height))
+print(area(width))
+print(1 + "x")
+if width {
+    print("wide")
+}
+print(mystery)</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin badtypes.jin
+jin: badtypes.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected
+  9:11: area() expects 2 argument(s), got 1
+  10:9: cannot add int and str
+  11:1: condition must be a bool, got int
+  14:7: undefined variable "mystery"</code></pre>
+
+  <p>Each line is <code>line:column: message</code>. The column is where the offending expression starts, counting from 1. The exit code is 1, and nothing was printed to standard output — the program did not run.</p>
+
+  <p>To see the same list without running anything, use <code>jin check</code>. It is the same check, so the answer is the same:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check badtypes.jin
+jin: badtypes.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected
+  9:11: area() expects 2 argument(s), got 1
+  10:9: cannot add int and str
+  11:1: condition must be a bool, got int
+  14:7: undefined variable "mystery"</code></pre>
+
+  <h3>Syntax errors — the file could not be read</h3>
+
+  <p>When the parser cannot make sense of the text, the errors come back on one line, separated by <code>;</code>. Given a file with a stray closing brace:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 1
+print("hello")
+}</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin extra.jin
+jin: extra.jin has syntax errors: 3:1: unexpected token "}"</code></pre>
+
+  <p>Read these from the left. The first message is the one that usually explains the rest: once the parser loses the shape of the file, everything after it is nonsense.</p>
+
+  <aside class="Callout Callout--warning">
+    <p><strong>Careful.</strong> A block that is never closed is not reported. The parser closes an open <code>{</code> at the end of the file, so a missing brace quietly swallows the rest of the file into the block above it. If a program prints nothing at all and you expected output, look for a brace that never got closed.</p>
+  </aside>
+
+  <h3>Runtime errors — the program started and then stopped</h3>
+
+  <p>Everything the type checker cannot know about — a file that is not there, a division by zero — happens while the program runs. The message points at the line that raised it:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn half(n: int) -&gt; int {
+    return n / 0
+}
+
+print(half(10))</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin boom.jin
+jin: 2:14: division by zero</code></pre>
+
+  <p>Here the shape is <code>line:column: message</code> with no file name, because there is only one file. The exit code is 1.</p>
+
+  <p>These runtime errors can be caught with <code>try</code> and <code>catch</code>, which is the subject of the <a href="errors.html">Error Handling</a> page. Type errors cannot — they happen before the program starts, so there is nothing running to catch them.</p>
+</section>
+
+<section class="DocSection" id="file-shape">
+  <h2>The shape of a Jin file</h2>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># A comment starts with a hash.
+
+fn greet(who: str) -&gt; str {
+    return "Hello, {who}!"
+}
+
+# A ';' is optional between statements.
+let a = 1; let b = 2
+print(a + b)
+
+print(greet("Jin"))</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>3
+Hello, Jin!</code></pre>
+
+  <ul class="Bullets">
+    <li><strong>Comments</strong> start with <code>#</code> and run to the end of the line.</li>
+    <li><strong>Statements</strong> sit at the top level or inside a <code>{ }</code> block. A <code>;</code> between them is optional; a newline is not a statement separator, because Jin uses braces and not indentation.</li>
+    <li><strong><code>let</code></strong> declares a name. A name may only be assigned to after it has been declared.</li>
+    <li><strong><code>fn</code></strong> declares a function. It has to be written before a top-level statement calls it — the declaration is what fills the name in. Two functions may call each other in either order, because those names are resolved before either body runs.</li>
+    <li><strong><code>struct</code></strong> declares a record type, and <strong><code>import</code></strong> brings another file's names in behind an alias. Both belong at the top level of a file.</li>
+    <li><strong>There is no <code>main</code>.</strong> The file is the program.</li>
+  </ul>
+</section>
+
+<section class="DocSection" id="next-steps">
+  <h2>What to read next</h2>
+
+  <ul class="Bullets">
+    <li><a href="tour.html">Language Tour</a> — every construct in Jin, with a short runnable example for each one.</li>
+    <li><a href="types.html">Type System</a> — the optional annotations and every check that runs before your program starts.</li>
+    <li><a href="records.html">Records and Methods</a> — user-defined types with fields, constructors and receiver methods.</li>
+    <li><a href="errors.html">Error Handling</a> — <code>try</code>, <code>catch</code>, raising your own errors and re-raising them.</li>
+    <li><a href="builtins.html">Built-ins</a> — the standard library, function by function.</li>
+    <li><a href="modules.html">Projects and Imports</a> — splitting a program across files.</li>
+    <li><a href="cli.html">Command Line</a> — every <code>jin</code> subcommand.</li>
+  </ul>
+</section>
+
+<a class="NextLink" href="tour.html">
+  <span>Next</span>
+  <strong>Language Tour &rarr;</strong>
+</a>
+
+  </div>
+</div>

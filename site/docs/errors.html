@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Error Handling — The Jin Programming Language</title>
+<meta name="description" content="Catching runtime errors in Jin with try and catch, raising your own with error(), and re-raising.">
+<meta property="og:title" content="Error Handling — The Jin Programming Language">
+<meta property="og:description" content="Catching runtime errors in Jin with try and catch, raising your own with error(), and re-raising.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jojin1709.github.io/jin/docs/errors.html">
+<meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://jojin1709.github.io/jin/docs/errors.html">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="stylesheet" href="../assets/css/site.css">
+
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var stored = localStorage.getItem("jin-theme") || "auto";
+      var dark = stored === "dark" ||
+        (stored === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) { /* private mode: light is fine */ }
+  })();
+</script>
+</head>
+<body class="Page">
+<a class="SkipLink" href="#main-content">Skip to main content</a>
+
+  <header class="Header js-header">
+    <div class="Header-inner">
+      <a class="Header-logo" href="../" aria-label="Jin home">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <nav class="Header-nav" aria-label="Main">
+        <ul class="Header-menu"><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-why">Why Jin<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-why" hidden><li class="Header-submenuItem"><a href="../docs/roadmap.html#design-rules">Design rules</a><p>The nine rules the language is built around</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html#what-is-in">What is in</a><p>Everything Jin can do today, honestly listed</p></li><li class="Header-submenuItem"><a href="../docs/architecture.html">Architecture</a><p>How a Jin program becomes running bytecode</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html">Roadmap</a><p>What comes after stage 10</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-learn">Learn<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-learn" hidden><li class="Header-submenuItem"><a href="../docs/tutorial.html">Getting started</a><p>Install Jin and run your first program</p></li><li class="Header-submenuItem"><a href="../docs/tour.html">Language tour</a><p>Every construct in the language, in one page</p></li><li class="Header-submenuItem"><a href="../#playground">Try Jin</a><p>Run Jin in your browser, no install needed</p></li></ul></li><li class="Header-menuItem Header-menuItem--active"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-docs">Docs<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-docs" hidden><li class="Header-submenuItem"><a href="../docs/index.html">Documentation</a><p>The index of everything written down</p></li><li class="Header-submenuItem"><a href="../docs/types.html">Type system</a><p>Optional annotations, enforced before the program runs</p></li><li class="Header-submenuItem"><a href="../docs/builtins.html">Built-ins</a><p>The standard library, function by function</p></li><li class="Header-submenuItem"><a href="../docs/records.html">Records & methods</a><p>User-defined types with fields and methods</p></li><li class="Header-submenuItem"><a href="../docs/errors.html">Error handling</a><p>try, catch and error()</p></li><li class="Header-submenuItem"><a href="../docs/modules.html">Projects & imports</a><p>Splitting a program across files</p></li><li class="Header-submenuItem"><a href="../docs/cli.html">Command line</a><p>Every jin subcommand</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-community">Community<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-community" hidden><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin">GitHub</a><p>The source, the issues and the releases</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main">Source code</a><p>Lexer, parser, type checker, compiler and VM</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a><p>Runnable programs that ship with Jin</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709">The author</a><p>JOJIN JOHN, who wrote all of it by hand</p></li></ul></li></ul>
+      </nav>
+      <div class="Header-actions">
+        <a class="Header-github" href="https://github.com/jojin1709/jin" aria-label="Jin on GitHub" title="Jin on GitHub">
+          <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <button class="Header-theme js-theme-toggle" type="button" aria-label="Change colour theme" title="Change colour theme">
+          <svg class="Header-themeIcon Header-themeIcon--auto" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 3a9 9 0 1 0 0 18V3z"/>
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M12 3a9 9 0 0 1 0 18"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--light" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-13a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 1 1zm16 0a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 1 2zM6.3 6.3a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zm12.4 12.4a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zM6.3 17.7a1 1 0 0 1-1.4 0l-.7-.7a1 1 0 1 1 1.4-1.4l.7.7a1 1 0 0 1 0 1.4zm10.8-9.8a1 1 0 0 1 0-1.4l.7-.7a1 1 0 1 1 1.4 1.4l-.7.7a1 1 0 0 1-1.4 0z"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--dark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <button class="Header-burger js-drawer-open" type="button" aria-label="Open navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="Drawer-scrim js-drawer-scrim" hidden></div>
+  <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
+    <div class="Drawer-head">
+      <a class="Header-logo" href="../">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
+    </div>
+    <nav class="Drawer-nav">
+      <ul class="Drawer-list">
+        <li><details class="Drawer-group"><summary>Why Jin</summary><ul class="Drawer-sublist"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></details></li><li><details class="Drawer-group"><summary>Learn</summary><ul class="Drawer-sublist"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../#playground">Try Jin</a></li></ul></details></li><li><details class="Drawer-group"><summary>Docs</summary><ul class="Drawer-sublist"><li><a href="../docs/index.html">Documentation</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></details></li><li><details class="Drawer-group"><summary>Community</summary><ul class="Drawer-sublist"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709">The author</a></li></ul></details></li>
+      </ul>
+    </nav>
+  </aside>
+
+<main id="main-content" class="Main">
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Error Handling</p>
+  <h1>Error Handling</h1>
+  <p class="DocHeader-lede">Catching runtime errors in Jin with <code>try</code> and <code>catch</code>, raising your own with <code>error()</code>, and re-raising one you have already caught.</p>
+</div>
+
+<div class="DocLayout">
+  <aside class="Sidebar"><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Overview</h2><ul class="Sidebar-list"><li><a href="index.html">Documentation</a></li><li><a href="tutorial.html">Getting started</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Language</h2><ul class="Sidebar-list"><li><a href="tour.html">Language tour</a></li><li><a href="types.html">Type system</a></li><li><a href="records.html">Records & methods</a></li><li><a href="errors.html" aria-current="page">Error handling</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Reference</h2><ul class="Sidebar-list"><li><a href="builtins.html">Built-ins</a></li><li><a href="cli.html">Command line</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Project</h2><ul class="Sidebar-list"><li><a href="modules.html">Projects & imports</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="roadmap.html">Status & roadmap</a></li></ul></div></aside>
+  <div class="DocMain">
+
+<section class="DocSection" id="try-catch">
+  <h2><code>try</code> and <code>catch</code></h2>
+
+  <p>Some things in a program cannot be known until it runs: a file that is not there, a division by zero, a key that is not in a map. <code>try</code> runs a block and hands any error to a handler:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let text = read_file("notes.txt")
+    print(text)
+} catch e {
+    print("failed: {e}")
+}</code></pre>
+
+  <p>Without the <code>try</code>, the same program would stop with a message and an exit code of 1. With it, the error is handled and the program carries on:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin notes.jin
+failed: 2:25: read_file() could not read notes.txt: The system cannot find the file specified.</code></pre>
+
+  <p>The block after <code>catch</code> runs only when the block after <code>try</code> raised something. If it did not, the <code>catch</code> block is skipped and the program continues after the whole statement.</p>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> The catch variable cannot be named after a built-in. <code>catch error { ... }</code> is a type error: <code>catch variable "error" cannot shadow a builtin</code>. Use <code>e</code>, or <code>err</code>, or anything else that is not a built-in name.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="the-message">
+  <h2>The catch variable is a <code>str</code></h2>
+
+  <p>Whatever you call it, the catch variable holds the error message as a plain string — the same text the program would have printed if nothing had caught it:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    error("boom")
+} catch e {
+    print(type(e))
+    print(e)
+    print(len(e))
+    print(e + " (added)")
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>str
+2:10: boom
+10
+2:10: boom (added)</code></pre>
+
+  <p>It is a <code>str</code> like any other, so it can be printed, measured, concatenated or put in a map. The message includes the line and column it came from, because that is the same text the program would have ended with.</p>
+
+  <aside class="Callout Callout--warning">
+    <p><strong>Careful.</strong> The message is text, not a structured error. There is no error type, no error code and no stack to look at — just a string. If you need to react to a particular failure, raise it yourself with <code>error()</code> and match on your own wording.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="raising">
+  <h2>Raising your own error</h2>
+
+  <p><code>error()</code> stops the program with a message you choose. It takes one argument and never returns:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn divide(a: int, b: int) -&gt; int {
+    if b == 0 {
+        error("denominator cannot be zero")
+    }
+    return a / b
+}
+
+try {
+    print(divide(10, 0))
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 3:14: denominator cannot be zero</code></pre>
+
+  <p>The argument does not have to be a string. Whatever it is, its printed form becomes the message, so <code>error("bad input: {value}")</code> is a good way to put the details in. <code>error(42)</code> raises the message <code>42</code>.</p>
+</section>
+
+<section class="DocSection" id="reraising">
+  <h2>Re-raising</h2>
+
+  <p>Calling <code>error(e)</code> inside a <code>catch</code> block hands the error on to the next handler out. That is how you log a failure in one place and handle it in another:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    try {
+        error("disk is full")
+    } catch inner {
+        print("logging:", inner)
+        error(inner)
+    }
+} catch outer {
+    print("handled:", outer)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>logging: 3:14: disk is full
+handled: 3:14: disk is full</code></pre>
+
+  <p>The outer handler sees the same message, not a new one, so the original place it came from is not lost.</p>
+</section>
+
+<section class="DocSection" id="catchable">
+  <h2>What can be caught</h2>
+
+  <p>Everything that stops a running program can be caught. These are the six kinds of thing, and the message each one produces:</p>
+
+  <table class="Table">
+    <thead>
+      <tr><th>What goes wrong</th><th>The message</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>You called <code>error()</code></td><td>The text you gave it.</td></tr>
+      <tr><td>A file operation failed</td><td><code>read_file() could not read notes.txt: The system cannot find the file specified.</code></td></tr>
+      <tr><td>An array index was out of range</td><td><code>index 10 out of range (length 2)</code></td></tr>
+      <tr><td>A map key was not there</td><td><code>key "email" is not in the map</code></td></tr>
+      <tr><td>A division by zero</td><td><code>division by zero</code></td></tr>
+      <tr><td>A record field was read or written that does not exist</td><td><code>Point has no field "z"</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>One program that catches one of each:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># 1. An error you raise yourself.
+try {
+    error("something went wrong")
+} catch e {
+    print("caught:", e)
+}
+
+# 2. Division by zero.
+try {
+    let x = 100 / 0
+    print(x)
+} catch e {
+    print("caught:", e)
+}
+
+# 3. An index past the end of an array.
+let items = ["first", "second"]
+try {
+    print(items[10])
+} catch e {
+    print("caught:", e)
+}
+
+# 4. A key that is not in the map.
+let user = {"name": "Alice"}
+try {
+    print(user["email"])
+} catch e {
+    print("caught:", e)
+}
+
+# 5. A file that is not there.
+try {
+    print(read_file("no-such-file.txt"))
+} catch e {
+    print("caught:", e)
+}
+
+# 6. A record field that is not there.
+struct Point {
+    x: int,
+    y: int
+}
+
+fn make() -&gt; any {
+    return Point(1, 2)
+}
+
+let r = make()
+try {
+    print(r.z)
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 3:10: something went wrong
+caught: 10:17: division by zero
+caught: 19:16: index 10 out of range (length 2)
+caught: 27:15: key "email" is not in the map
+caught: 34:20: read_file() could not read no-such-file.txt: The system cannot find the file specified.
+caught: 51:12: Point has no field "z"</code></pre>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> Built-ins that fail at run time are catchable too, not just the six above. <code>int("abc")</code>, <code>float("x")</code> and <code>slice()</code> with an end past the length all raise errors you can catch, because they are all the same kind of thing.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="boundaries">
+  <h2>Errors cross function calls</h2>
+
+  <p>An error raised deep inside a function travels back up to whichever <code>try</code> is waiting for it. The frames in between are unwound as it goes:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn divide(a: int, b: int) -&gt; int {
+    if b == 0 {
+        error("denominator cannot be zero")
+    }
+    return a / b
+}
+
+fn outer() -&gt; int {
+    return divide(10, 0)
+}
+
+try {
+    print(outer())
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 3:14: denominator cannot be zero</code></pre>
+
+  <p>The same is true for a method:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Account {
+    balance: int
+}
+
+fn (a: Account) withdraw(amount: int) -&gt; int {
+    if amount &gt; a.balance {
+        error("insufficient funds")
+    }
+    a.balance = a.balance - amount
+    return a.balance
+}
+
+let acct = Account(50)
+try {
+    acct.withdraw(100)
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: 7:14: insufficient funds</code></pre>
+
+  <p>And the same for an imported file. The message names the file the error came from, so you can tell where it was raised:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># util.jin
+fn half(n: int) -&gt; int {
+    if n &lt; 0 {
+        error("negative input")
+    }
+    return n / 2
+}</code></pre>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "util" as util
+
+try {
+    print(util.half(-1))
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught: util.jin:3:14: negative input</code></pre>
+</section>
+
+<section class="DocSection" id="compile-time">
+  <h2>Type errors cannot be caught</h2>
+
+  <p>Everything above is a runtime error: it happened while the program was running, and the program was still there to catch it. A type error is different — it is found before the program starts, so there is nothing running to catch it.</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x: int = "abc"
+    print(x)
+} catch e {
+    print("caught:", e)
+}</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin err_type.jin
+jin: err_type.jin has type errors:
+  2:5: cannot assign str to int variable "x"</code></pre>
+
+  <p>The <code>catch</code> block is never reached. The type checker runs first, and if it finds anything it reports it and the program never begins.</p>
+
+  <aside class="Callout Callout--error">
+    <p><strong>Error.</strong> <code>try</code> catches runtime errors only. It is not a way to make a type error go away — if a program does not type-check, it does not run, and no amount of <code>try</code> will change that. Put the annotation on the right, or leave it off.</p>
+  </aside>
+
+  <p>The same is true of syntax errors: the file has to be readable before anything can run. The <a href="types.html">Type System</a> page lists every check that happens before the program starts.</p>
+</section>
+
+<a class="NextLink" href="builtins.html">
+  <span>Next</span>
+  <strong>Built-ins &rarr;</strong>
+</a>
+
+  </div>
+</div>
+
+</main>
+
+  <footer class="Footer">
+    <div class="Container">
+      <div class="Footer-cols"><div class="Footer-col"><h2 class="Footer-colTitle">Why Jin</h2><ul class="Footer-list"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Learn</h2><ul class="Footer-list"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Reference</h2><ul class="Footer-list"><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Project</h2><ul class="Footer-list"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709/jin/issues">Issues</a></li></ul></div></div>
+    </div>
+    <div class="Container">
+      <div class="Footer-bottom">
+        <p class="Footer-copy">
+          Jin is free and open source, released under the
+          <a href="https://github.com/jojin1709/jin/blob/main/LICENSE">MIT licence</a>.
+          Written from scratch in Go by
+          <a href="https://github.com/jojin1709">JOJIN JOHN</a>.
+        </p>
+        <ul class="Footer-bottomList">
+          <li><a href="https://github.com/jojin1709/jin">Source on GitHub</a></li>
+          <li><a href="https://github.com/jojin1709/jin/issues">Report an issue</a></li>
+          <li class="Footer-version">Version 0.10.0</li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+<script src="../assets/js/site.js" defer></script>
+
+</body>
+</html>

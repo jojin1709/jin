@@ -1,0 +1,338 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Type System</p>
+  <h1>Type System</h1>
+  <p class="DocHeader-lede">Jin's type annotations are optional, and they are checked before your program runs. This page is the reference for what the checker accepts, what it refuses, and the exact words it uses when it refuses.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+    <section class="DocSection" id="optional">
+      <h2>Annotations are optional</h2>
+      <p>You never have to write a type. When you do write one, Jin enforces it before the program starts, so a mistake is found up front instead of halfway through a loop.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 4
+let height = 3
+
+print(area(width, height))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>12</code></pre>
+
+      <p>The same program with the wrong types does not run at all:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 3
+let height = "4"
+
+print(area(width, height))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: area.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected</code></pre>
+    </section>
+
+    <section class="DocSection" id="annotation-names">
+      <h2>The annotation names</h2>
+      <p>These are the type names the checker knows. Anything else is refused with <code>unknown type "..."</code>.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Name</th><th>What it accepts</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>int</code></td><td>A whole number.</td></tr>
+            <tr><td><code>float</code></td><td>A decimal number.</td></tr>
+            <tr><td><code>str</code></td><td>Text.</td></tr>
+            <tr><td><code>bool</code></td><td><code>true</code> or <code>false</code>.</td></tr>
+            <tr><td><code>nil</code></td><td>The absence of a value.</td></tr>
+            <tr><td><code>array</code></td><td>A list. The elements are not checked.</td></tr>
+            <tr><td><code>map</code></td><td>A map. The values are not checked.</td></tr>
+            <tr><td><code>any</code></td><td>Anything. Nothing is checked.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A bare <code>array</code> or <code>map</code> leaves the contents alone, which is usually what you want, because a map holding a name and an age at once is normal:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let mixed: array = [1, "two"]
+let person: map = {"name": "Ada", "age": 36}
+print(mixed)
+print(person)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>[1, "two"]
+{"name": "Ada", "age": 36}</code></pre>
+
+      <p>The name of a record declared in the file also works as a type, so <code>let p: Point = Point(1, 2)</code> is checked against the record's own fields.</p>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> The checker knows the name <code>nil</code>, but <code>nil</code> is a keyword in Jin, so the parser will not accept it as an annotation. Writing <code>let x: nil = nil</code> is a syntax error, not a type error: <code>expected IDENT, got nil</code>. Leave the annotation off and use <code>nil</code> as a value.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="any">
+      <h2>What is left alone</h2>
+      <p>A function parameter with no annotation is <code>any</code>, and a function with no return annotation is not return-checked at all. Plain scripts therefore keep working exactly as they always did.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn double(value) {
+    return value * 2
+}
+print(double(21))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>42</code></pre>
+
+      <p>A parameter of type <code>any</code> may be given any value at all, and it may be reassigned to anything:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn f(v) { v = "text"; return v }
+print(f(1))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>text</code></pre>
+
+      <h3>An unannotated <code>let</code> still takes the type of its value</h3>
+      <p>This is the one place where an unannotated name is not simply <code>any</code>. A <code>let</code> with no annotation takes the kind of the value it is given, so the name is still checked afterwards:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 1
+x = "text"</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: x.jin has type errors:
+  2:3: cannot assign str to int variable "x"</code></pre>
+
+      <p>Give the name the annotation <code>any</code> if you want it to hold anything later.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x: any = 1
+x = "text"
+print(x)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>text</code></pre>
+    </section>
+
+    <section class="DocSection" id="check">
+      <h2>Checking before the program runs</h2>
+      <p><code>jin check</code> type-checks a file and reports the problems without running anything.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">go build -o jin.exe .
+./jin.exe check examples/types.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>examples/types.jin: no type errors</code></pre>
+
+      <p>Running a file checks it first. A program with a type error never starts, so there is no half-finished run and no output to clean up.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x: int = "text"
+print("never")</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe broken.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: broken.jin has type errors:
+  1:1: cannot assign str to int variable "x"</code></pre>
+
+      <p>Every problem in the file is reported at once, and they come out in the order they appear, each with the line and column it came from.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> Jin prints the name of the file you gave it, so the examples on this page name the file they belong to. The wording of each message is the same whatever the file is called.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="messages">
+      <h2>What the checker says</h2>
+      <p>These are the messages the checker produces, word for word.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Message</th><th>What it means</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>cannot assign str to int variable "x"</code></td><td>The name was given a value of the wrong kind.</td></tr>
+            <tr><td><code>cannot assign array&lt;int&gt; to int variable "xs"</code></td><td>The same, for an array.</td></tr>
+            <tr><td><code>cannot add int and str</code></td><td>Two values of different kinds were added.</td></tr>
+            <tr><td><code>cannot add int and float; convert one explicitly with int() or float()</code></td><td>An <code>int</code> and a <code>float</code> were mixed.</td></tr>
+            <tr><td><code>cannot use '-' on str and str</code></td><td>The operator does not work on that kind of value.</td></tr>
+            <tr><td><code>cannot compare int and str with '&lt;'</code></td><td>The two sides cannot be compared.</td></tr>
+            <tr><td><code>condition must be a bool, got int</code></td><td>The condition is not a <code>bool</code>. There is no truthiness.</td></tr>
+            <tr><td><code>cannot loop over int</code></td><td>The value in a <code>for</code> loop is not something you can walk over.</td></tr>
+            <tr><td><code>undefined variable "x"</code></td><td>The name was never declared.</td></tr>
+            <tr><td><code>undefined variable "x"; use 'let' to declare it first</code></td><td>The name was assigned to but never declared.</td></tr>
+            <tr><td><code>unknown type "integer"</code></td><td>The annotation is not a type Jin knows.</td></tr>
+            <tr><td><code>f() expects 1 argument(s), got 2</code></td><td>The wrong number of arguments.</td></tr>
+            <tr><td><code>argument 1: cannot use str where int is expected</code></td><td>An argument of the wrong kind.</td></tr>
+            <tr><td><code>cannot return str from a function declared to return int</code></td><td>The returned value does not match the declared return type.</td></tr>
+            <tr><td><code>function "g" returns str on its last line but is declared to return int</code></td><td>The implicit return does not match either.</td></tr>
+            <tr><td><code>'return' is only allowed inside a function</code></td><td>A misplaced <code>return</code>.</td></tr>
+            <tr><td><code>'break' is only allowed inside a loop</code></td><td>A misplaced <code>break</code> or <code>continue</code>.</td></tr>
+            <tr><td><code>cannot index int</code></td><td>The value cannot be indexed.</td></tr>
+            <tr><td><code>index must be an int, got str</code></td><td>The index was not a number.</td></tr>
+            <tr><td><code>len() expects str, array or map, got int</code></td><td>A built-in was given the wrong kind of argument.</td></tr>
+            <tr><td><code>map keys must be int, str or bool, got array&lt;int&gt;</code></td><td>The key was not one of the three kinds a map accepts.</td></tr>
+            <tr><td><code>catch variable "len" cannot shadow a builtin</code></td><td>The catch variable would hide a built-in.</td></tr>
+            <tr><td><code>int is not callable</code></td><td>The name is not a function.</td></tr>
+            <tr><td><code>cannot read a field of map; use m["a"] to read a key</code></td><td>A map key was read with a dot instead of brackets.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>A file with several problems</h3>
+      <p>Every problem is reported, not just the first one.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 3
+let height = "4"
+
+print(area(width, height))
+print(area(width))
+print(1 + "x")
+if width { print("hi") }
+for n in 42 { print(n) }
+let bad: int = "text"
+print(area(width, "three"))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: area.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected
+  9:11: area() expects 2 argument(s), got 1
+  10:9: cannot add int and str
+  11:1: condition must be a bool, got int
+  12:1: cannot loop over int
+  13:1: cannot assign str to int variable "bad"
+  14:11: argument 2: cannot use str where int is expected</code></pre>
+    </section>
+
+    <section class="DocSection" id="flow">
+      <h2>Flow-sensitive checking</h2>
+      <p>The checker follows the order of the program. It knows what each name holds at each point, and it knows which names exist there.</p>
+
+      <h3>A function may use a name declared further down</h3>
+      <p>Function bodies are checked after the whole file has been read, so a helper at the top can use a variable that is declared below it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn shout() { print(upper(message)) }
+let message = "hi"
+shout()</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>HI</code></pre>
+
+      <p>Top-level code does not get that allowance. It runs in order, so it has to meet a name before it uses it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(message)
+let message = "hi"</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: message.jin has type errors:
+  1:7: undefined variable "message"</code></pre>
+
+      <h3>A block's names stay in the block</h3>
+      <pre class="Code" data-lang="jin"><code class="lang-jin">if true {
+    let hidden = 1
+    print(hidden)
+}
+print(hidden)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: block.jin has type errors:
+  5:7: undefined variable "hidden"</code></pre>
+
+      <h3>Two functions in the same body can call each other</h3>
+      <p>Both names are known before either body is checked, so the order they are written in does not matter:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn outer() {
+    fn a(n) {
+        if n &lt;= 0 { return "a" }
+        return b(n - 1)
+    }
+    fn b(n) {
+        if n &lt;= 0 { return "b" }
+        return a(n - 1)
+    }
+    return a(5)
+}
+print(outer())</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>b</code></pre>
+
+      <p>A local declared with <code>let</code> still has to come first, and the allowance stops at the block the functions were declared in:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">if true {
+    fn hidden() { return 1 }
+}
+hidden()</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: scope.jin has type errors:
+  4:1: undefined variable "hidden"</code></pre>
+    </section>
+
+    <section class="DocSection" id="shadowing">
+      <h2>Shadowing a built-in</h2>
+      <p>A local or a global may take a built-in's name. The name then means the variable, not the built-in, and the checker knows that: it stops checking the call as a built-in call and checks it as a call of your own function.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let len = 3
+print(len)
+
+fn width(items) {
+    let len = "hidden"
+    return len
+}
+print(width([]))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>3
+hidden</code></pre>
+
+      <p>Calling the shadowing name is then a call of an <code>int</code>, and the checker says so:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let len = 3
+print(len(5))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: shadow.jin has type errors:
+  2:10: int is not callable</code></pre>
+
+      <p>Where nothing shadows it, the built-in's own checks still apply:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(len(5))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: len.jin has type errors:
+  1:10: len() expects str, array or map, got int</code></pre>
+
+      <aside class="Callout Callout--error">
+        <p><strong>Error.</strong> A catch variable may not shadow a built-in. <code>catch len</code> is refused with <code>catch variable "len" cannot shadow a builtin</code>.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="runtime">
+      <h2>Type errors cannot be caught at run time</h2>
+      <p>A type error is found before the program starts, so there is nothing running that could catch it. <code>try</code> and <code>catch</code> handle run-time errors only.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x: int = "text"
+    print("this never runs")
+} catch e {
+    print("caught: {e}")
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: caught.jin has type errors:
+  2:5: cannot assign str to int variable "x"</code></pre>
+
+      <p>The program does not run, so the block inside the <code>try</code> never executes and the catch never runs either.</p>
+
+      <p>A run-time error is a different thing, and <code>try</code> does catch it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x = 1 / 0
+} catch e {
+    print("caught: {e}")
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>caught: 2:15: division by zero</code></pre>
+
+      <p>So there are two kinds of failure in Jin, and they are never mixed up: a type error stops the program before it starts, and a run-time error stops it while it runs, where a handler can pick it up. Error handling is covered in <a href="errors.html">Error Handling</a>.</p>
+    </section>
+
+    <a class="NextLink" href="records.html">
+      <span>Next</span>
+      <strong>Records and methods &rarr;</strong>
+    </a>
+
+  </div>
+</div>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Records and Methods — The Jin Programming Language</title>
+<meta name="description" content="User-defined record types in Jin: fields, constructors, receiver methods and bound methods.">
+<meta property="og:title" content="Records and Methods — The Jin Programming Language">
+<meta property="og:description" content="User-defined record types in Jin: fields, constructors, receiver methods and bound methods.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jojin1709.github.io/jin/docs/records.html">
+<meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://jojin1709.github.io/jin/docs/records.html">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="stylesheet" href="../assets/css/site.css">
+
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var stored = localStorage.getItem("jin-theme") || "auto";
+      var dark = stored === "dark" ||
+        (stored === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) { /* private mode: light is fine */ }
+  })();
+</script>
+</head>
+<body class="Page">
+<a class="SkipLink" href="#main-content">Skip to main content</a>
+
+  <header class="Header js-header">
+    <div class="Header-inner">
+      <a class="Header-logo" href="../" aria-label="Jin home">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <nav class="Header-nav" aria-label="Main">
+        <ul class="Header-menu"><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-why">Why Jin<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-why" hidden><li class="Header-submenuItem"><a href="../docs/roadmap.html#design-rules">Design rules</a><p>The nine rules the language is built around</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html#what-is-in">What is in</a><p>Everything Jin can do today, honestly listed</p></li><li class="Header-submenuItem"><a href="../docs/architecture.html">Architecture</a><p>How a Jin program becomes running bytecode</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html">Roadmap</a><p>What comes after stage 10</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-learn">Learn<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-learn" hidden><li class="Header-submenuItem"><a href="../docs/tutorial.html">Getting started</a><p>Install Jin and run your first program</p></li><li class="Header-submenuItem"><a href="../docs/tour.html">Language tour</a><p>Every construct in the language, in one page</p></li><li class="Header-submenuItem"><a href="../#playground">Try Jin</a><p>Run Jin in your browser, no install needed</p></li></ul></li><li class="Header-menuItem Header-menuItem--active"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-docs">Docs<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-docs" hidden><li class="Header-submenuItem"><a href="../docs/index.html">Documentation</a><p>The index of everything written down</p></li><li class="Header-submenuItem"><a href="../docs/types.html">Type system</a><p>Optional annotations, enforced before the program runs</p></li><li class="Header-submenuItem"><a href="../docs/builtins.html">Built-ins</a><p>The standard library, function by function</p></li><li class="Header-submenuItem"><a href="../docs/records.html">Records & methods</a><p>User-defined types with fields and methods</p></li><li class="Header-submenuItem"><a href="../docs/errors.html">Error handling</a><p>try, catch and error()</p></li><li class="Header-submenuItem"><a href="../docs/modules.html">Projects & imports</a><p>Splitting a program across files</p></li><li class="Header-submenuItem"><a href="../docs/cli.html">Command line</a><p>Every jin subcommand</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-community">Community<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-community" hidden><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin">GitHub</a><p>The source, the issues and the releases</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main">Source code</a><p>Lexer, parser, type checker, compiler and VM</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a><p>Runnable programs that ship with Jin</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709">The author</a><p>JOJIN JOHN, who wrote all of it by hand</p></li></ul></li></ul>
+      </nav>
+      <div class="Header-actions">
+        <a class="Header-github" href="https://github.com/jojin1709/jin" aria-label="Jin on GitHub" title="Jin on GitHub">
+          <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <button class="Header-theme js-theme-toggle" type="button" aria-label="Change colour theme" title="Change colour theme">
+          <svg class="Header-themeIcon Header-themeIcon--auto" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 3a9 9 0 1 0 0 18V3z"/>
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M12 3a9 9 0 0 1 0 18"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--light" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-13a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 1 1zm16 0a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 1 2zM6.3 6.3a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zm12.4 12.4a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zM6.3 17.7a1 1 0 0 1-1.4 0l-.7-.7a1 1 0 1 1 1.4-1.4l.7.7a1 1 0 0 1 0 1.4zm10.8-9.8a1 1 0 0 1 0-1.4l.7-.7a1 1 0 1 1 1.4 1.4l-.7.7a1 1 0 0 1-1.4 0z"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--dark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <button class="Header-burger js-drawer-open" type="button" aria-label="Open navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="Drawer-scrim js-drawer-scrim" hidden></div>
+  <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
+    <div class="Drawer-head">
+      <a class="Header-logo" href="../">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
+    </div>
+    <nav class="Drawer-nav">
+      <ul class="Drawer-list">
+        <li><details class="Drawer-group"><summary>Why Jin</summary><ul class="Drawer-sublist"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></details></li><li><details class="Drawer-group"><summary>Learn</summary><ul class="Drawer-sublist"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../#playground">Try Jin</a></li></ul></details></li><li><details class="Drawer-group"><summary>Docs</summary><ul class="Drawer-sublist"><li><a href="../docs/index.html">Documentation</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></details></li><li><details class="Drawer-group"><summary>Community</summary><ul class="Drawer-sublist"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709">The author</a></li></ul></details></li>
+      </ul>
+    </nav>
+  </aside>
+
+<main id="main-content" class="Main">
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Records and Methods</p>
+  <h1>Records and Methods</h1>
+  <p class="DocHeader-lede">User-defined types in Jin: declaring a <code>struct</code>, building one, reading and changing its fields, and giving it methods.</p>
+</div>
+
+<div class="DocLayout">
+  <aside class="Sidebar"><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Overview</h2><ul class="Sidebar-list"><li><a href="index.html">Documentation</a></li><li><a href="tutorial.html">Getting started</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Language</h2><ul class="Sidebar-list"><li><a href="tour.html">Language tour</a></li><li><a href="types.html">Type system</a></li><li><a href="records.html" aria-current="page">Records & methods</a></li><li><a href="errors.html">Error handling</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Reference</h2><ul class="Sidebar-list"><li><a href="builtins.html">Built-ins</a></li><li><a href="cli.html">Command line</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Project</h2><ul class="Sidebar-list"><li><a href="modules.html">Projects & imports</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="roadmap.html">Status & roadmap</a></li></ul></div></aside>
+  <div class="DocMain">
+
+<section class="DocSection" id="declaring">
+  <h2>Declaring a record</h2>
+
+  <p>A record is a type you write yourself: a name, and a fixed list of typed fields. It is declared with <code>struct</code>, at the top level of a file:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}</code></pre>
+
+  <p>The name after <code>struct</code> becomes a type. It can be used to make records, and it is the name that shows up in error messages and in <code>type()</code>.</p>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> A <code>struct</code> belongs to the file it is written in. It cannot be declared inside a function or a block — the compiler says <code>'struct' is only allowed at the top level of a file</code> if you try. The same is true of methods.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="a-running-example">
+  <h2>One running example</h2>
+
+  <p>The rest of this page walks through a single file. Save it as <code>rec_demo.jin</code>:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}
+
+struct Circle {
+    center: Point,
+    radius: int
+}
+
+# A method on Point, with 'p' as the receiver.
+fn (p: Point) shift(dx: int, dy: int) -&gt; Point {
+    p.x = p.x + dx
+    p.y = p.y + dy
+    return p
+}
+
+# Named construction: any order, every field required.
+let p = Point{y: 20, x: 10}
+# Positional construction: fields in declaration order.
+let q = Point(1, 2)
+
+print(p, q)
+print(p.x, p.y)
+
+p.x = 15
+print(p)
+
+p.shift(5, -10)
+print(p)
+
+# A bound method is a value of its own.
+let move = p.shift
+move(1, 1)
+print(p)
+
+print(type(p), type(q))
+
+# Nested records.
+let c = Circle{center: Point(0, 0), radius: 25}
+print(c)
+print(c.center.x, c.radius)</code></pre>
+
+  <p>Running it prints:</p>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point{x: 10, y: 20} Point{x: 1, y: 2}
+10 20
+Point{x: 15, y: 20}
+Point{x: 20, y: 10}
+Point{x: 21, y: 11}
+Point Point
+Circle{center: Point{x: 0, y: 0}, radius: 25}
+0 25</code></pre>
+
+  <p>Each section below explains one line of that output.</p>
+</section>
+
+<section class="DocSection" id="constructing">
+  <h2>Making one</h2>
+
+  <p>There are two ways to construct a record, and they make exactly the same thing.</p>
+
+  <p><strong>Positionally</strong>, with the fields in the order they were declared:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">let q = Point(1, 2)</code></pre>
+
+  <p><strong>By name</strong>, with the fields in any order:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">let p = Point{y: 20, x: 10}</code></pre>
+
+  <p>The named form uses braces, not parentheses — <code>Point(y: 20, x: 10)</code> is a syntax error, because that is a call. Every field must be given a value: there are no defaults, and no field may be left out.</p>
+
+  <p>Printing a record shows the type name and its fields, in the order they were declared:</p>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point{x: 10, y: 20} Point{x: 1, y: 2}</code></pre>
+</section>
+
+<section class="DocSection" id="fields">
+  <h2>Reading and changing fields</h2>
+
+  <p>A field is read with a dot, and written the same way:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">print(p.x, p.y)
+
+p.x = 15
+print(p)</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>10 20
+Point{x: 15, y: 20}</code></pre>
+
+  <p>Records are reference values, the same way maps and arrays are. Assigning to a field changes the record itself, and everybody holding it sees the change — including a function that was given the record as an argument:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}
+
+fn move_it(p: Point, dx: int) {
+    p.x = p.x + dx
+}
+
+let p = Point(1, 2)
+move_it(p, 10)
+print(p)</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point{x: 11, y: 2}</code></pre>
+
+  <aside class="Callout Callout--warning">
+    <p><strong>Careful.</strong> Because a record is a reference, <code>let q = p</code> does not make a copy. <code>q</code> and <code>p</code> are two names for the same record, and writing to a field of one writes to the field of the other.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="methods">
+  <h2>Methods</h2>
+
+  <p>A method is a function that belongs to a record type. It is declared at the top level of a file with receiver syntax: the receiver comes first, in brackets, and it names both the type and the variable the method works on.</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn (p: Point) shift(dx: int, dy: int) -&gt; Point {
+    p.x = p.x + dx
+    p.y = p.y + dy
+    return p
+}</code></pre>
+
+  <p>You call it with a dot, and the record is passed in for you:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">p.shift(5, -10)
+print(p)</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point{x: 20, y: 10}</code></pre>
+
+  <p>The receiver is an ordinary variable. It can be named anything, and it is the same record the method was called on — so a method can change the record's fields, and those changes are seen by the caller.</p>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> The return type is optional. A method that ends with a <code>return</code> of a value is written <code>-&gt; Point</code>; one that only changes fields can leave it off and return nothing.</p>
+  </aside>
+</section>
+
+<section class="DocSection" id="bound-methods">
+  <h2>Bound methods are values</h2>
+
+  <p>Reading a method off a record gives you the record and the method together, as one callable value. So a method can be stored in a variable and called later, and it still works on the record it came from:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">let move = p.shift
+move(1, 1)
+print(p)</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point{x: 21, y: 11}</code></pre>
+
+  <p>That is what makes methods work with the higher-order built-ins: <code>map</code>, <code>filter</code>, <code>sort_by</code> and the rest all take a function, and a bound method is one.</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}
+
+fn (p: Point) doubled() -&gt; int {
+    return p.x * 2
+}
+
+let points = [Point(1, 0), Point(2, 0), Point(3, 0)]
+print(map(points, fn(p) { p.doubled() }))</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>[2, 4, 6]</code></pre>
+</section>
+
+<section class="DocSection" id="nested">
+  <h2>Nested records</h2>
+
+  <p>A field can be another record, and a record can hold any number of them. The inner one is reached with another dot:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Circle {
+    center: Point,
+    radius: int
+}
+
+let c = Circle{center: Point(0, 0), radius: 25}
+print(c)
+print(c.center.x, c.radius)</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Circle{center: Point{x: 0, y: 0}, radius: 25}
+0 25</code></pre>
+
+  <p>A method can walk through nested records the same way:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">fn (c: Circle) area() -&gt; int {
+    return 3 * c.radius * c.radius
+}
+
+print(c.area())</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>1875</code></pre>
+</section>
+
+<section class="DocSection" id="recursive">
+  <h2>A record that refers to its own type</h2>
+
+  <p>A field may be given the type of the record it is inside. That is what lets you build a linked list:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Node {
+    value: int,
+    next: Node
+}
+
+let head = Node(1, Node(2, Node(3, nil)))
+let curr = head
+let total = 0
+while curr != nil {
+    total = total + curr.value
+    curr = curr.next
+}
+print("sum:", total)</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>sum: 6</code></pre>
+
+  <p>The last node points at <code>nil</code>, which is how the loop knows to stop. A record type never has to be complete at the point it is declared.</p>
+</section>
+
+<section class="DocSection" id="type">
+  <h2>What <code>type()</code> says</h2>
+
+  <p>For a record, <code>type()</code> gives the name the type was declared under — not a generic word like <code>"struct"</code>:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">print(type(p), type(q))</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point Point</code></pre>
+
+  <p>The same name is used in error messages, so a message about a <code>Point</code> reads the same whether it is about the type or about one of its instances.</p>
+</section>
+
+<section class="DocSection" id="conditions">
+  <h2>Struct literals in conditions</h2>
+
+  <p>Jin statements put the condition in front of a braced block — <code>if cond { ... }</code>, <code>while cond { ... }</code> — with no parentheses of their own. So a struct literal written straight into a condition would be read as the start of the block.</p>
+
+  <p>Put it in parentheses and it is unambiguous:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">let p = Point{x: 1, y: 2}
+if (p == Point{x: 1, y: 2}) {
+    print("matched")
+}
+while (p != Point{x: 0, y: 0}) {
+    print("not the origin")
+    break
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>matched
+not the origin</code></pre>
+
+  <p>Leave the parentheses out and the parser says so. The first message is the one that explains it; the rest follow from it:</p>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin cond_noparen.jin
+jin: cond_noparen.jin has syntax errors: 7:15: struct literals in conditions must be enclosed in parentheses, e.g. (Point{...}); 7:16: unexpected token ":"; 7:19: unexpected token ","; 7:21: struct literals in conditions must be enclosed in parentheses, e.g. (Point{...}); 7:22: unexpected token ":"; 8:20: expected :, got }; 9:1: unexpected token "}"</code></pre>
+
+  <p>Struct literals inside an array, or inside any parenthesised expression, are fine without extra parentheses:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">for p in [Point{x: 1, y: 2}, Point{x: 3, y: 4}] {
+    print(p)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>Point{x: 1, y: 2}
+Point{x: 3, y: 4}</code></pre>
+</section>
+
+<section class="DocSection" id="mistakes">
+  <h2>The mistakes you can make</h2>
+
+  <p>Most of them are caught before the program starts, because the type checker knows what each field is.</p>
+
+  <h3>A field left out</h3>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}
+
+let p = Point{x: 1}</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check rec_missing.jin
+jin: rec_missing.jin has type errors:
+  6:14: missing field "y" in Point</code></pre>
+
+  <h3>A field of the wrong type</h3>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}
+
+let p = Point{x: "one", y: 2}</code></pre>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check rec_wrongtype.jin
+jin: rec_wrongtype.jin has type errors:
+  6:15: field "x": cannot use str where int is expected</code></pre>
+
+  <h3>A field the record does not have</h3>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check rec_unknown.jin
+jin: rec_unknown.jin has type errors:
+  6:27: Point has no field "z"</code></pre>
+
+  <h3>The wrong number of values</h3>
+
+  <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check rec_arity.jin
+jin: rec_arity.jin has type errors:
+  6:14: Point(...) expects 2 value(s), got 1</code></pre>
+
+  <h3>Reading a field that is not there, at run time</h3>
+
+  <p>When the type checker cannot know what a value is — because it came back from a function with no annotation, say — the run time has the last word, and the mistake becomes a catchable runtime error instead:</p>
+
+  <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point {
+    x: int,
+    y: int
+}
+
+fn make() -&gt; any {
+    return Point(1, 2)
+}
+
+let r = make()
+try {
+    print(r.z)
+} catch e {
+    print("caught read:", e)
+}
+try {
+    r.z = 5
+} catch e {
+    print("caught write:", e)
+}</code></pre>
+
+  <pre class="Code Code--out" data-lang="output"><code>caught read: 12:12: Point has no field "z"
+caught write: 17:6: Point has no field "z"</code></pre>
+
+  <aside class="Callout Callout--note">
+    <p><strong>Note.</strong> Writing to a method is refused too, and says why: <code>cannot assign to method "shift" of Point</code>. A method is not a field, and there is nowhere to put a new one.</p>
+  </aside>
+</section>
+
+<a class="NextLink" href="errors.html">
+  <span>Next</span>
+  <strong>Error Handling &rarr;</strong>
+</a>
+
+  </div>
+</div>
+
+</main>
+
+  <footer class="Footer">
+    <div class="Container">
+      <div class="Footer-cols"><div class="Footer-col"><h2 class="Footer-colTitle">Why Jin</h2><ul class="Footer-list"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Learn</h2><ul class="Footer-list"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Reference</h2><ul class="Footer-list"><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Project</h2><ul class="Footer-list"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709/jin/issues">Issues</a></li></ul></div></div>
+    </div>
+    <div class="Container">
+      <div class="Footer-bottom">
+        <p class="Footer-copy">
+          Jin is free and open source, released under the
+          <a href="https://github.com/jojin1709/jin/blob/main/LICENSE">MIT licence</a>.
+          Written from scratch in Go by
+          <a href="https://github.com/jojin1709">JOJIN JOHN</a>.
+        </p>
+        <ul class="Footer-bottomList">
+          <li><a href="https://github.com/jojin1709/jin">Source on GitHub</a></li>
+          <li><a href="https://github.com/jojin1709/jin/issues">Report an issue</a></li>
+          <li class="Footer-version">Version 0.10.0</li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+<script src="../assets/js/site.js" defer></script>
+
+</body>
+</html>

@@ -1,0 +1,290 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Architecture</p>
+  <h1>Architecture</h1>
+  <p class="DocHeader-lede">How a Jin program becomes running bytecode: the lexer, the parser, the module loader, the type checker, the compiler and the virtual machine — and the tree-walking interpreter kept beside it.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+    <section id="pipeline" class="DocSection">
+      <h2>The pipeline</h2>
+      <p>Jin is written as a pipeline. Source text goes in one end and running values come out the other, and each stage has one job.</p>
+
+      <pre class="Code" data-lang="text"><code class="lang-text">source text
+   |  lexer.go        -&gt; tokens
+   v
+tokens
+   |  parser.go       -&gt; syntax tree
+   v
+syntax tree            (ast.go)
+   |  module.go       -&gt; the file plus everything it imports
+   v
+one whole program
+   |  typechecker.go  -&gt; type errors, or a clean bill of health
+   v
+one whole program
+   |  compiler.go     -&gt; bytecode
+   v
+bytecode               (code.go)
+   |  vm.go           -&gt; result
+   v
+values                 (object.go, record.go, symboltable.go, builtins.go)
+
+alternate back end
+one whole program
+   |  interpreter.go  -&gt; result       (jin interpret)
+   v
+values                 (object.go, environment.go, builtins.go)</code></pre>
+
+      <p>The stages, in order:</p>
+
+      <ol class="Steps">
+        <li><strong>Lexer</strong> (<code>lexer.go</code>) turns source text into tokens, each one carrying the line and column it came from.</li>
+        <li><strong>Parser</strong> (<code>parser.go</code>) turns the tokens into a syntax tree, using a precedence table so <code>1 + 2 * 3</code> groups the way it reads.</li>
+        <li><strong>Module loader</strong> (<code>module.go</code>) reads the file and everything it imports, resolves the import paths and aliases, refuses cycles, and hands the whole program over as one unit.</li>
+        <li><strong>Type checker</strong> (<code>typechecker.go</code>) walks the tree and reports every problem it can find, or a clean bill of health.</li>
+        <li><strong>Compiler</strong> (<code>compiler.go</code>) turns the tree into bytecode, resolving every name to a slot on the way.</li>
+        <li><strong>Bytecode</strong> (<code>code.go</code>) is the finished instruction stream, with its constants, its positions and its local slots.</li>
+        <li><strong>VM</strong> (<code>vm.go</code>) runs the bytecode on a value stack with a stack of call frames.</li>
+      </ol>
+
+      <p>The tree-walking interpreter (<code>interpreter.go</code>) is an alternate back end for the same tree. It is slower, and that is the point of keeping it: the test suite runs every program on both engines and demands byte-identical output, so the two cannot drift apart without a test noticing.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> Each stage is available on its own from the command line: <code>jin tokens</code>, <code>jin parse</code>, <code>jin check</code>, <code>jin compile</code>. You can watch a program being translated one layer at a time.</p>
+      </aside>
+
+      <p>The bytecode is readable. <code>jin compile</code> prints the constants and then the instruction stream:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe compile examples/tour.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>== constants ==
+0000 &lt;fn add&gt;
+0001 &lt;fn square&gt;
+0002 1
+0003 2
+0004 3
+...
+== &lt;script&gt; (locals: 9) ==
+0000 OpClosure 0 0
+0004 OpDup
+0005 OpSetGlobal 0
+0008 OpPopStatement
+0009 OpClosure 1 0
+0013 OpDup
+0014 OpSetGlobal 1
+0017 OpPopStatement
+0018 OpConstant 2
+0021 OpConstant 3
+0024 OpConstant 4</code></pre>
+    </section>
+
+    <section id="files" class="DocSection">
+      <h2>Project layout</h2>
+      <p>Every part of the implementation is one file with one job.</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>File</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>token.go</code></td><td>Token types, the keyword table, and the <code>line:column</code> position format errors use.</td></tr>
+          <tr><td><code>lexer.go</code></td><td>Source text to tokens, tracking the line and column of every one.</td></tr>
+          <tr><td><code>ast.go</code></td><td>The syntax tree: the node types a program is made of.</td></tr>
+          <tr><td><code>parser.go</code></td><td>Tokens to a syntax tree, using an operator precedence table.</td></tr>
+          <tr><td><code>dump.go</code></td><td>Renders a syntax tree as indented text, behind <code>jin parse</code>.</td></tr>
+          <tr><td><code>typechecker.go</code></td><td>Static types, and every check that runs before the program does.</td></tr>
+          <tr><td><code>template.go</code></td><td>Splits <code>{interpolation}</code> inside strings, shared by the checker and the compiler.</td></tr>
+          <tr><td><code>module.go</code></td><td>Reads a file and everything it imports: paths, aliases, cycles, <code>jin.toml</code>, <code>jin new</code>.</td></tr>
+          <tr><td><code>code.go</code></td><td>The opcodes, how an instruction is encoded, and the disassembler behind <code>jin compile</code>.</td></tr>
+          <tr><td><code>symboltable.go</code></td><td>Name resolution: globals, frame slots, captured variables, block scopes.</td></tr>
+          <tr><td><code>compiler.go</code></td><td>The syntax tree to bytecode.</td></tr>
+          <tr><td><code>frame.go</code></td><td>One active call: its closure, where it is, and where its locals live.</td></tr>
+          <tr><td><code>vm.go</code></td><td>The stack machine that runs the bytecode.</td></tr>
+          <tr><td><code>object.go</code></td><td>Runtime values: integers, strings, arrays, maps, closures and capture cells.</td></tr>
+          <tr><td><code>record.go</code></td><td>Record types and instances: fields, methods, and the messages about them.</td></tr>
+          <tr><td><code>environment.go</code></td><td>Variable scopes for the tree-walking back end, and the aliases a scope can reach.</td></tr>
+          <tr><td><code>builtins.go</code></td><td>The built-in functions, shared by both back ends.</td></tr>
+          <tr><td><code>interpreter.go</code></td><td>Evaluates the tree, kept as a reference implementation.</td></tr>
+          <tr><td><code>main.go</code></td><td>The command line and the REPL.</td></tr>
+        </tbody>
+      </table>
+
+      <p>Beside them are the tests and the example programs:</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Path</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>lexer_test.go</code>, <code>parser_test.go</code></td><td>The front end, one file each.</td></tr>
+          <tr><td><code>typechecker_test.go</code></td><td>Every static check, and every message it produces.</td></tr>
+          <tr><td><code>compiler_test.go</code></td><td>The bytecode: instruction encoding, slots, closures and positions.</td></tr>
+          <tr><td><code>interpreter_test.go</code></td><td>The tree-walking back end on its own.</td></tr>
+          <tr><td><code>vm_test.go</code></td><td>The VM, and the differential corpus that runs both engines.</td></tr>
+          <tr><td><code>object_test.go</code></td><td>The runtime value model, including maps.</td></tr>
+          <tr><td><code>project_test.go</code></td><td>Imports, projects, <code>jin.toml</code>, <code>jin new</code> and <code>args()</code>.</td></tr>
+          <tr><td><code>examples/</code></td><td>Programs that both engines must run identically, including the <code>greeting</code> project.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="names" class="DocSection">
+      <h2>How names resolve to slots</h2>
+      <p>The compiler resolves every name <em>before</em> the program runs. By the time the VM sees a name, it is no longer a name — it is a number saying where the value lives.</p>
+
+      <p>There are four places a name can live, and each has its own pair of opcodes:</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Where the name lives</th><th>Scope</th><th>Read</th><th>Write</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>A global slot, for a top-level <code>let</code>, <code>fn</code> or <code>struct</code></td><td><code>GlobalScope</code></td><td><code>OpGetGlobal</code></td><td><code>OpSetGlobal</code></td></tr>
+          <tr><td>A slot in the current call frame, for a parameter or a local</td><td><code>LocalScope</code></td><td><code>OpGetLocal</code></td><td><code>OpSetLocal</code></td></tr>
+          <tr><td>A captured variable, held by the enclosing function's closure</td><td><code>FreeScope</code></td><td><code>OpGetFree</code></td><td><code>OpSetFree</code></td></tr>
+          <tr><td>A built-in function</td><td><code>BuiltinScope</code></td><td><code>OpGetBuiltin</code></td><td>—</td></tr>
+        </tbody>
+      </table>
+
+      <p>The symbol table (<code>symboltable.go</code>) hands out those slots. A name at the top level of the file you ran is a global; a name anywhere else is a slot in the frame. Blocks nest: leaving a block puts back whatever it shadowed. Slots handed out inside a block are not reclaimed, because a frame is sized by the highest slot ever used, and keeping the counter high is what makes the size right.</p>
+
+      <p>A name that belongs to an enclosing function becomes a captured variable. The compiler records where it came from — a local slot of the enclosing frame, or an entry in the enclosing closure's free list — and the closure is built with exactly those captures.</p>
+
+      <p>A name that is in none of those places is an error, not a runtime surprise. The type checker catches it before the program starts:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: main.jin has type errors:
+  1:7: undefined variable "y"</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> This is why <code>jin check</code> and <code>jin compile</code> catch different classes of mistake: the checker works on types, and the compiler works on names and slots.</p>
+      </aside>
+    </section>
+
+    <section id="positions" class="DocSection">
+      <h2>Every instruction knows where it came from</h2>
+      <p>The compiler records a source position for every byte it emits, in a table that sits alongside the instruction stream. Each entry holds a line, a column, and the file the code came from.</p>
+
+      <p>When the VM raises an error it looks up the position of the instruction that was running, and builds the message from it. The tree-walking back end does the same thing from the tree, so both engines print the same message for the same mistake.</p>
+
+      <p>The file name is left out when the code came from the file you ran — there is only one of that, so the message stays plain:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: 3:5: division by zero</code></pre>
+
+      <p>When the code came from an imported file, the instruction carries that file's name, which is its path relative to the file you ran:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># utils.jin
+# A deliberate mistake, to show where an error points.
+100 / 0</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "utils" as u
+print("never reached")</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: utils.jin:3:5: division by zero</code></pre>
+
+      <p>The same message comes out of both back ends:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe run main.jin
+./jin.exe interpret main.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: utils.jin:3:5: division by zero
+jin: utils.jin:3:5: division by zero</code></pre>
+    </section>
+
+    <section id="one-place" class="DocSection">
+      <h2>Kept in one place</h2>
+      <p>Two pieces of logic live in exactly one place, so the back ends cannot drift apart.</p>
+
+      <p><code>indexInto</code> and <code>setInto</code> in <code>vm.go</code> do every indexed read and write, and <code>iterateValues</code> decides what a <code>for</code> loop walks. The interpreter calls all three, which is why an error message about a map key is the same whichever engine you run.</p>
+
+      <ul class="Bullets">
+        <li><code>indexInto(container, index)</code> reads <code>container[index]</code>: a map lookup, an array element or a character of a string.</li>
+        <li><code>setInto(container, index, value)</code> writes <code>container[index] = value</code>.</li>
+        <li><code>iterateValues(obj)</code> turns a collection into the values a loop walks: an array stays as it is, a string becomes its characters, and a map becomes its keys in the order they were added.</li>
+      </ul>
+
+      <p>A missing map key is an error on both engines, not a quiet <code>nil</code>:</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>2:8: key "nope" is not in the map</code></pre>
+
+      <p>The same idea runs through the record code: <code>getField</code> and <code>setField</code> in <code>record.go</code> are the only places that read or write a field, and they build the message for a name a record does not have. The type checker builds the same text, so a mistake is caught before the program runs when it can be, and reported the same way when it cannot.</p>
+    </section>
+
+    <section id="closures" class="DocSection">
+      <h2>How closures use cells</h2>
+      <p>A captured variable is the <em>variable</em>, not a snapshot of it. Two functions written side by side see each other's writes, and each pass of a loop gets its own binding.</p>
+
+      <p>The VM does this with cells. Each captured local gets one cell, and every closure that captured it shares that same cell — which is where the sharing comes from.</p>
+
+      <ul class="Bullets">
+        <li>While the frame that owns the variable is still running, the cell points straight at that frame's stack slot. An ordinary read or write of the local is therefore seen by every closure holding it.</li>
+        <li>When the scope ends — the block closes, or the frame returns — the value is copied out of the slot and the cell is closed. That is what lets a closure outlive the call that made it.</li>
+        <li>A second closure capturing the same slot gets the <em>same</em> cell. That is what makes sibling closures see each other's writes.</li>
+      </ul>
+
+      <p>In the code, <code>capture(slot)</code> in <code>vm.go</code> finds or creates the cell for a slot, <code>closeCells(from)</code> closes every cell at or above a slot, and the <code>OpCloseUpvalues</code> instruction closes the cells a block owns. The cell itself lives in <code>object.go</code>, next to the closure it belongs to.</p>
+
+      <p>The tree-walking back end reaches the same semantics a different way: it hands every function a pointer to the environment it was written in, so the captured variable is shared by construction. Both engines run the same differential corpus, so the two cannot disagree about what a capture means.</p>
+    </section>
+
+    <section id="differential" class="DocSection">
+      <h2>The differential corpus</h2>
+      <p>The centrepiece of the test suite is a corpus of programs that is run on <em>both</em> back ends, and the two results have to match exactly — including the text of any error.</p>
+
+      <p>Two independent implementations agreeing is a far stronger correctness signal than either one passing on its own.</p>
+
+      <p>What the corpus covers:</p>
+
+      <ul class="Bullets">
+        <li><strong>96 programs</strong> in <code>vm_test.go</code>, from integer arithmetic and operator precedence through closures, records, maps and string interpolation. Each one must produce its expected output on the VM <em>and</em> on the interpreter.</li>
+        <li><strong>31 error programs</strong> that must fail on both engines. The wording is pinned, so a bug cannot make both engines wrong in the same way, and the two messages are compared to each other byte for byte.</li>
+        <li><strong>Every file in <code>examples/</code></strong>, run on both engines and compared.</li>
+        <li><strong>Every project</strong> under test: the tests write real files into a temporary folder and require both back ends to agree on what the whole project prints, and on where it fails when a module, an alias or an import path is wrong.</li>
+      </ul>
+
+      <p>Error programs take the same route as working ones, which is what keeps the two engines honest about their messages rather than merely compatible.</p>
+
+      <p>The whole suite is 389 test cases, all passing:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">go test ./...
+go vet ./...
+gofmt -l .</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>ok  	jin	4.589s</code></pre>
+    </section>
+
+    <section id="performance" class="DocSection">
+      <h2>Performance</h2>
+      <p>Naive <code>fib(30)</code>, wall clock including start-up, compile and type-check, measured on the machine the project describes (Windows, Go 1.26, CPython 3.14):</p>
+
+      <table class="Table">
+        <thead>
+          <tr><th>Engine</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>jin run</code> (bytecode VM)</td><td>~0.45 s</td></tr>
+          <tr><td><code>jin interpret</code> (tree walker)</td><td>~3.5 s</td></tr>
+          <tr><td>CPython 3.14, same program</td><td>~0.20 s</td></tr>
+        </tbody>
+      </table>
+
+      <p>So the VM is roughly seven to eight times faster than Jin's own tree-walking back end, and in the same ballpark as CPython on a call-heavy benchmark. The exact figures depend on the machine; the ratio is the thing to take away.</p>
+
+      <p>The VM keeps that lead by doing the work before the program starts, and by not doing it again:</p>
+
+      <ul class="Bullets">
+        <li>Names are resolved to slots before execution, so there is no name lookup at run time.</li>
+        <li>Small integers, booleans and <code>nil</code> are pooled instead of allocated on every step.</li>
+        <li>Call frames are reused, so a call allocates nothing.</li>
+        <li>The common arithmetic cases are handled without building any object that gets thrown away.</li>
+      </ul>
+
+      <p>Getting clearly past CPython would need unboxed stack slots and inline caches, which are a later stage's work.</p>
+    </section>
+
+    <a class="NextLink" href="roadmap.html">Next: Status and roadmap <span>What Jin can do today, and what comes next</span></a>
+
+  </div>
+</div>

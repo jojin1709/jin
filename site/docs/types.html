@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Type System — The Jin Programming Language</title>
+<meta name="description" content="Jin's optional type annotations, and every check the type checker runs before your program starts.">
+<meta property="og:title" content="Type System — The Jin Programming Language">
+<meta property="og:description" content="Jin's optional type annotations, and every check the type checker runs before your program starts.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jojin1709.github.io/jin/docs/types.html">
+<meta property="og:image" content="https://jojin1709.github.io/jin/assets/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://jojin1709.github.io/jin/docs/types.html">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/img/icon.png">
+<link rel="stylesheet" href="../assets/css/site.css">
+
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var stored = localStorage.getItem("jin-theme") || "auto";
+      var dark = stored === "dark" ||
+        (stored === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) { /* private mode: light is fine */ }
+  })();
+</script>
+</head>
+<body class="Page">
+<a class="SkipLink" href="#main-content">Skip to main content</a>
+
+  <header class="Header js-header">
+    <div class="Header-inner">
+      <a class="Header-logo" href="../" aria-label="Jin home">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <nav class="Header-nav" aria-label="Main">
+        <ul class="Header-menu"><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-why">Why Jin<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-why" hidden><li class="Header-submenuItem"><a href="../docs/roadmap.html#design-rules">Design rules</a><p>The nine rules the language is built around</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html#what-is-in">What is in</a><p>Everything Jin can do today, honestly listed</p></li><li class="Header-submenuItem"><a href="../docs/architecture.html">Architecture</a><p>How a Jin program becomes running bytecode</p></li><li class="Header-submenuItem"><a href="../docs/roadmap.html">Roadmap</a><p>What comes after stage 10</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-learn">Learn<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-learn" hidden><li class="Header-submenuItem"><a href="../docs/tutorial.html">Getting started</a><p>Install Jin and run your first program</p></li><li class="Header-submenuItem"><a href="../docs/tour.html">Language tour</a><p>Every construct in the language, in one page</p></li><li class="Header-submenuItem"><a href="../#playground">Try Jin</a><p>Run Jin in your browser, no install needed</p></li></ul></li><li class="Header-menuItem Header-menuItem--active"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-docs">Docs<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-docs" hidden><li class="Header-submenuItem"><a href="../docs/index.html">Documentation</a><p>The index of everything written down</p></li><li class="Header-submenuItem"><a href="../docs/types.html">Type system</a><p>Optional annotations, enforced before the program runs</p></li><li class="Header-submenuItem"><a href="../docs/builtins.html">Built-ins</a><p>The standard library, function by function</p></li><li class="Header-submenuItem"><a href="../docs/records.html">Records & methods</a><p>User-defined types with fields and methods</p></li><li class="Header-submenuItem"><a href="../docs/errors.html">Error handling</a><p>try, catch and error()</p></li><li class="Header-submenuItem"><a href="../docs/modules.html">Projects & imports</a><p>Splitting a program across files</p></li><li class="Header-submenuItem"><a href="../docs/cli.html">Command line</a><p>Every jin subcommand</p></li></ul></li><li class="Header-menuItem"><button class="Header-submenuTrigger" aria-expanded="false" aria-controls="submenu-community">Community<svg class="Header-caret" width="12" height="8" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><ul class="Header-submenu" id="submenu-community" hidden><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin">GitHub</a><p>The source, the issues and the releases</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main">Source code</a><p>Lexer, parser, type checker, compiler and VM</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a><p>Runnable programs that ship with Jin</p></li><li class="Header-submenuItem"><a href="https://github.com/jojin1709">The author</a><p>JOJIN JOHN, who wrote all of it by hand</p></li></ul></li></ul>
+      </nav>
+      <div class="Header-actions">
+        <a class="Header-github" href="https://github.com/jojin1709/jin" aria-label="Jin on GitHub" title="Jin on GitHub">
+          <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </a>
+        <button class="Header-theme js-theme-toggle" type="button" aria-label="Change colour theme" title="Change colour theme">
+          <svg class="Header-themeIcon Header-themeIcon--auto" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 3a9 9 0 1 0 0 18V3z"/>
+            <path fill="none" stroke="currentColor" stroke-width="2" d="M12 3a9 9 0 0 1 0 18"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--light" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-13a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 15a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 1 1zm16 0a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 1 2zM6.3 6.3a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zm12.4 12.4a1 1 0 0 1 0 1.4l-.7.7a1 1 0 1 1-1.4-1.4l.7-.7a1 1 0 0 1 1.4 0zM6.3 17.7a1 1 0 0 1-1.4 0l-.7-.7a1 1 0 1 1 1.4-1.4l.7.7a1 1 0 0 1 0 1.4zm10.8-9.8a1 1 0 0 1 0-1.4l.7-.7a1 1 0 1 1 1.4 1.4l-.7.7a1 1 0 0 1-1.4 0z"/>
+          </svg>
+          <svg class="Header-themeIcon Header-themeIcon--dark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <button class="Header-burger js-drawer-open" type="button" aria-label="Open navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="Drawer-scrim js-drawer-scrim" hidden></div>
+  <aside class="Drawer js-drawer" aria-label="Site navigation" aria-hidden="true">
+    <div class="Drawer-head">
+      <a class="Header-logo" href="../">
+        <img src="../assets/img/logo.svg" alt="" width="30" height="30">
+        <span class="Header-wordmark">Jin</span>
+      </a>
+      <button class="Drawer-close js-drawer-close" type="button" aria-label="Close navigation">&times;</button>
+    </div>
+    <nav class="Drawer-nav">
+      <ul class="Drawer-list">
+        <li><details class="Drawer-group"><summary>Why Jin</summary><ul class="Drawer-sublist"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></details></li><li><details class="Drawer-group"><summary>Learn</summary><ul class="Drawer-sublist"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../#playground">Try Jin</a></li></ul></details></li><li><details class="Drawer-group"><summary>Docs</summary><ul class="Drawer-sublist"><li><a href="../docs/index.html">Documentation</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></details></li><li><details class="Drawer-group"><summary>Community</summary><ul class="Drawer-sublist"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709">The author</a></li></ul></details></li>
+      </ul>
+    </nav>
+  </aside>
+
+<main id="main-content" class="Main">
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Type System</p>
+  <h1>Type System</h1>
+  <p class="DocHeader-lede">Jin's type annotations are optional, and they are checked before your program runs. This page is the reference for what the checker accepts, what it refuses, and the exact words it uses when it refuses.</p>
+</div>
+
+<div class="DocLayout">
+  <aside class="Sidebar"><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Overview</h2><ul class="Sidebar-list"><li><a href="index.html">Documentation</a></li><li><a href="tutorial.html">Getting started</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Language</h2><ul class="Sidebar-list"><li><a href="tour.html">Language tour</a></li><li><a href="types.html" aria-current="page">Type system</a></li><li><a href="records.html">Records & methods</a></li><li><a href="errors.html">Error handling</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Reference</h2><ul class="Sidebar-list"><li><a href="builtins.html">Built-ins</a></li><li><a href="cli.html">Command line</a></li></ul></div><div class="Sidebar-group"><h2 class="Sidebar-groupTitle">Project</h2><ul class="Sidebar-list"><li><a href="modules.html">Projects & imports</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="roadmap.html">Status & roadmap</a></li></ul></div></aside>
+  <div class="DocMain">
+
+    <section class="DocSection" id="optional">
+      <h2>Annotations are optional</h2>
+      <p>You never have to write a type. When you do write one, Jin enforces it before the program starts, so a mistake is found up front instead of halfway through a loop.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 4
+let height = 3
+
+print(area(width, height))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>12</code></pre>
+
+      <p>The same program with the wrong types does not run at all:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 3
+let height = "4"
+
+print(area(width, height))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: area.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected</code></pre>
+    </section>
+
+    <section class="DocSection" id="annotation-names">
+      <h2>The annotation names</h2>
+      <p>These are the type names the checker knows. Anything else is refused with <code>unknown type "..."</code>.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Name</th><th>What it accepts</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>int</code></td><td>A whole number.</td></tr>
+            <tr><td><code>float</code></td><td>A decimal number.</td></tr>
+            <tr><td><code>str</code></td><td>Text.</td></tr>
+            <tr><td><code>bool</code></td><td><code>true</code> or <code>false</code>.</td></tr>
+            <tr><td><code>nil</code></td><td>The absence of a value.</td></tr>
+            <tr><td><code>array</code></td><td>A list. The elements are not checked.</td></tr>
+            <tr><td><code>map</code></td><td>A map. The values are not checked.</td></tr>
+            <tr><td><code>any</code></td><td>Anything. Nothing is checked.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>A bare <code>array</code> or <code>map</code> leaves the contents alone, which is usually what you want, because a map holding a name and an age at once is normal:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let mixed: array = [1, "two"]
+let person: map = {"name": "Ada", "age": 36}
+print(mixed)
+print(person)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>[1, "two"]
+{"name": "Ada", "age": 36}</code></pre>
+
+      <p>The name of a record declared in the file also works as a type, so <code>let p: Point = Point(1, 2)</code> is checked against the record's own fields.</p>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> The checker knows the name <code>nil</code>, but <code>nil</code> is a keyword in Jin, so the parser will not accept it as an annotation. Writing <code>let x: nil = nil</code> is a syntax error, not a type error: <code>expected IDENT, got nil</code>. Leave the annotation off and use <code>nil</code> as a value.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="any">
+      <h2>What is left alone</h2>
+      <p>A function parameter with no annotation is <code>any</code>, and a function with no return annotation is not return-checked at all. Plain scripts therefore keep working exactly as they always did.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn double(value) {
+    return value * 2
+}
+print(double(21))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>42</code></pre>
+
+      <p>A parameter of type <code>any</code> may be given any value at all, and it may be reassigned to anything:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn f(v) { v = "text"; return v }
+print(f(1))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>text</code></pre>
+
+      <h3>An unannotated <code>let</code> still takes the type of its value</h3>
+      <p>This is the one place where an unannotated name is not simply <code>any</code>. A <code>let</code> with no annotation takes the kind of the value it is given, so the name is still checked afterwards:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 1
+x = "text"</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: x.jin has type errors:
+  2:3: cannot assign str to int variable "x"</code></pre>
+
+      <p>Give the name the annotation <code>any</code> if you want it to hold anything later.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x: any = 1
+x = "text"
+print(x)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>text</code></pre>
+    </section>
+
+    <section class="DocSection" id="check">
+      <h2>Checking before the program runs</h2>
+      <p><code>jin check</code> type-checks a file and reports the problems without running anything.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">go build -o jin.exe .
+./jin.exe check examples/types.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>examples/types.jin: no type errors</code></pre>
+
+      <p>Running a file checks it first. A program with a type error never starts, so there is no half-finished run and no output to clean up.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x: int = "text"
+print("never")</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe broken.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: broken.jin has type errors:
+  1:1: cannot assign str to int variable "x"</code></pre>
+
+      <p>Every problem in the file is reported at once, and they come out in the order they appear, each with the line and column it came from.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> Jin prints the name of the file you gave it, so the examples on this page name the file they belong to. The wording of each message is the same whatever the file is called.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="messages">
+      <h2>What the checker says</h2>
+      <p>These are the messages the checker produces, word for word.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Message</th><th>What it means</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>cannot assign str to int variable "x"</code></td><td>The name was given a value of the wrong kind.</td></tr>
+            <tr><td><code>cannot assign array&lt;int&gt; to int variable "xs"</code></td><td>The same, for an array.</td></tr>
+            <tr><td><code>cannot add int and str</code></td><td>Two values of different kinds were added.</td></tr>
+            <tr><td><code>cannot add int and float; convert one explicitly with int() or float()</code></td><td>An <code>int</code> and a <code>float</code> were mixed.</td></tr>
+            <tr><td><code>cannot use '-' on str and str</code></td><td>The operator does not work on that kind of value.</td></tr>
+            <tr><td><code>cannot compare int and str with '&lt;'</code></td><td>The two sides cannot be compared.</td></tr>
+            <tr><td><code>condition must be a bool, got int</code></td><td>The condition is not a <code>bool</code>. There is no truthiness.</td></tr>
+            <tr><td><code>cannot loop over int</code></td><td>The value in a <code>for</code> loop is not something you can walk over.</td></tr>
+            <tr><td><code>undefined variable "x"</code></td><td>The name was never declared.</td></tr>
+            <tr><td><code>undefined variable "x"; use 'let' to declare it first</code></td><td>The name was assigned to but never declared.</td></tr>
+            <tr><td><code>unknown type "integer"</code></td><td>The annotation is not a type Jin knows.</td></tr>
+            <tr><td><code>f() expects 1 argument(s), got 2</code></td><td>The wrong number of arguments.</td></tr>
+            <tr><td><code>argument 1: cannot use str where int is expected</code></td><td>An argument of the wrong kind.</td></tr>
+            <tr><td><code>cannot return str from a function declared to return int</code></td><td>The returned value does not match the declared return type.</td></tr>
+            <tr><td><code>function "g" returns str on its last line but is declared to return int</code></td><td>The implicit return does not match either.</td></tr>
+            <tr><td><code>'return' is only allowed inside a function</code></td><td>A misplaced <code>return</code>.</td></tr>
+            <tr><td><code>'break' is only allowed inside a loop</code></td><td>A misplaced <code>break</code> or <code>continue</code>.</td></tr>
+            <tr><td><code>cannot index int</code></td><td>The value cannot be indexed.</td></tr>
+            <tr><td><code>index must be an int, got str</code></td><td>The index was not a number.</td></tr>
+            <tr><td><code>len() expects str, array or map, got int</code></td><td>A built-in was given the wrong kind of argument.</td></tr>
+            <tr><td><code>map keys must be int, str or bool, got array&lt;int&gt;</code></td><td>The key was not one of the three kinds a map accepts.</td></tr>
+            <tr><td><code>catch variable "len" cannot shadow a builtin</code></td><td>The catch variable would hide a built-in.</td></tr>
+            <tr><td><code>int is not callable</code></td><td>The name is not a function.</td></tr>
+            <tr><td><code>cannot read a field of map; use m["a"] to read a key</code></td><td>A map key was read with a dot instead of brackets.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>A file with several problems</h3>
+      <p>Every problem is reported, not just the first one.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn area(w: int, h: int) -&gt; int {
+    return w * h
+}
+
+let width: int = 3
+let height = "4"
+
+print(area(width, height))
+print(area(width))
+print(1 + "x")
+if width { print("hi") }
+for n in 42 { print(n) }
+let bad: int = "text"
+print(area(width, "three"))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: area.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected
+  9:11: area() expects 2 argument(s), got 1
+  10:9: cannot add int and str
+  11:1: condition must be a bool, got int
+  12:1: cannot loop over int
+  13:1: cannot assign str to int variable "bad"
+  14:11: argument 2: cannot use str where int is expected</code></pre>
+    </section>
+
+    <section class="DocSection" id="flow">
+      <h2>Flow-sensitive checking</h2>
+      <p>The checker follows the order of the program. It knows what each name holds at each point, and it knows which names exist there.</p>
+
+      <h3>A function may use a name declared further down</h3>
+      <p>Function bodies are checked after the whole file has been read, so a helper at the top can use a variable that is declared below it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn shout() { print(upper(message)) }
+let message = "hi"
+shout()</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>HI</code></pre>
+
+      <p>Top-level code does not get that allowance. It runs in order, so it has to meet a name before it uses it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(message)
+let message = "hi"</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: message.jin has type errors:
+  1:7: undefined variable "message"</code></pre>
+
+      <h3>A block's names stay in the block</h3>
+      <pre class="Code" data-lang="jin"><code class="lang-jin">if true {
+    let hidden = 1
+    print(hidden)
+}
+print(hidden)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: block.jin has type errors:
+  5:7: undefined variable "hidden"</code></pre>
+
+      <h3>Two functions in the same body can call each other</h3>
+      <p>Both names are known before either body is checked, so the order they are written in does not matter:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn outer() {
+    fn a(n) {
+        if n &lt;= 0 { return "a" }
+        return b(n - 1)
+    }
+    fn b(n) {
+        if n &lt;= 0 { return "b" }
+        return a(n - 1)
+    }
+    return a(5)
+}
+print(outer())</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>b</code></pre>
+
+      <p>A local declared with <code>let</code> still has to come first, and the allowance stops at the block the functions were declared in:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">if true {
+    fn hidden() { return 1 }
+}
+hidden()</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: scope.jin has type errors:
+  4:1: undefined variable "hidden"</code></pre>
+    </section>
+
+    <section class="DocSection" id="shadowing">
+      <h2>Shadowing a built-in</h2>
+      <p>A local or a global may take a built-in's name. The name then means the variable, not the built-in, and the checker knows that: it stops checking the call as a built-in call and checks it as a call of your own function.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let len = 3
+print(len)
+
+fn width(items) {
+    let len = "hidden"
+    return len
+}
+print(width([]))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>3
+hidden</code></pre>
+
+      <p>Calling the shadowing name is then a call of an <code>int</code>, and the checker says so:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let len = 3
+print(len(5))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: shadow.jin has type errors:
+  2:10: int is not callable</code></pre>
+
+      <p>Where nothing shadows it, the built-in's own checks still apply:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(len(5))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: len.jin has type errors:
+  1:10: len() expects str, array or map, got int</code></pre>
+
+      <aside class="Callout Callout--error">
+        <p><strong>Error.</strong> A catch variable may not shadow a built-in. <code>catch len</code> is refused with <code>catch variable "len" cannot shadow a builtin</code>.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="runtime">
+      <h2>Type errors cannot be caught at run time</h2>
+      <p>A type error is found before the program starts, so there is nothing running that could catch it. <code>try</code> and <code>catch</code> handle run-time errors only.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x: int = "text"
+    print("this never runs")
+} catch e {
+    print("caught: {e}")
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>jin: caught.jin has type errors:
+  2:5: cannot assign str to int variable "x"</code></pre>
+
+      <p>The program does not run, so the block inside the <code>try</code> never executes and the catch never runs either.</p>
+
+      <p>A run-time error is a different thing, and <code>try</code> does catch it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x = 1 / 0
+} catch e {
+    print("caught: {e}")
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>caught: 2:15: division by zero</code></pre>
+
+      <p>So there are two kinds of failure in Jin, and they are never mixed up: a type error stops the program before it starts, and a run-time error stops it while it runs, where a handler can pick it up. Error handling is covered in <a href="errors.html">Error Handling</a>.</p>
+    </section>
+
+    <a class="NextLink" href="records.html">
+      <span>Next</span>
+      <strong>Records and methods &rarr;</strong>
+    </a>
+
+  </div>
+</div>
+
+</main>
+
+  <footer class="Footer">
+    <div class="Container">
+      <div class="Footer-cols"><div class="Footer-col"><h2 class="Footer-colTitle">Why Jin</h2><ul class="Footer-list"><li><a href="../docs/roadmap.html#design-rules">Design rules</a></li><li><a href="../docs/roadmap.html#what-is-in">What is in</a></li><li><a href="../docs/architecture.html">Architecture</a></li><li><a href="../docs/roadmap.html">Roadmap</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Learn</h2><ul class="Footer-list"><li><a href="../docs/tutorial.html">Getting started</a></li><li><a href="../docs/tour.html">Language tour</a></li><li><a href="../docs/types.html">Type system</a></li><li><a href="../docs/builtins.html">Built-ins</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Reference</h2><ul class="Footer-list"><li><a href="../docs/records.html">Records & methods</a></li><li><a href="../docs/errors.html">Error handling</a></li><li><a href="../docs/modules.html">Projects & imports</a></li><li><a href="../docs/cli.html">Command line</a></li></ul></div><div class="Footer-col"><h2 class="Footer-colTitle">Project</h2><ul class="Footer-list"><li><a href="https://github.com/jojin1709/jin">GitHub</a></li><li><a href="https://github.com/jojin1709/jin/tree/main">Source code</a></li><li><a href="https://github.com/jojin1709/jin/tree/main/examples">Examples</a></li><li><a href="https://github.com/jojin1709/jin/issues">Issues</a></li></ul></div></div>
+    </div>
+    <div class="Container">
+      <div class="Footer-bottom">
+        <p class="Footer-copy">
+          Jin is free and open source, released under the
+          <a href="https://github.com/jojin1709/jin/blob/main/LICENSE">MIT licence</a>.
+          Written from scratch in Go by
+          <a href="https://github.com/jojin1709">JOJIN JOHN</a>.
+        </p>
+        <ul class="Footer-bottomList">
+          <li><a href="https://github.com/jojin1709/jin">Source on GitHub</a></li>
+          <li><a href="https://github.com/jojin1709/jin/issues">Report an issue</a></li>
+          <li class="Footer-version">Version 0.10.0</li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+
+<script src="../assets/js/site.js" defer></script>
+
+</body>
+</html>

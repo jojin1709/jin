@@ -1,0 +1,525 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Command Line</p>
+  <h1>Command Line</h1>
+  <p class="DocHeader-lede">Every <code>jin</code> subcommand: what it does, what it prints, and what it returns to the shell.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+    <section class="DocSection" id="overview">
+      <h2>The commands at a glance</h2>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Command</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>jin &lt;file.jin&gt; [args]</code></td><td>Compile and run a program on the bytecode VM. The short form of <code>jin run</code>.</td></tr>
+            <tr><td><code>jin run [file|folder] [args]</code></td><td>Run a program, or a whole project, on the bytecode VM.</td></tr>
+            <tr><td><code>jin interpret [file|folder] [args]</code></td><td>Run the same program on the tree-walking reference interpreter.</td></tr>
+            <tr><td><code>jin check [file|folder]</code></td><td>Type-check without running anything.</td></tr>
+            <tr><td><code>jin build [folder]</code></td><td>Check and compile a whole project, and report what came out.</td></tr>
+            <tr><td><code>jin new &lt;name&gt;</code></td><td>Start a project in <code>&lt;name&gt;/</code>.</td></tr>
+            <tr><td><code>jin compile &lt;file&gt;</code></td><td>Print the bytecode instead of running it.</td></tr>
+            <tr><td><code>jin parse &lt;file&gt;</code></td><td>Print the syntax tree instead of running it.</td></tr>
+            <tr><td><code>jin tokens &lt;file&gt;</code></td><td>Print the raw token stream.</td></tr>
+            <tr><td><code>jin</code></td><td>Run the project you are in, or start the REPL.</td></tr>
+            <tr><td><code>jin --version</code></td><td>Print the version.</td></tr>
+            <tr><td><code>jin --help</code></td><td>Print the usage text.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Every pipeline stage is available on its own, so you can watch a program being translated one layer at a time: source text, tokens, syntax tree, checked program, bytecode, result.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>-v</code> and <code>version</code> both print the version, and <code>-h</code> and <code>help</code> both print the usage text. A file named <code>help</code> or <code>version</code> in the current folder would be shadowed by those words, so give it a path such as <code>jin ./version</code>.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="run">
+      <h2><code>run</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin run [file|folder] [args]
+jin &lt;file.jin&gt; [args]</code></pre>
+
+      <p><code>run</code> type-checks the program, compiles it to bytecode, and executes it on the stack virtual machine. The bare <code>jin &lt;file.jin&gt;</code> form does exactly the same thing.</p>
+
+      <p>Given <code>hello.jin</code>:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let who = args()
+if len(who) == 0 {
+    print("hello, world")
+} else {
+    print("hello, {who[0]}")
+}</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin hello.jin
+hello, world
+$ jin hello.jin Ada
+hello, Ada
+$ jin run hello.jin Ada
+hello, Ada</code></pre>
+
+      <p>A program with a type error never starts. <code>run</code> checks first, reports every problem at once, and stops.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin run badtypes.jin
+jin: badtypes.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected
+$ echo $?
+1</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> A file that does not exist is reported as exactly that:</p>
+      </aside>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin missing.jin
+jin: there is no missing.jin
+$ echo $?
+1</code></pre>
+    </section>
+
+    <section class="DocSection" id="arguments">
+      <h2>Program arguments</h2>
+
+      <p>Anything after the file name is handed to the program, where <code>args()</code> returns it as an array of strings. Jin itself has no options, so there is nothing for the arguments to be confused with.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin hello.jin Ada Bo
+hello, Ada</code></pre>
+
+      <p>A <code>--</code> before the arguments is allowed and ignored. It is there for the case where an argument looks like something Jin might want, so that <code>--help</code> reaches the program rather than Jin:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin run hello.jin -- --help
+hello, --help</code></pre>
+
+      <p>The separator is optional once the target has been named, and it is the only way to pass arguments when there is no target — because then the first word would otherwise be taken for a file name.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ cd hello
+$ jin -- Jin
+Hello, Jin!</code></pre>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> The first word after the command is the target, not an argument. In a project folder, <code>jin run Jin</code> looks for a file called <code>Jin</code> and says <code>jin: there is no Jin</code>. Write <code>jin run -- Jin</code> instead.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="interpret">
+      <h2><code>interpret</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin interpret [file|folder] [args]</code></pre>
+
+      <p><code>interpret</code> runs the program on the tree-walking reference interpreter instead of the bytecode VM. It takes the same file, the same folder and the same arguments, and it prints the same thing.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin interpret hello.jin Ada
+hello, Ada
+$ echo $?
+0</code></pre>
+
+      <p>The interpreter is slower — roughly seven to eight times slower on a call-heavy program — but it exists so that the two back ends can be checked against each other. The test suite runs every program in the differential corpus on both of them and requires byte-identical output, error text included.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>interpret</code> type-checks the program first, exactly as <code>run</code> does. A type error stops it just the same.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="check">
+      <h2><code>check</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin check [file|folder]</code></pre>
+
+      <p><code>check</code> type-checks a program without running it. Nothing is printed by your program, no file is touched, and no side effect happens.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check hello.jin
+hello.jin: no type errors
+$ echo $?
+0</code></pre>
+
+      <p>Every problem is reported at once, each with the line and column it came from:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check badtypes.jin
+jin: badtypes.jin has type errors:
+  8:11: argument 2: cannot use str where int is expected
+$ echo $?
+1</code></pre>
+
+      <p>Given a folder that is a project, <code>check</code> type-checks every file the project reaches and says how many there were:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check hello
+hello 0.1.0: no type errors in 2 file(s)</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>check</code> also catches syntax errors, and reports them the same way <code>run</code> does.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="build">
+      <h2><code>build</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin build [folder]</code></pre>
+
+      <p><code>build</code> checks a whole project and compiles it, then reports what came out. Jin runs from source, so there is no binary to write and no artefact to keep in step with the code — a build here proves the project compiles and tells you how big it is.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin build hello
+jin build: hello 0.1.0
+  entry: main.jin
+  files: main.jin, greeting.jin
+  code:  68 bytes of bytecode, 6 constants, 0 locals
+  ok
+$ echo $?
+0</code></pre>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> A folder is only a project when it holds a <code>jin.toml</code>. Pointing <code>build</code> at a folder without one is refused:</p>
+      </aside>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin build notes
+jin: notes is a folder, but it has no jin.toml, so it is not a project
+$ echo $?
+1</code></pre>
+    </section>
+
+    <section class="DocSection" id="new">
+      <h2><code>new</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin new &lt;name&gt;</code></pre>
+
+      <p><code>new</code> writes a starting project into a new folder called <code>&lt;name&gt;</code>.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin new hello
+created hello/
+  jin.toml
+  main.jin
+  greeting.jin
+
+next: cd hello &amp;&amp; jin run</code></pre>
+
+      <p>The name has to be usable as a folder name: letters, digits, <code>-</code> and <code>_</code>. A name that already exists is refused, rather than being written over.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin new "bad name"
+jin: "bad name" is not a project name; use letters, digits, - and _
+$ jin new hello
+jin: hello already exists</code></pre>
+
+      <h3>The manifest</h3>
+
+      <p>The project is described by a <code>jin.toml</code> in its folder. Three settings, and that is all of it:</p>
+
+      <pre class="Code" data-lang="toml"><code class="lang-text"># Settings for this Jin project.
+name = "hello"
+version = "0.1.0"
+entry = "main.jin"</code></pre>
+
+      <ul class="Bullets">
+        <li><code>name</code> — the project's name, used in messages such as <code>hello 0.1.0</code>. It defaults to the folder's name.</li>
+        <li><code>version</code> — the project's version, used in the same messages. It defaults to <code>0.1.0</code>.</li>
+        <li><code>entry</code> — the file to run. It defaults to <code>main.jin</code>, and it has to be a <code>.jin</code> file inside the project folder.</li>
+      </ul>
+
+      <p>Lines beginning with <code>#</code> are comments, and blank lines are ignored. An unknown setting is an error, so a typo in the manifest is reported rather than ignored.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>jin new</code> writes two files besides the manifest: <code>main.jin</code>, which imports <code>greeting.jin</code> and prints a greeting, and <code>greeting.jin</code>, which holds the <code>hello</code> function. See <a href="modules.html">Projects and Imports</a> for how the two are put together.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="projects">
+      <h2>Projects</h2>
+
+      <p>A folder holding a <code>jin.toml</code> is a project. <code>run</code>, <code>interpret</code>, <code>check</code> and <code>build</code> all accept a folder as their target, and they load the entry file together with everything that file imports.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin run hello
+Hello, world!
+$ jin run hello Ada
+Hello, Ada!
+$ jin interpret hello Ada
+Hello, Ada!</code></pre>
+
+      <p>The commands also work from any folder <em>inside</em> a project, the way a build tool does. Jin walks up from the current folder looking for a <code>jin.toml</code> and uses the first one it finds.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ cd hello
+$ jin run
+Hello, world!
+$ cd lib
+$ jin run
+Hello, world!
+$ jin check
+hello 0.1.0: no type errors in 2 file(s)</code></pre>
+
+      <p>Outside a project, the same commands want a file:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin check
+jin: no jin.toml here; name a file, or start one with 'jin new'
+$ echo $?
+1</code></pre>
+    </section>
+
+    <section class="DocSection" id="compile">
+      <h2><code>compile</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin compile &lt;file&gt;</code></pre>
+
+      <p><code>compile</code> type-checks the file, compiles it, and prints the bytecode instead of running it. The constants come first, then the instructions.</p>
+
+      <p>Given <code>small.jin</code>:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let total = 0
+for i in range(4) {
+    total = total + i
+}
+print(total)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>== constants ==
+0000 0
+0001 4
+0002 0
+0003 1
+== &lt;script&gt; (locals: 3) ==
+0000 OpConstant 0
+0003 OpDup
+0004 OpSetGlobal 0
+0007 OpPopStatement
+0008 OpGetBuiltin 7
+0010 OpConstant 1
+0013 OpCall 1
+0015 OpIterate
+0016 OpSetLocal 0
+0018 OpConstant 2
+0021 OpSetLocal 1
+0023 OpCloseUpvalues 2
+0026 OpGetLocal 1
+0028 OpGetLocal 0
+0030 OpLen
+0031 OpLess
+0032 OpJumpNotTruthy 65
+0035 OpPop
+0036 OpGetLocal 0
+0038 OpGetLocal 1
+0040 OpIndex
+0041 OpSetLocal 2
+0043 OpGetGlobal 0
+0046 OpGetLocal 2
+0048 OpAdd
+0049 OpDup
+0050 OpSetGlobal 0
+0053 OpPop
+0054 OpGetLocal 1
+0056 OpConstant 3
+0059 OpAdd
+0060 OpSetLocal 1
+0062 OpJump 23
+0065 OpPop
+0066 OpNil
+0067 OpPopStatement
+0068 OpGetBuiltin 0
+0070 OpGetGlobal 0
+0073 OpCall 1
+0075 OpPopStatement
+0076 OpNil
+0077 OpReturnValue</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>OpGetBuiltin 7</code> is <code>range</code> and <code>OpGetBuiltin 0</code> is <code>print</code>: the built-ins are numbered in one fixed order that the compiler and the VM share.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="parse">
+      <h2><code>parse</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin parse &lt;file&gt;</code></pre>
+
+      <p><code>parse</code> prints the syntax tree and stops. Nothing is type-checked and nothing runs.</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin parse small.jin
+Program
+  Let total =
+    Int 0
+  For i in
+    Call
+      Ident range
+      Int 4
+    Block
+      Expr
+        Assign
+          Ident total
+          Infix +
+            Ident total
+            Ident i
+  Expr
+    Call
+      Ident print
+      Ident total</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> A file that does not parse is reported and the command stops:</p>
+      </aside>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin parse broken.jin
+jin: broken.jin has syntax errors:
+  2:1: expected a receiver name, got EOF
+$ echo $?
+1</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>parse</code> lists each syntax error on its own line, because it can find several in one pass. The commands that go through the module loader — <code>run</code>, <code>check</code>, <code>build</code> — put the first one on a single line instead.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="tokens">
+      <h2><code>tokens</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin tokens &lt;file&gt;</code></pre>
+
+      <p><code>tokens</code> prints the raw token stream: the lexer on its own, with the line and column of every token. Strings are shown in quotes.</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin tokens small.jin
+1:1     let      let
+1:5     IDENT    total
+1:11    =        =
+1:13    INT      0
+2:1     for      for
+2:5     IDENT    i
+2:7     in       in
+2:10    IDENT    range
+2:15    (        (
+2:16    INT      4
+2:17    )        )
+2:19    {        {
+3:5     IDENT    total
+3:11    =        =
+3:13    IDENT    total
+3:19    +        +
+3:21    IDENT    i
+4:1     }        }
+5:1     IDENT    print
+5:6     (        (
+5:7     IDENT    total
+5:12    )        )
+6:1     EOF</code></pre>
+
+      <p>Every line is the line and column, the kind of token, and the token's own text. A string is shown in quotes, so you can see exactly what the lexer made of it.</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin tokens tok.jin
+1:1     IDENT    print
+1:6     (        (
+1:7     STRING   "hi"
+1:11    )        )
+1:12    EOF</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> <code>tokens</code> and <code>parse</code> need a file. A folder is not accepted, because there is no single file to read.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="bare">
+      <h2>Bare <code>jin</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin</code></pre>
+
+      <p>With no arguments at all, Jin does one of two things, depending on where you are.</p>
+
+      <p><strong>Inside a project</strong>, it runs that project's entry file:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ cd hello
+$ jin
+Hello, world!
+$ echo $?
+0</code></pre>
+
+      <p><strong>Anywhere else</strong>, it starts the REPL. The prompt is <code>jin&gt;</code>, state carries from one line to the next, and a half-typed block is held until it parses, so a function can be typed over several lines.</p>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin
+Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)
+Type Jin code and press Enter. 'exit' or Ctrl+D quits.
+'clear' discards a half-typed block.
+jin&gt; 5
+jin&gt; 10
+jin&gt; </code></pre>
+
+      <p>The three lines typed were <code>let x = 5</code>, <code>print(x * 2)</code> and <code>exit</code>. The REPL shows the value of a declaration, so <code>5</code> appears after the first prompt; the <code>10</code> is the program's own output, written after the second prompt.</p>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> A type error in the REPL is shown and the prompt carries on, so one bad line does not end the session. <code>exit</code> or Ctrl+D quits, and <code>clear</code> throws away a half-typed block.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="version-help">
+      <h2><code>--version</code> and <code>--help</code></h2>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin --version
+jin -v
+jin version</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin --version
+Jin 0.10.0 (stage 10: input, functional built-ins, multi-line strings, named records)
+$ echo $?
+0</code></pre>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">jin --help
+jin -h
+jin help</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>$ jin --help
+Jin - a small fast language
+
+Usage:
+  jin                       run the project here, or start the REPL
+  jin &lt;file.jin&gt; [args]     run a program
+  jin run [file|folder] [args]
+                            run a program or a project
+  jin check [file|folder]   type-check without running
+  jin build [folder]        check and compile a whole project
+  jin compile &lt;file&gt;        print the bytecode instead of running
+  jin interpret &lt;file&gt;      run with the tree-walking interpreter
+  jin parse &lt;file&gt;          print the syntax tree instead of running
+  jin tokens &lt;file&gt;         print the raw token stream
+  jin new &lt;name&gt;            start a project in &lt;name&gt;/
+  jin --version             print the version
+
+A folder is a project when it holds a jin.toml. Anything after the file name is
+passed to the program, where args() returns it:
+
+  jin greet.jin hello world</code></pre>
+    </section>
+
+    <section class="DocSection" id="exit-codes">
+      <h2>Exit codes</h2>
+
+      <p>There are two, and nothing else.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Code</th><th>When</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>0</code></td><td>The command did what it was asked to.</td></tr>
+            <tr><td><code>1</code></td><td>Something went wrong: a type error, a syntax error, a runtime error, a file that is not there, a folder that is not a project, or a project name that cannot be used.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Problems are written to standard error and the message starts with <code>jin:</code>, so a script can tell them apart from your program's own output.</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">$ jin hello.jin Ada
+hello, Ada
+$ echo $?
+0
+$ jin missing.jin
+jin: there is no missing.jin
+$ echo $?
+1</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> An uncaught runtime error stops the program with exit code 1 as well. A caught one does not: the program carries on and finishes normally.</p>
+      </aside>
+    </section>
+
+    <a class="NextLink" href="modules.html">
+      <span>Next</span>
+      <strong>Projects and Imports &rarr;</strong>
+    </a>
+
+  </div>
+</div>

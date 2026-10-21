@@ -1,0 +1,591 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="index.html">Docs</a> / Language Tour</p>
+  <h1>Language Tour</h1>
+  <p class="DocHeader-lede">Every construct in Jin, with a short runnable example for each one: values, control flow, functions, closures, strings, arrays, maps, records, errors and imports.</p>
+</div>
+
+<div class="DocLayout">
+  <div class="DocMain">
+
+    <section class="DocSection" id="values">
+      <h2>Values and types</h2>
+      <p>Jin's values come from a small set of kinds. <code>type()</code> tells you which one you are holding.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Kind</th><th>Written as</th><th>What it holds</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>int</code></td><td><code>42</code></td><td>A whole number.</td></tr>
+            <tr><td><code>float</code></td><td><code>4.5</code></td><td>A decimal number.</td></tr>
+            <tr><td><code>str</code></td><td><code>"text"</code></td><td>Text.</td></tr>
+            <tr><td><code>bool</code></td><td><code>true</code>, <code>false</code></td><td>True or false. Nothing else is a condition.</td></tr>
+            <tr><td><code>nil</code></td><td><code>nil</code></td><td>The absence of a value.</td></tr>
+            <tr><td><code>array</code></td><td><code>[1, 2, 3]</code></td><td>An ordered list of values.</td></tr>
+            <tr><td><code>map</code></td><td><code>{"a": 1}</code></td><td>Key and value pairs, in the order they were added.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(type(1), type(1.5), type("hi"), type(true), type(nil))
+print(type([1, 2]), type({"a": 1}))
+print(1, 2.5, "text", true, false, nil)
+print(7 / 2, 7 % 2, 2 * 3 + 1)
+print(int(3.9), float(3), str(42))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>int float str bool nil
+array map
+1 2.5 text true false nil
+3 1 7
+3 3 42</code></pre>
+
+      <p>An <code>int</code> and a <code>float</code> never mix. <code>1 + 2.5</code> is refused before the program starts, and <code>float()</code> and <code>int()</code> convert between them.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(float(1) + float(2))
+print(float(3) / 2.0)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>3
+1.5</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> A float prints without a trailing <code>.0</code>, so <code>print(1.0)</code> writes <code>1</code>.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="let">
+      <h2><code>let</code> and assignment</h2>
+      <p><code>let</code> declares a name. A plain <code>=</code> gives an existing name a new value. Assigning to a name that was never declared is an error, so a typo cannot quietly create a new variable.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 5
+let name = "Jin"
+x = x + 1
+print(x)
+
+let a = 1; let b = 2
+print(a, b)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>6
+1 2</code></pre>
+
+      <p>A <code>;</code> separates statements. It is optional, and Jin does not care about indentation.</p>
+    </section>
+
+    <section class="DocSection" id="comments">
+      <h2>Comments</h2>
+      <p>A <code>#</code> starts a comment, and it runs to the end of the line. There are no block comments.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># this whole line is a comment
+let x = 5  # and so is everything after the hash here
+print(x)   # 5</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>5</code></pre>
+    </section>
+
+    <section class="DocSection" id="operators">
+      <h2>Operators and precedence</h2>
+      <p>Jin's operators are the familiar ones. What is unusual is that <code>==</code> is the only equality test, and that there is no truthiness: a condition has to be a <code>bool</code>.</p>
+
+      <div class="TableWrap">
+        <table class="Table">
+          <thead>
+            <tr><th>Operators</th><th>What they do</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>+ - * / %</code></td><td>Arithmetic. <code>/</code> on two ints gives an int.</td></tr>
+            <tr><td><code>== !=</code></td><td>Equality.</td></tr>
+            <tr><td><code>&lt; &gt; &lt;= &gt;=</code></td><td>Ordering, for numbers and for strings.</td></tr>
+            <tr><td><code>&amp;&amp;</code> <code>||</code></td><td>And, or. Both short-circuit.</td></tr>
+            <tr><td><code>!</code></td><td>Not. The operand has to be a <code>bool</code>.</td></tr>
+            <tr><td><code>-</code> (in front)</td><td>Negation of a number.</td></tr>
+            <tr><td><code>=</code></td><td>Assignment.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>From loosest to tightest, the order is:</p>
+
+      <ol class="Steps">
+        <li><code>=</code></li>
+        <li><code>||</code></li>
+        <li><code>&amp;&amp;</code></li>
+        <li><code>==</code> <code>!=</code></li>
+        <li><code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code></li>
+        <li><code>+</code> <code>-</code></li>
+        <li><code>*</code> <code>/</code> <code>%</code></li>
+        <li><code>!</code> and a leading <code>-</code></li>
+        <li>a call <code>f()</code>, an index <code>a[i]</code> or a field <code>a.b</code></li>
+      </ol>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">print(2 + 3 * 4)
+print((2 + 3) * 4)
+print(10 - 2 - 3)
+print(2 * 3 % 4)
+print(1 + 2 &lt; 4 &amp;&amp; 3 != 4)
+print(!true)
+print(-5)
+print(1 == 1, 1 != 1, 2 &gt;= 2, 2 &lt;= 1)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>14
+20
+5
+2
+true
+false
+-5
+true false true false</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> There is no <code>**</code> operator. Use <code>pow()</code>.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="conditionals">
+      <h2><code>if</code>, <code>else if</code> and <code>else</code></h2>
+      <p>A condition does not need parentheses. The braces after it are the block that runs.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 6
+if x &gt; 5 {
+    print("big")
+} else if x == 5 {
+    print("five")
+} else {
+    print("small")
+}
+
+if x &gt; 10 { print("huge") }</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>big</code></pre>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> The condition has to be a <code>bool</code>. <code>if x { }</code> with an <code>int</code> <code>x</code> is an error, not a truthy test.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="while">
+      <h2><code>while</code>, <code>break</code> and <code>continue</code></h2>
+      <p>A <code>while</code> loop runs for as long as its condition is <code>true</code>. <code>break</code> leaves the nearest loop; <code>continue</code> goes to the next turn of it.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let x = 5
+let count = 0
+while x &gt; 0 {
+    x = x - 1
+    count = count + 1
+    if x == 2 { break }
+}
+print(x, count)
+
+let i = 0
+while i &lt; 10 {
+    i = i + 1
+    if i % 2 == 0 { continue }
+    print(i)
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>2 3
+1
+3
+5
+7
+9</code></pre>
+    </section>
+
+    <section class="DocSection" id="for">
+      <h2><code>for</code> loops</h2>
+      <p>A <code>for</code> loop walks over an array, a string or a range.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">for n in [1, 2, 3] {
+    print(n)
+}
+
+for ch in "abc" {
+    print(ch)
+}
+
+for i in range(3) {
+    print(i)
+}
+
+for i in range(2, 5) {
+    print(i)
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>1
+2
+3
+a
+b
+c
+0
+1
+2
+2
+3
+4</code></pre>
+
+      <p>A map loops over its keys. A string loops over its characters, one character at a time.</p>
+    </section>
+
+    <section class="DocSection" id="functions">
+      <h2>Functions</h2>
+      <p><code>fn</code> declares a function. Parameters are written by name, and may carry an optional type. A function ends with <code>return</code>, or returns its last expression if it has no <code>return</code> at all.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn add(a, b) { return a + b }
+fn square(x) { x * x }
+
+fn labelled(label: str, value: int) -&gt; str {
+    return "{label}: {value}"
+}
+
+print(add(2, 3))
+print(square(4))
+print(labelled("answer", add(2, 3)))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>5
+16
+answer: 5</code></pre>
+
+      <p>The implicit return is the last expression of the body:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn greet(name: str) -&gt; str {
+    "hello, {name}"
+}
+print(greet("Jin"))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>hello, Jin</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> Functions are called in any order. A function may call one that is written further down the file.</p>
+      </aside>
+    </section>
+
+    <section class="DocSection" id="anonymous-functions">
+      <h2>Anonymous functions</h2>
+      <p>A function does not have to have a name. <code>fn(...)</code> is a value, and it can be stored, passed and returned.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let double = fn(v) { return v * 2 }
+print(double(21))
+
+let nums = [1, 2, 3]
+let doubled = map(nums, fn(n) { return n * 2 })
+print(doubled)
+
+let apply = fn(f, v) { return f(v) }
+print(apply(double, 5))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>42
+[2, 4, 6]
+10</code></pre>
+    </section>
+
+    <section class="DocSection" id="closures">
+      <h2>Closures</h2>
+      <p>A function written inside another function may use the variables around it, and it keeps them after the call that created it has finished.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn counter() {
+    let n = 0
+    return fn() {
+        n = n + 1
+        return n
+    }
+}
+let next = counter()
+print(next(), next(), next())</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>1 2 3</code></pre>
+
+      <h3>A capture is the variable, not a copy</h3>
+      <p>Two functions made in the same scope see each other's writes to the variable they share.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn running_total() {
+    let total = 0
+    let add = fn(n) { total = total + n }
+    let show = fn() { return total }
+    return [add, show]
+}
+
+let pair = running_total()
+pair[0](10)
+pair[0](5)
+print(pair[1]())</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>15</code></pre>
+
+      <h3>Each pass of a loop gets a fresh binding</h3>
+      <p>The loop variable is rebound on every turn, so a function made in the body keeps the value that turn had, not the value the loop ended on.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let printers = []
+for word in ["one", "two", "three"] {
+    printers = push(printers, fn() { return word })
+}
+for p in printers { print(p()) }</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>one
+two
+three</code></pre>
+
+      <h3>Mutual recursion</h3>
+      <p>Two functions written in the same body may call each other in either order, because both names are known before either body is compiled.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">fn classify(n) {
+    fn even(n) { if n == 0 { return true } return odd(n - 1) }
+    fn odd(n) { if n == 0 { return false } return even(n - 1) }
+    if even(n) { return "even" }
+    return "odd"
+}
+print(classify(4), classify(7))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>even odd</code></pre>
+    </section>
+
+    <section class="DocSection" id="strings">
+      <h2>Strings and interpolation</h2>
+      <p>Text goes in double quotes. Inside a string, <code>{expr}</code> is replaced by the value of the expression. Write <code>{{</code> and <code>}}</code> when you want braces themselves.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let name = "Jin"
+let n = 3
+
+print("name is {name}, n is {n}")
+print("use {{braces}} for literal braces")
+print("sum is {1 + 2}")
+print("nested braces: { [1, 2][0] }")</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>name is Jin, n is 3
+use {braces} for literal braces
+sum is 3
+nested braces: 1</code></pre>
+
+      <aside class="Callout Callout--note">
+        <p><strong>Note.</strong> The expression inside <code>{ }</code> may not contain a double quote of its own in a single-quoted string. Use a multi-line string when you need one; see below.</p>
+      </aside>
+
+      <p>Strings can be compared and added, and the string helpers are listed in <a href="builtins.html">Built-ins</a>.</p>
+    </section>
+
+    <section class="DocSection" id="multi-line-strings">
+      <h2>Multi-line strings</h2>
+      <p>Three double quotes open and close a string that may run over several lines. The newline straight after the opening quotes is dropped, and the text keeps its own newlines. Interpolation works inside it.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let name = "Jin"
+
+let banner = """
+Welcome to Jin!
+Name: {name}
+"""
+
+print(banner)
+print(len(banner))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Welcome to Jin!
+Name: Jin
+
+26</code></pre>
+    </section>
+
+    <section class="DocSection" id="arrays">
+      <h2>Arrays</h2>
+      <p>An array is written with square brackets. The helpers all return a new array and leave the original alone, so you assign the result back.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let xs = [3, 1, 2]
+
+print(len(xs))
+print(push(xs, 9))
+print(xs)
+print(sort(xs))
+print(reverse(xs))
+print(slice(xs, 0, 2))
+print(contains(xs, 2))
+print(join(xs, "-"))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>3
+[3, 1, 2, 9]
+[3, 1, 2]
+[1, 2, 3]
+[2, 1, 3]
+[3, 1]
+true
+3-1-2</code></pre>
+
+      <p>To add to an array, assign the result of <code>push</code> back to it:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let items = []
+for w in ["pear", "apple"] {
+    items = push(items, w)
+}
+print(items)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>["pear", "apple"]</code></pre>
+
+      <aside class="Callout Callout--error">
+        <p><strong>Error.</strong> An index past the end of an array is an error, not a quiet <code>nil</code>: <code>xs[9]</code> stops the program with <code>index 9 out of range (length 3)</code>.</p>
+      </aside>
+
+      <p>The higher-order helpers work on arrays too: <code>map</code>, <code>filter</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>sort_by</code> and <code>find_index</code>.</p>
+    </section>
+
+    <section class="DocSection" id="maps">
+      <h2>Maps</h2>
+      <p>A map holds key and value pairs. Keys are an <code>int</code>, a <code>str</code> or a <code>bool</code>, and the entries keep the order they were added in.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let server = {"host": "local", "port": 8080, "up": true}
+print(server["host"], server["port"])
+print(len(server))
+print(keys(server))
+print(values(server))
+print(has(server, "up"))
+
+server["port"] = 9090
+server["tags"] = ["a", "b"]
+delete(server, "up")
+print(server)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>local 8080
+3
+["host", "port", "up"]
+["local", 8080, true]
+true
+{"host": "local", "port": 9090, "tags": ["a", "b"]}</code></pre>
+
+      <p>A map grows and shrinks in place: <code>m[k] = v</code> sets a key, and <code>delete(m, k)</code> removes one.</p>
+
+      <h3>A missing key is an error</h3>
+      <p>Reading a key that is not there stops the program. It does not quietly give you <code>nil</code>. Ask first with <code>has</code>, or give a fallback with <code>get</code>.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let server = {"host": "local"}
+print(has(server, "nope"))
+print(get(server, "nope", "default"))</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>false
+default</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let server = {"host": "local"}
+print(server["nope"])</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>2:13: key "nope" is not in the map</code></pre>
+
+      <p>A map also loops over its keys, and a counter map is a common use:</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">let counts = {}
+for w in ["pear", "apple", "pear"] {
+    counts[w] = get(counts, w, 0) + 1
+}
+print(counts)
+for w in counts { print(w, counts[w]) }</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>{"pear": 2, "apple": 1}
+pear 2
+apple 1</code></pre>
+    </section>
+
+    <section class="DocSection" id="records">
+      <h2>Records in brief</h2>
+      <p>A record is a type of your own with named fields. <code>struct</code> declares it, the name constructs one, and a method is declared with a receiver in front of the name.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">struct Point { x: int, y: int }
+
+fn (p: Point) shift(dx: int, dy: int) -&gt; Point {
+    p.x = p.x + dx
+    p.y = p.y + dy
+    return p
+}
+
+let p = Point{y: 20, x: 10}
+print(p)
+print(p.x, p.y)
+p.shift(5, -10)
+print(p)
+print(type(p))
+
+let q = Point(1, 2)
+print(q)</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>Point{x: 10, y: 20}
+10 20
+Point{x: 15, y: 10}
+Point
+Point{x: 1, y: 2}</code></pre>
+
+      <aside class="Callout Callout--warning">
+        <p><strong>Careful.</strong> A struct literal in a condition has to be wrapped in parentheses, so the block brace is not mistaken for it: <code>if (p == Point{x: 1, y: 2}) { ... }</code>.</p>
+      </aside>
+
+      <p>Records, methods and bound methods are covered in <a href="records.html">Records and Methods</a>.</p>
+    </section>
+
+    <section class="DocSection" id="errors">
+      <h2>Errors in brief</h2>
+      <p><code>try</code> runs a block and <code>catch</code> handles whatever stops it. The catch variable holds the error message as a string.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin">try {
+    let x = 1 / 0
+} catch e {
+    print("caught: {e}")
+}
+
+try {
+    error("something went wrong")
+} catch e {
+    print("caught: {e}")
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>caught: 2:15: division by zero
+caught: 8:10: something went wrong</code></pre>
+
+      <p><code>error("...")</code> raises an error of your own. Everything that can stop a running program can be caught: a failed file operation, an index past the end of an array, a missing map key, division by zero, or a call to <code>error()</code>.</p>
+
+      <p>Error handling is covered in <a href="errors.html">Error Handling</a>.</p>
+    </section>
+
+    <section class="DocSection" id="imports">
+      <h2>Imports in brief</h2>
+      <p>A program can be split across files. An import names another file and gives it an alias, and the other file's top-level names are reached through that alias.</p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># main.jin
+import "utils" as u
+
+print(u.double(21))
+print(u.name)</code></pre>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># utils.jin
+let name = "utils"
+
+fn double(n: int) -&gt; int {
+    return n * 2
+}</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>42
+utils</code></pre>
+
+      <p>The alias is required, and another file's names cannot be changed from outside it. Projects and imports are covered in <a href="modules.html">Projects and Imports</a>.</p>
+    </section>
+
+    <section class="DocSection" id="running">
+      <h2>Running the examples</h2>
+      <p>Every example on this page is a whole program. Put one in a file and run it:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">go build -o jin.exe .
+./jin.exe myprogram.jin</code></pre>
+
+      <p>The program that ships with Jin puts the same ideas together:</p>
+
+      <pre class="Code" data-lang="shell"><code class="lang-shell">./jin.exe examples/tour.jin</code></pre>
+
+      <pre class="Code Code--out" data-lang="output"><code>1 squared is 1
+2 squared is 4
+3 squared is 9
+4 squared is 16
+5 squared is 25
+2 + 3 = 5
+THE QUICK BROWN FOX
+fib: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34</code></pre>
+
+      <p>A program with a type error never starts. <code>jin check</code> reports the problems without running anything.</p>
+    </section>
+
+    <a class="NextLink" href="types.html">
+      <span>Next</span>
+      <strong>Type system &rarr;</strong>
+    </a>
+
+  </div>
+</div>

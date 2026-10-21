@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<meta property="og:title" content="{{TITLE}}">
+<meta property="og:description" content="{{DESCRIPTION}}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{SITE_URL}}/{{PAGE_PATH}}">
+<meta property="og:image" content="{{SITE_URL}}/assets/img/banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="{{SITE_URL}}/{{PAGE_PATH}}">
+<link rel="icon" href="{{ASSETS}}/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{ASSETS}}/img/icon.png">
+<link rel="stylesheet" href="{{ASSETS}}/css/site.css">
+{{EXTRA_HEAD}}
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var stored = localStorage.getItem("jin-theme") || "auto";
+      var dark = stored === "dark" ||
+        (stored === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) { /* private mode: light is fine */ }
+  })();
+</script>
+</head>
+<body class="Page{{EXTRA_CLASS}}">
+<a class="SkipLink" href="#main-content">Skip to main content</a>
+
+{{NAVBAR}}
+
+<main id="main-content" class="Main">
+{{BODY}}
+</main>
+
+{{FOOTER}}
+
+<script src="{{ASSETS}}/js/site.js" defer></script>
+{{EXTRA_SCRIPT}}
+</body>
+</html>

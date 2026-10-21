@@ -1,0 +1,124 @@
+<div class="DocHeader">
+  <p class="DocHeader-crumb"><a href="{{HOME}}">Home</a> / Documentation</p>
+  <h1>Documentation</h1>
+  <p class="DocHeader-lede">
+    Jin is an open-source project, written from scratch, to make programmers
+    more productive. It is expressive, small, statically checked and fast.
+    This is the whole of it, written down.
+  </p>
+</div>
+
+<div class="DocLayout DocLayout--plain">
+  <div class="DocMain">
+    <div class="Masonry">
+
+      <section class="BigCard">
+        <h2>Getting started</h2>
+        <h3><a href="tutorial.html">Installing Jin</a></h3>
+        <p>Go 1.21 is the only requirement. Build the binary and run your first program.</p>
+
+        <h3><a href="tutorial.html#first-program">Your first program</a></h3>
+        <p>Hello, world, then variables, a function, a loop and a map &mdash; built up one step at a time.</p>
+
+        <h3><a href="tutorial.html#reading-errors">Reading the errors</a></h3>
+        <p>What a Jin error message looks like, and what each part of it is telling you.</p>
+
+        <h3><a href="tutorial.html#the-repl">The REPL</a></h3>
+        <p>Try a line at a time, with state that survives between lines.</p>
+      </section>
+
+      <section class="BigCard">
+        <h2>Using and understanding Jin</h2>
+        <h3><a href="tour.html">Language tour</a></h3>
+        <p>Every construct in the language, in one page, with a runnable example next to each one.</p>
+
+        <h3><a href="types.html">The type system</a></h3>
+        <p>Annotations are optional, and when you write one it is enforced before the program starts.</p>
+
+        <h3><a href="records.html">Records and methods</a></h3>
+        <p>User-defined types with fields, constructors, receiver methods and bound methods.</p>
+
+        <h3><a href="errors.html">Error handling</a></h3>
+        <p><code>try</code> and <code>catch</code>, raising your own errors, and re-raising them outward.</p>
+
+        <h3><a href="modules.html">Projects and imports</a></h3>
+        <p>Splitting a program across files, importing them under an alias, and building a project.</p>
+      </section>
+
+      <section class="BigCard">
+        <h2>References</h2>
+        <h3><a href="builtins.html">Built-ins</a></h3>
+        <p>Every function in the standard library: what it takes, what it returns, and the traps around it.</p>
+
+        <h3><a href="cli.html">Command line</a></h3>
+        <p>Every <code>jin</code> subcommand, with a real terminal transcript for each one.</p>
+
+        <h3><a href="architecture.html">Architecture</a></h3>
+        <p>The pipeline from source text to running bytecode, and the file-by-file map of the implementation.</p>
+
+        <h3><a href="roadmap.html">Status and roadmap</a></h3>
+        <p>What Jin can do today, what it cannot do yet, and what comes after stage 10.</p>
+      </section>
+
+      <section class="BigCard">
+        <h2>Language rules</h2>
+        <h3><a href="roadmap.html#design-rules">The nine design rules</a></h3>
+        <p>
+          Braces, not invisible whitespace. One obvious way to do things. No
+          silent type mixing. Conditions must be <code>bool</code>. No
+          accidental globals. A missing key is an error. A captured variable is
+          shared, not copied. Fast by default. A file&rsquo;s names belong to
+          that file.
+        </p>
+
+        <h3><a href="roadmap.html#what-is-in">What is in, and what is not</a></h3>
+        <p>An honest list, in both directions. No remote packages yet, no compiled output, no inheritance.</p>
+
+        <h3><a href="architecture.html#the-pipeline">The pipeline</a></h3>
+        <p>Lexer, parser, module loader, type checker, compiler, bytecode, virtual machine &mdash; and a second, independent back end that has to agree with the first.</p>
+      </section>
+
+    </div>
+
+    <div class="DocSection">
+      <h2>The shape of the language</h2>
+      <p>
+        If you have read nothing else, read this. It is the whole of Jin in
+        about forty lines, and every line of it runs.
+      </p>
+
+      <pre class="Code" data-lang="jin"><code class="lang-jin"># comments start with a hash
+
+let x = 5                      # let declares
+let name = "Jin"
+x = x + 1                      # assign to an existing name
+
+fn add(a, b) { return a + b }  # implicit return also works
+fn sq(x) { x * x }
+
+if x &gt; 5 { print("big") } else if x == 5 { print("five") } else { print("small") }
+
+for n in [1, 2, 3] { print(n) }        # also: for ch in "abc", for i in range(10)
+while x &gt; 0 { x = x - 1; if x == 2 { break } }
+
+let f = fn(v) { v * 2 }                # anonymous functions
+print("{name} has {len(name)} letters")
+print("use {{braces}} for literal braces")
+
+let person = {"name": "Ada", "age": 36} # a map
+print(person["name"], has(person, "job"))
+for field in person { print(field) }    # maps loop over their keys</code></pre>
+
+      <p>
+        That is the shape of it. Braces instead of whitespace,
+        <code>{interpolation}</code> inside strings, optional type
+        annotations, and a standard library small enough to keep in your head.
+      </p>
+
+      <a class="NextLink" href="tutorial.html">
+        <span>Next</span>
+        <strong>Getting started &rarr;</strong>
+      </a>
+    </div>
+  </div>
+</div>
