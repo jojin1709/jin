@@ -10,7 +10,7 @@
   <img src="docs/assets/icon.png" alt="Jin logo" width="96">
 </p>
 
-**A small, fast programming language — as easy to write as Python, with fewer footguns and much better performance.**
+**A small programming language that is easy to write, checked before it runs, and as fast as CPython on call-heavy code.**
 
 [![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
@@ -19,8 +19,8 @@
 [![Stars](https://img.shields.io/github/stars/jojin1709/jin?style=social)](https://github.com/jojin1709/jin/stargazers)
 
 A complete language implementation written from scratch — lexer, parser, type
-checker, bytecode compiler, stack virtual machine, standard library and package
-manager — in pure Go, with no third-party dependencies.
+checker, bytecode compiler, stack virtual machine, standard library, projects
+and imports — in pure Go, with no third-party dependencies.
 
 [Quick Start](#quick-start) · [Language Tour](#language-tour) · [Architecture](#architecture) · [Project Status](#project-status)
 
@@ -856,7 +856,7 @@ prints, and on where it fails when a module, an alias or an import path is wrong
 - [x] Stage 5: bytecode compiler + VM
 - [x] Stage 6: standard library
 - [x] Closures: shared captures, loop-pass bindings, and mutual recursion between nested functions
-- [x] Stage 7: package manager + CLI — imports, projects, `jin new` / `jin build`, `args()`
+- [x] Stage 7: projects and imports + CLI — imports, projects, `jin new` / `jin build`, `args()`
 - [x] Stage 8: records — user-defined struct types, constructors, receiver methods (`fn (p: Point)`), dotted field access and mutation
 - [x] Stage 9: error handling — try / catch statements, catchable runtime errors and error(), re-raising
 - [x] Stage 10: real programs — terminal input (`input`, `read_all_stdin`), multi-line strings (`"""`), higher-order built-ins (`map`, `filter`, `reduce`, `any`, `all`, `sort_by`, `find_index`), and named record construction (`Point{x: 1, y: 2}`)

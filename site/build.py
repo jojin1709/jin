@@ -404,8 +404,8 @@ def main():
         "index", body,
         os.path.join(SITE, "index.html"),
         "The Jin Programming Language",
-        "Jin is a small, fast, statically checked programming language — "
-        "as easy to write as Python, with fewer footguns and much better performance.",
+        "Jin is a small programming language that is easy to write, checked "
+        "before it runs, and as fast as CPython on call-heavy code.",
         active="", assets="assets", home="", page_path="index.html",
     )
 

@@ -19,7 +19,7 @@
         <li><strong>Stage 5: bytecode compiler and VM.</strong> A stack machine with a pooled constant table, pre-allocated frame slots and reused call frames, running names resolved to slots.</li>
         <li><strong>Stage 6: standard library.</strong> The built-in functions: strings, numbers, lists, maps, files and the functional ones, shared by both back ends.</li>
         <li><strong>Closures.</strong> Shared captures, a fresh binding on every pass of a loop, and mutual recursion between nested functions.</li>
-        <li><strong>Stage 7: package manager and CLI.</strong> Imports, projects, <code>jin new</code>, <code>jin build</code> and <code>args()</code>.</li>
+        <li><strong>Stage 7: projects and imports, and the CLI.</strong> Imports, projects, <code>jin new</code>, <code>jin build</code> and <code>args()</code>.</li>
         <li><strong>Stage 8: records.</strong> User-defined struct types, constructors, receiver methods (<code>fn (p: Point)</code>), dotted field access and mutation.</li>
         <li><strong>Stage 9: error handling.</strong> <code>try</code> / <code>catch</code> statements, catchable runtime errors and <code>error()</code>, and re-raising across handler frames.</li>
         <li><strong>Stage 10: real programs.</strong> Terminal input (<code>input</code>, <code>read_all_stdin</code>), multi-line strings (<code>"""</code>), higher-order built-ins (<code>map</code>, <code>filter</code>, <code>reduce</code>, <code>any</code>, <code>all</code>, <code>sort_by</code>, <code>find_index</code>), and named record construction (<code>Point{x: 1, y: 2}</code>).</li>
