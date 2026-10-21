@@ -17,4 +17,5 @@
 /replica
 __pycache__/
 shots/
+shots-live/
 shot-*.png
