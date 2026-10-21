@@ -15,8 +15,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOCS = os.path.join(ROOT, "docs")
-JIN = os.path.join(os.path.dirname(ROOT), "jin.exe")
+DOCS = os.path.join(ROOT, "docs", "docs")
+JIN = os.path.join(ROOT, "jin.exe")
 
 BLOCK = re.compile(
     r'<pre class="Code" data-lang="jin"><code class="lang-jin">'

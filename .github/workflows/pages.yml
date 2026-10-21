@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "docs/**"
       - "site/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -30,13 +31,10 @@ jobs:
       - name: Set up Pages
         uses: actions/configure-pages@v5
 
-      - name: Keep only the published files
-        run: rm -rf site/tools site/README.md
-
       - name: Upload the site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: docs
 
       - name: Deploy to GitHub Pages
         id: deployment

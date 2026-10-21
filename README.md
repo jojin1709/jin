@@ -1,13 +1,13 @@
 <div align="center">
 
 <p align="center">
-  <img src="assets/banner.png" alt="Jin — a small, fast programming language" width="100%">
+  <img src="docs/assets/banner.png" alt="Jin — a small, fast programming language" width="100%">
 </p>
 
 # Jin
 
 <p align="center">
-  <img src="assets/icon.png" alt="Jin logo" width="96">
+  <img src="docs/assets/icon.png" alt="Jin logo" width="96">
 </p>
 
 **A small, fast programming language — as easy to write as Python, with fewer footguns and much better performance.**

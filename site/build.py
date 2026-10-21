@@ -17,11 +17,12 @@ import os
 import re
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)          # site/
+HERE = os.path.dirname(os.path.abspath(__file__))     # site/
+ROOT = os.path.dirname(HERE)            # the repository
+SITE = os.path.join(ROOT, "docs")       # the published site
 TPL = os.path.join(HERE, "templates")
 PAGES = os.path.join(HERE, "pages")
-OUT_DOCS = os.path.join(ROOT, "docs")
+OUT_DOCS = os.path.join(SITE, "docs")
 
 SITE_NAME = "Jin"
 SITE_TAGLINE = "A small, fast programming language"
@@ -345,7 +346,6 @@ def build(name, body, out_path, title, description, active="",
         handle.write(template)
     print("wrote %s" % os.path.relpath(out_path, ROOT))
 
-
 DOC_PAGES = [
     ("docs-index", "index", "Documentation", "index.html", ""),
     ("tutorial", "tutorial", "Getting Started", "tutorial.html", "tutorial.html"),
@@ -383,7 +383,7 @@ def main():
     body = read(os.path.join(PAGES, "index.body.html"))
     build(
         "index", body,
-        os.path.join(ROOT, "index.html"),
+        os.path.join(SITE, "index.html"),
         "The Jin Programming Language",
         "Jin is a small, fast, statically checked programming language — "
         "as easy to write as Python, with fewer footguns and much better performance.",

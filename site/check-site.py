@@ -8,7 +8,7 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs")
 
 LINK = re.compile(r'(?:href|src)="([^"]+)"')
 TITLE = re.compile(r"<title>(.*?)</title>", re.S)

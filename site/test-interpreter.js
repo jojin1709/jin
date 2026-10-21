@@ -13,7 +13,7 @@ sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
-for (const file of ["assets/js/jin.js", "assets/js/examples.js"]) {
+for (const file of ["docs/assets/js/jin.js", "docs/assets/js/examples.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, file), "utf8"), sandbox, {
     filename: file
   });
